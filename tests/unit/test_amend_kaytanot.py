@@ -67,8 +67,8 @@ EXPECTED_LINES = [
 
 def main():
     before = load_before()
-    after = build_after(before)
-    got = amend(before, after, law_footnote_key="kaytanot")
+    after, annotations = build_after(before)
+    got = amend(before, after, annotations, law_footnote_key="kaytanot")
     want = EXPECTED_LINES
 
     ok = True

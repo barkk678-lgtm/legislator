@@ -43,7 +43,7 @@ def load_before() -> LegislativeNode:
     return parse_wikitext(text, law_id="kaytanot-1990")
 
 
-def build_after(before: LegislativeNode) -> LegislativeNode:
+def build_after(before: LegislativeNode) -> tuple[LegislativeNode, list]:
     """מוצא את הצומת היחיד תחת סעיף 5 (הפסקה היחידה בו) ובונה 'אחרי'
     כטרנספורמציית ReplaceWords מפורשת עליו - לא ביד."""
     section5 = next(c for c in before.children if c.node_type == "section" and c.number == "5")
@@ -56,8 +56,8 @@ def build_after(before: LegislativeNode) -> LegislativeNode:
 
 def main():
     before = load_before()
-    after = build_after(before)
-    got = amend(before, after, law_footnote_key="kaytanot")
+    after, annotations = build_after(before)
+    got = amend(before, after, annotations, law_footnote_key="kaytanot")
     want = EXPECTED_LINES
 
     ok = True

@@ -1,15 +1,22 @@
-"""amend(before, after) -> list[Line]. מנוע ה-diff. ראו TASKS.md משימה 4.
+"""amend(before, after, annotations) -> list[Line]. מנוע ה-diff. ראו TASKS.md משימה 4.
 
 טהור: בלי רשת, בלי LLM (חוק ברזל 2). קלט זהה נותן פלט זהה תמיד.
 
-היקף מכוון (לא מנוע כללי): מזהה רק שני סוגי שינוי שיש להם מקרה זהב
+היקף מכוון (לא מנוע כללי): מזהה רק שלושה סוגי שינוי שיש להם מקרה זהב
 אמיתי כרגע - הוספת ילד חדש בתוך רשימת ילדיו של סעיף (הגדרה/פסקה
-חדשה), והוספת מילים בתוך טקסט קיים של ילד שלא השתנה זהותו. שינויים
-אחרים (מחיקת סעיף, החלפת סעיף שלם, תיקון עקיף וכו') לא נתמכים -
-יחכו למקרה זהב משלהם, לפי עקרון "התחל מהטסט" ב-CLAUDE.md.
+חדשה), הוספת מילים בתוך טקסט קיים של ילד שלא השתנה זהותו, והחלפת
+מילים מסומנת במפורש (annotations, ראו transform.py). שינויים אחרים
+(מחיקת סעיף, החלפת סעיף שלם, תיקון עקיף וכו') לא נתמכים - יחכו
+למקרה זהב משלהם, לפי עקרון "התחל מהטסט" ב-CLAUDE.md.
 
 כמה כללי ניסוח כאן הוסקו ממקרה זהב *יחיד* (חוק הקייטנות) ומסומנים
 "מוסק מדוגמה אחת" למטה - ייתכן שידרשו הכללה כשיגיע מקרה שני.
+
+annotations: הידע ה"בתהליך" (ביטוי ישן/חדש שהוחלף, מיקום הפניית הערת
+שוליים) מגיע כרשימת FootnoteAnnotation/ReplacementAnnotation (ראו
+transform.py) שמצביעות על צמתים לפי id - לא מוטבע כסמן טקסטואלי בתוך
+.text. לכן .text בכל צומת, בכל עץ, מכיל נוסח חוק בלבד תמיד; ראו
+tests/unit/test_no_marker_leak.py למחסום המבני שאוכף את זה.
 """
 
 import re
@@ -22,10 +29,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
 from node import LegislativeNode  # noqa: E402
 from numbering import sort_section_numbers  # noqa: E402
 from render_bill import Line  # noqa: E402
+from transform import Annotation, FootnoteAnnotation, ReplacementAnnotation  # noqa: E402
 
-_FOOTNOTE_MARKER_RE = re.compile(r"⟦footnote:(\w+)⟧")
 _QUOTED_TERM_RE = re.compile(r'^"([^"]+)"')
-_REPLACE_MARKER_RE = re.compile(r"⟦replaced-from:(?P<old>.*?)⟧(?P<new>.*?)⟦/replaced⟧")
 
 
 def _quoted_term(text: str) -> str:
@@ -48,8 +54,8 @@ def _diff_text(before: str, after: str) -> tuple[str, str]:
     זוהה בפועל ב-2026-09: מקרה בוחן "מאסר ששה חדשים" -> "מאסר שנה"
     (סעיף 5 בקייטנות) גרם לפונקציה הזו "לחשוב" שרק "נה" הוכנס אחרי
     "...מאסר ש", בגלל חפיפה מקרית של האות "ש" - שורה משפטית שגויה
-    שהייתה נכנסת לרנדרר בלי שום שגיאה. ראו packages/amend/transform.py
-    (ReplaceWords) ו-_diff_replace() לדפוס "החלפת מילים" הנתמך (משימה 4א).
+    שהייתה נכנסת לרנדרר בלי שום שגיאה. מוטציה כזו צריכה ReplacementAnnotation
+    (ראו transform.ReplaceWords) - בלעדיה, זו טעות קלט, לא מקרה נתמך.
     """
     max_prefix = min(len(before), len(after))
     prefix_len = 0
@@ -67,53 +73,34 @@ def _diff_text(before: str, after: str) -> tuple[str, str]:
         raise NotImplementedError(
             "החלפת מילים אינה נתמכת עדיין על ידי _diff_text - נדרש דפוס "
             f'"במקום X יבוא Y" (drafting-rules.md §1.1). זוהה טקסט קיים '
-            f"שהוסר ולא רק נוסף: {before_middle!r}. השתמשו ב-_diff_replace "
-            "או בדפוס ReplaceWords, לא בפונקציה הזו."
+            f"שהוסר ולא רק נוסף: {before_middle!r}. יש לבנות את ה'אחרי' דרך "
+            "transform.ReplaceWords (מייצרת ReplacementAnnotation), לא ידנית."
         )
     anchor = before[:prefix_len].rstrip()
     inserted = after[prefix_len : len(after) - suffix_len]
     return anchor, inserted
 
 
-def _diff_replace(before: str, after: str) -> tuple[str, str]:
-    """מחזיר (old_phrase, new_phrase) עבור החלפת מילים מפורשת (דפוס
-    "החלפת מילים", drafting-rules.md §1.1 שורה 1). בכוונה **לא** דיף:
-    בניגוד ל-_diff_text (הכנסה), שם גבול ההכנסה נקבע באופן חד-משמעי
-    על ידי המשותף (prefix/suffix) לפני/אחרי, בהחלפה אין דרך לגזור את
-    גבול הביטוי מהטקסט בלבד - "מאסר ששה חדשים" -> "מאסר שנה" ו"ששה
-    חדשים" -> "שנה" מייצרים בדיוק אותו before/after, וההבדל ביניהם הוא
-    החלטת ניסוח משפטית (מה ראוי לצטט לשם בהירות), לא עובדה טקסטואלית.
-    אלגוריתם שהיה "מחליט" לבד איפה הביטוי מתחיל ונגמר הוא ניחוש גם אם
-    הוא דטרמיניסטי - הפרה של חוק ברזל 2 (ראו TASKS.md משימה 4א).
-
-    לכן: הביטויים המפורשים מגיעים מ-transform.ReplaceWords, מוטבעים
-    ב-after כסמן פנימי (⟦replaced-from:old⟧new⟦/replaced⟧, ראו
-    transform.apply). הפונקציה הזו רק *מוודאת עקביות* בין הסמן לבין
-    before/after בפועל - לא גוזרת את הגבול בעצמה."""
-    match = _REPLACE_MARKER_RE.search(after)
-    if not match:
-        raise NotImplementedError(
-            "מוטציה שאינה הכנסה טהורה, וללא סמן replaced-from - לא "
-            "נתמך. אם מדובר בהחלפת מילים, יש לבנות את ה'אחרי' דרך "
-            "transform.ReplaceWords, לא באופן ידני."
-        )
-    old_phrase = match.group("old")
-    new_phrase = match.group("new")
-    occurrences = before.count(old_phrase)
+def _validate_replacement(before: str, after: str, replacement: ReplacementAnnotation) -> None:
+    """מוודאת עקביות בין ReplacementAnnotation (שהביטויים בה נבחרו
+    במפורש על ידי transform.ReplaceWords) לבין before/after בפועל -
+    **לא** גוזרת את הגבול בעצמה (ראו TASKS.md משימה 4א: דיף מינימלי
+    לא יכול לשמש להחלפה, כי גבול הביטוי הוא החלטת ניסוח משפטית, לא
+    עובדה טקסטואלית - זו בדיוק הסיבה ש-ReplacementAnnotation קיימת)."""
+    occurrences = before.count(replacement.old_phrase)
     if occurrences != 1:
         raise ValueError(
-            f"'{old_phrase}' אמור להופיע פעם אחת בדיוק בטקסט ה'לפני' "
-            f"אבל מופיע {occurrences} פעמים - חוסר עקביות בין הסמן "
-            "לטקסט בפועל."
+            f"'{replacement.old_phrase}' אמור להופיע פעם אחת בדיוק בטקסט "
+            f"ה'לפני' אבל מופיע {occurrences} פעמים - חוסר עקביות בין "
+            "האנוטציה לטקסט בפועל."
         )
-    reconstructed_before = after[: match.start()] + old_phrase + after[match.end() :]
-    if reconstructed_before != before:
+    expected_after = before.replace(replacement.old_phrase, replacement.new_phrase, 1)
+    if expected_after != after:
         raise ValueError(
-            "שחזור ה'לפני' מתוך סמן replaced-from לא תואם את הטקסט "
+            "שחזור ה'אחרי' מתוך ReplacementAnnotation לא תואם את הטקסט "
             "בפועל - חוסר עקביות בין transform.ReplaceWords לבין "
             "before/after שהתקבלו."
         )
-    return old_phrase, new_phrase
 
 
 @dataclass
@@ -166,27 +153,33 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
     return instructions
 
 
-def _wrap_new_content(text: str, terminator: str) -> tuple[str, str, list[str]]:
+def _wrap_new_content(
+    text: str, terminator: str, footnote: FootnoteAnnotation | None
+) -> tuple[str, str, list[str]]:
     """עוטף תוכן חדש במרכאות (חוק ברזל: מילים חדשות מובאות במרכאות),
-    ומפצל סביב סמן ⟦footnote:key⟧ אם יש. terminator (';' לפריט לא-אחרון
-    ברשימת ההוספות של הסעיף, '.' לפריט האחרון) מתווסף גם מחוץ למרכאות
-    הסוגרות - בלי קשר לסימן הפיסוק הפנימי של התוכן עצמו (שנקבע על ידי
-    מחבר הטקסט, לא על ידי המנוע - כך נמדד בקובץ הזהב: לתוכן עם כמה
-    משפטים מחוברים בפסיקים אין בהכרח סימן פיסוק לפני המרכאה הסוגרת).
+    ומפצל בנקודת footnote.offset אם יש הערת שוליים (footnote הוא
+    FootnoteAnnotation שמצביע לצומת הזה, ראו transform.py - לא סמן
+    מוטבע בטקסט). terminator (';' לפריט לא-אחרון ברשימת ההוספות של
+    הסעיף, '.' לפריט האחרון) מתווסף גם מחוץ למרכאות הסוגרות - בלי קשר
+    לסימן הפיסוק הפנימי של התוכן עצמו (שנקבע על ידי מחבר הטקסט, לא על
+    ידי המנוע - כך נמדד בקובץ הזהב: לתוכן עם כמה משפטים מחוברים
+    בפסיקים אין בהכרח סימן פיסוק לפני המרכאה הסוגרת).
 
     מוכלל ממקרה יחיד: אומת מול 3 הוספות בקייטנות (שתיים עם ';' פנימי
     לפני הסגירה, אחת בלי) - 3 דוגמאות מאותו קובץ, לא 3 מקורות עצמאיים.
     """
     wrapped = f'"{text}"{terminator}'
-    match = _FOOTNOTE_MARKER_RE.search(wrapped)
-    if not match:
+    if footnote is None:
         return wrapped, "", []
-    before_marker = wrapped[: match.start()]
-    after_marker = wrapped[match.end() :]
-    return before_marker, after_marker, [match.group(1)]
+    split_at = footnote.offset + 1  # +1: המרכאה הפותחת שנוספה ב-wrapped
+    before_marker = wrapped[:split_at]
+    after_marker = wrapped[split_at:]
+    return before_marker, after_marker, [footnote.key]
 
 
-def _render_insertion(insertion: _Insertion, terminator: str, ordinal: int) -> list[Line]:
+def _render_insertion(
+    insertion: _Insertion, terminator: str, ordinal: int, footnote: FootnoteAnnotation | None
+) -> list[Line]:
     anchor = insertion.anchor
     if insertion.anchor_is_last_child:
         # מוסק מדוגמה אחת: הוספה בסוף הרשימה מקבלת מספר-פסקה מפורש (המיקום
@@ -200,19 +193,24 @@ def _render_insertion(insertion: _Insertion, terminator: str, ordinal: int) -> l
         phrase = _strip_anchor_phrase(anchor.text)
         phrase_line = Line(text=f'אחרי "{phrase}" יבוא:', depth=0)
 
-    text, text_after, footnotes = _wrap_new_content(insertion.new_node.text, terminator)
+    text, text_after, footnotes = _wrap_new_content(insertion.new_node.text, terminator, footnote)
     content_line = Line(
         text=text, text_after=text_after, footnotes=footnotes, style="TableBlockOutdent", depth=0
     )
     return [phrase_line, content_line]
 
 
-def _render_mutation(section_number: str, mutation: _Mutation) -> Line:
-    if _REPLACE_MARKER_RE.search(mutation.after_text):
+def _render_mutation(
+    section_number: str, mutation: _Mutation, replacement: ReplacementAnnotation | None
+) -> Line:
+    if replacement is not None:
         # דפוס "החלפת מילים" (drafting-rules.md §1.1 שורה 1) - הביטויים
-        # מגיעים מסומנים מ-transform.ReplaceWords, לא מדיף (_diff_replace).
-        old, new = _diff_replace(mutation.before_text, mutation.after_text)
-        text = f'בסעיף {section_number} לחוק העיקרי, במקום "{old}" יבוא "{new}".'
+        # מגיעים מ-ReplacementAnnotation, לא נגזרים מדיף.
+        _validate_replacement(mutation.before_text, mutation.after_text, replacement)
+        text = (
+            f'בסעיף {section_number} לחוק העיקרי, במקום "{replacement.old_phrase}" '
+            f'יבוא "{replacement.new_phrase}".'
+        )
         return Line(text=text, depth=0)
     anchor, inserted = _diff_text(mutation.before_text, mutation.after_text)
     anchor, inserted = anchor.strip(), inserted.strip()
@@ -220,14 +218,28 @@ def _render_mutation(section_number: str, mutation: _Mutation) -> Line:
     return Line(text=text, depth=0)
 
 
-def amend(before: LegislativeNode, after: LegislativeNode, *, law_footnote_key: str) -> list[Line]:
+def amend(
+    before: LegislativeNode,
+    after: LegislativeNode,
+    annotations: list[Annotation] | None = None,
+    *,
+    law_footnote_key: str,
+) -> list[Line]:
     """משווה שני עצי LegislativeNode של אותו חוק ומחזיר רשימת Line
     (ראו packages/render/render_bill.py) - הוראות תיקון מוכנות לרינדור.
 
+    annotations: הרשימה שהוחזרה מ-transform.apply() לצד after - הידע
+    ה"בתהליך" (ביטוי ישן/חדש, מיקום הערת שוליים) שלא מוטבע ב-.text.
     law_footnote_key: מפתח הערת השוליים לחוק עצמו (מראה מקום), כפי
     שמוגדר בטבלת REFS החיצונית - זה חלק מהחיווט הכללי של הצעת החוק,
     לא נגזר מהעץ עצמו.
     """
+    annotations = annotations or []
+    replacements_by_id = {
+        a.node_id: a for a in annotations if isinstance(a, ReplacementAnnotation)
+    }
+    footnotes_by_id = {a.node_id: a for a in annotations if isinstance(a, FootnoteAnnotation)}
+
     before_sections = {c.number: c for c in before.children if c.node_type == "section"}
     after_sections = {c.number: c for c in after.children if c.node_type == "section"}
 
@@ -246,7 +258,8 @@ def amend(before: LegislativeNode, after: LegislativeNode, *, law_footnote_key: 
             # או "סעיף שאינו הראשון שנוגעים בו"? בקייטנות שני התנאים
             # חופפים (סעיף 2 הוא גם מוטציה יחידה וגם לא-ראשון) ואי אפשר
             # להפריד ביניהם ממקרה אחד.
-            mutation_line = _render_mutation(number, instructions[0])
+            replacement = replacements_by_id.get(instructions[0].node_id)
+            mutation_line = _render_mutation(number, instructions[0], replacement)
             mutation_line.side_heading = f"תיקון סעיף {number}"
             if touched_count > 1:
                 mutation_line.number = f"{touched_count}."
@@ -282,8 +295,10 @@ def amend(before: LegislativeNode, after: LegislativeNode, *, law_footnote_key: 
         for i, instruction in enumerate(instructions):
             if isinstance(instruction, _Insertion):
                 terminator = "." if i == len(instructions) - 1 else ";"
-                lines.extend(_render_insertion(instruction, terminator, ordinal=i + 1))
+                footnote = footnotes_by_id.get(instruction.new_node.id)
+                lines.extend(_render_insertion(instruction, terminator, ordinal=i + 1, footnote=footnote))
             else:
-                lines.append(_render_mutation(number, instruction))
+                replacement = replacements_by_id.get(instruction.node_id)
+                lines.append(_render_mutation(number, instruction, replacement))
 
     return lines

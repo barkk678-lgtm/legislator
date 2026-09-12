@@ -1,11 +1,12 @@
-"""בדיקות ל-ReplaceWords (transform.py) ול-_diff_replace (engine.py).
+"""בדיקות ל-ReplaceWords (transform.py) ול-_validate_replacement (engine.py).
 ראו TASKS.md משימה 4א.
 
 עיקרון מרכזי הנבדק כאן: הביטויים הישן/חדש הם בחירה מפורשת של
-ReplaceWords, לא נגזרים מדיף טקסטואלי - _diff_replace רק מוודאת
-עקביות בין הסמן הפנימי (⟦replaced-from:...⟧...⟦/replaced⟧) לבין
-before/after בפועל. אותו עיקרון-אי-ניחוש נבדק גם ב-InsertWordsAfter
-(anchor_substring חייב להופיע פעם אחת בדיוק).
+ReplaceWords, מועברים ל-engine.amend() כ-ReplacementAnnotation נפרדת -
+לא מוטבעים כסמן טקסטואלי בתוך .text (ראו tests/unit/test_no_marker_leak.py
+למחסום המבני שאוכף את זה). _validate_replacement רק מוודאת עקביות בין
+האנוטציה לבין before/after בפועל - לא גוזרת אותה. אותו עיקרון-אי-ניחוש
+נבדק גם ב-InsertWordsAfter (anchor_substring חייב להופיע פעם אחת בדיוק).
 """
 
 import sys
@@ -15,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpu
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 
 from node import LegislativeNode  # noqa: E402
-from transform import InsertWordsAfter, ReplaceWords, apply  # noqa: E402
-from engine import _diff_replace  # noqa: E402
+from transform import InsertWordsAfter, ReplaceWords, ReplacementAnnotation, apply  # noqa: E402
+from engine import _validate_replacement  # noqa: E402
 
 
 def _tree(text: str) -> LegislativeNode:
@@ -41,24 +42,27 @@ def main():
     checks = []
 
     before = _tree(BEFORE_TEXT)
-    after = apply(
+    after, annotations = apply(
         before,
         [ReplaceWords(target_id="law/s5/p0", old_phrase="מאסר ששה חדשים", new_phrase="מאסר שנה")],
     )
     leaf_after = after.children[0].children[0]
-    checks.append(
-        (
-            "ReplaceWords מטביע סמן replaced-from עם שני הביטויים",
-            leaf_after.text
-            == "המנהל קייטנה בניגוד להוראות סעיפים 2 או 4, דינו – "
-            "⟦replaced-from:מאסר ששה חדשים⟧מאסר שנה⟦/replaced⟧.",
-        )
-    )
+    checks.append(("after.text נקי לגמרי, בלי שום סמן", leaf_after.text == AFTER_TEXT))
     checks.append(("before לא השתנה (deepcopy)", before.children[0].children[0].text == BEFORE_TEXT))
 
-    old, new = _diff_replace(BEFORE_TEXT, leaf_after.text)
-    checks.append(("_diff_replace שולפת old_phrase נכון", old == "מאסר ששה חדשים"))
-    checks.append(("_diff_replace שולפת new_phrase נכון", new == "מאסר שנה"))
+    checks.append(("apply מחזירה בדיוק אנוטציה אחת", len(annotations) == 1))
+    replacement = annotations[0]
+    checks.append(("האנוטציה מסוג ReplacementAnnotation", isinstance(replacement, ReplacementAnnotation)))
+    checks.append(("node_id נכון", replacement.node_id == "law/s5/p0"))
+    checks.append(("old_phrase נכון", replacement.old_phrase == "מאסר ששה חדשים"))
+    checks.append(("new_phrase נכון", replacement.new_phrase == "מאסר שנה"))
+
+    # _validate_replacement לא אמורה לזרוק על קלט עקבי
+    try:
+        _validate_replacement(BEFORE_TEXT, AFTER_TEXT, replacement)
+        checks.append(("_validate_replacement: קלט עקבי -> לא זורקת", True))
+    except ValueError:
+        checks.append(("_validate_replacement: קלט עקבי -> לא זורקת", False))
 
     # אפס הופעות
     try:
@@ -78,12 +82,12 @@ def main():
     except ValueError:
         checks.append(("ReplaceWords: הופעה כפולה -> שגיאה (לא ניחוש)", True))
 
-    # _diff_replace: חוסר עקביות בין הסמן לבין before בפועל
+    # _validate_replacement: חוסר עקביות בין האנוטציה לבין before בפועל
     try:
-        _diff_replace("טקסט לפני שלא תואם", leaf_after.text)
-        checks.append(("_diff_replace: חוסר עקביות -> שגיאה", False))
+        _validate_replacement("טקסט לפני שלא תואם", AFTER_TEXT, replacement)
+        checks.append(("_validate_replacement: חוסר עקביות -> שגיאה", False))
     except ValueError:
-        checks.append(("_diff_replace: חוסר עקביות -> שגיאה", True))
+        checks.append(("_validate_replacement: חוסר עקביות -> שגיאה", True))
 
     # InsertWordsAfter: אותו עיקרון-אי-ניחוש
     ins_before = _tree("לא ינהל אדם קייטנה אלא אם כן יש בידו רשיון.")

@@ -47,12 +47,13 @@ def load_before() -> LegislativeNode:
     return parse_wikitext(text, law_id="kaytanot-1990")
 
 
-def build_after(before: LegislativeNode) -> LegislativeNode:
+def build_after(before: LegislativeNode) -> tuple[LegislativeNode, list]:
     """בונה את עץ 'אחרי' כטרנספורמציה מפורשת ומתועדת על ה'לפני' האמיתי
     (ולא ככתיבה עצמאית של עץ שלם - זה היה מחזיר את בעיית המעגליות).
     שלושה שינויים: שתי הגדרות חדשות בסעיף 1 (בשתי נקודות שונות ברשימה),
-    ותוספת מילים בתוך הפסקה הקיימת של סעיף 2. ⟦footnote:budget⟧ מסמן
-    איפה הערת השוליים החיצונית נכנסת בתוך ההגדרה החדשה השנייה."""
+    ותוספת מילים בתוך הפסקה הקיימת של סעיף 2. footnotes=[(...)] בהגדרה
+    החדשה השנייה מסמן היכן הערת השוליים החיצונית נכנסת - כאנוטציה
+    נפרדת, לא כסמן מוטבע בתוך .text (ראו transform.py)."""
     transformations = [
         InsertAfter(
             section_number="1",
@@ -79,13 +80,16 @@ def build_after(before: LegislativeNode) -> LegislativeNode:
                 text=(
                     '"מבחנים לצורך תמיכה" – מבחנים לצורך תמיכה של משרד חינוך '
                     "בפעילות ארגוני ילדים ונוער במוסדות ציבור לפי חוק יסודות "
-                    'התקציב, התשמ"ה–1985⟦footnote:budget⟧'
+                    'התקציב, התשמ"ה–1985'
                     '; מבחנים לצורך תמיכה של משרד החינוך בתנועות נוער לפי חוק '
                     'יסודות התקציב, התשמ"ה-1985; מבחנים נוספים לחלוקת כספים '
                     'לצורך תמיכה של משרד החינוך, התרבות והספורט במוסדות ציבור '
                     'לפי חוק יסודות התקציב, התשמ"ה-1985'
                 ),
             ),
+            # העוגן משתמש ב-en dash (–), ולכן ייחודי מול שני האזכורים
+            # החוזרים של אותה שנה עם מקף רגיל (-) בהמשך אותו טקסט.
+            footnotes=[('התשמ"ה–1985', "budget")],
         ),
         InsertAfter(
             section_number="1",
@@ -108,7 +112,7 @@ def build_after(before: LegislativeNode) -> LegislativeNode:
 
 
 _BEFORE = load_before()
-_AFTER = build_after(_BEFORE)
+_AFTER, _ANNOTATIONS = build_after(_BEFORE)
 
 BILL = Bill(
     knesset="הכנסת העשרים וחמש",
@@ -116,7 +120,7 @@ BILL = Bill(
     initiator="יעקב אשר",
     bill_number="פ/?????????",
     submitted_date="????????????????????????",
-    lines=amend(_BEFORE, _AFTER, law_footnote_key="kaytanot"),
+    lines=amend(_BEFORE, _AFTER, _ANNOTATIONS, law_footnote_key="kaytanot"),
     explanatory=[
         'מטרת חוק הקייטנות (רישוי ופיקוח), התש"ן–1990 (להלן – החוק), היא לפקח '
         "על פעילות יום יומית של נופש וחברה לקבוצת ילדים בחופשת הקיץ.",
