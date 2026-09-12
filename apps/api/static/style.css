@@ -95,6 +95,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .node-header:hover .node-add-btn { visibility: visible; }
 
+.editor-note-flag {
+  font-size: 0.72rem;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--muted);
+}
+
 .node-text {
   white-space: pre-wrap;
   line-height: 1.5;

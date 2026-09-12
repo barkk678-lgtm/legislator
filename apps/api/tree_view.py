@@ -29,6 +29,7 @@ def node_view(node: LegislativeNode) -> dict:
         "type_label": TYPE_HE.get(node.node_type, node.node_type),
         "number": node.number,
         "margin_title": node.margin_title,
+        "full_title": node.full_title,  # משמעותי רק בשורש (node_type=="law")
         "text": node.text,
         "is_normative": node.is_normative,
         "status": node.status,

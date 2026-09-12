@@ -91,12 +91,26 @@ function renderNode(node, ctx, sectionNumber) {
   const header = document.createElement("div");
   header.className = "node-header";
   const label = document.createElement("span");
-  let labelText = node.type_label;
-  if (node.number) labelText += " " + node.number;
-  if (node.margin_title) labelText += " — " + node.margin_title;
-  if (!node.is_normative) labelText += "  [לא נוסח חוק]";
-  label.textContent = labelText;
+
+  if (node.node_type === "law") {
+    // השורש הוא מטא-דאטה של החוק (שם, לא נוסח) - לא הערת עורך, ולכן
+    // לא מקבל את תווית "הערת עורך" למטה. מציג את שם החוק המלא, לא
+    // תווית טכנית גנרית.
+    label.textContent = node.full_title || node.type_label;
+  } else {
+    let labelText = node.type_label;
+    if (node.number) labelText += " " + node.number;
+    if (node.margin_title) labelText += " — " + node.margin_title;
+    label.textContent = labelText;
+  }
   header.appendChild(label);
+
+  if (node.node_type !== "law" && !node.is_normative) {
+    const flag = document.createElement("span");
+    flag.className = "editor-note-flag";
+    flag.textContent = "הערת עורך — אינה חלק מהחוק";
+    header.appendChild(flag);
+  }
 
   // "+ הוסף אחרי" מותר רק על עוגן שהוא ילד בתוך סעיף (InsertAfter דורש
   // anchor_id בתוך רשימת הילדים של הסעיף) - לא על הסעיף/החוק עצמם,
