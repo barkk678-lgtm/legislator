@@ -32,21 +32,29 @@ class InsertSectionIn(BaseModel):
     anchor_node_id: str
     margin_title: str  # חובה - המשתמש מקליד, המערכת לא ממציאה
     text: str
+    client_id: str  # מזהה יציב שהלקוח יצר - ראו InsertionIn למטה
 
 
 class InsertSubsectionIn(BaseModel):
     kind: Literal["subsection"]
     anchor_node_id: str
     text: str
+    client_id: str
 
 
 class InsertParagraphIn(BaseModel):
     kind: Literal["paragraph"]
     anchor_node_id: str
     text: str
+    client_id: str
 
 
 InsertionIn = InsertSectionIn | InsertSubsectionIn | InsertParagraphIn
+"""client_id: מזהה יציב שהלקוח יוצר בעצמו (10ב) כשההוספה נוצרת -
+נשמר כ-id של הצומת החדש בעץ שחוזר מ-/render (ראו
+insert_preview.build_insertion_transform). בלי זה, מזהה הצומת החדש
+היה משתנה בכל קריאה חוזרת (מונה גלובלי מצטבר, ראו _fresh_id) - הלקוח
+לא היה יכול לשייך DOM<->צומת אחרי רינדור-מחדש מלא של העץ."""
 
 
 class BillMetaIn(BaseModel):

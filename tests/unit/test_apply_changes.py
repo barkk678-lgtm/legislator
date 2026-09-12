@@ -28,6 +28,7 @@ class _Insertion:
     anchor_node_id: str
     text: str
     margin_title: str | None = None
+    client_id: str = "test-insertion-1"
 
 
 def _tree() -> LegislativeNode:

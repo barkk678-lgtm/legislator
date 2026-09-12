@@ -114,6 +114,11 @@ def api_render(law_id: str, req: RenderRequest) -> dict:
         "edit_statuses": [dataclasses.asdict(s) for s in result.edit_statuses],
         "insertion_errors": [dataclasses.asdict(e) for e in result.insertion_errors],
         "touched_sections": sorted(touched_section_numbers(before, result.after)),
+        # עץ ה"אחרי" הנוכחי (אחרי כל העריכות/ההוספות עד כה) - הלקוח
+        # מרנדר ממנו מחדש את צד העריכה בכל פעם, כדי שסעיפים/סעיפים
+        # קטנים/פסקאות שהוספו כרגע יופיעו כצמתים אמיתיים לעריכה, לא
+        # רק כתקציר סטטי (ראו TASKS.md משימה 10ב, משוב המשתמש).
+        "tree": node_view(result.after),
     }
 
 

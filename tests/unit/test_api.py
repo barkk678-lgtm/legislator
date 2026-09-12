@@ -157,13 +157,26 @@ def main():
         ],
         "insertions": [
             {"kind": "section", "anchor_node_id": "kaytanot-1990/s5",
-             "margin_title": "ביצוע", "text": "השר ממונה על ביצועו של חוק זה."},
+             "margin_title": "ביצוע", "text": "השר ממונה על ביצועו של חוק זה.",
+             "client_id": "test-ins-1"},
         ],
         "bill": _GOOD_BILL,
     }
     combined_render = client.post("/api/laws/kaytanot-1990/render", json=combined_req).json()
     checks.append(("שילוב עריכה+הוספה: אין שגיאות הוספה", combined_render["insertion_errors"] == []))
     checks.append(("שילוב עריכה+הוספה: 2 סעיפים נגעו", len(combined_render["touched_sections"]) == 2))
+
+    def _walk2(node):
+        yield node
+        for c in node["children"]:
+            yield from _walk2(c)
+
+    combined_nodes = list(_walk2(combined_render["tree"]))
+    inserted_node = next((n for n in combined_nodes if n["id"] == "test-ins-1"), None)
+    checks.append(
+        ("עץ ה-render כולל את הצומת שהוכנס, עם ה-client_id היציב שנשלח",
+         inserted_node is not None and inserted_node["margin_title"] == "ביצוע"),
+    )
 
     docx_resp = client.post("/api/laws/kaytanot-1990/docx", json=combined_req)
     checks.append(("docx: סטטוס 200", docx_resp.status_code == 200))

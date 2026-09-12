@@ -146,7 +146,8 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
     for ins in insertions:
         margin_title = getattr(ins, "margin_title", None)
         t, err = build_insertion_transform(
-            current, ins.anchor_node_id, ins.kind, text=ins.text, margin_title=margin_title
+            current, ins.anchor_node_id, ins.kind, text=ins.text, margin_title=margin_title,
+            new_id=ins.client_id,
         )
         if t is None:
             insertion_errors.append(

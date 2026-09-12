@@ -203,11 +203,19 @@ def preview_insertion_label(root: LegislativeNode, node_id: str, level: str) -> 
 
 
 def build_insertion_transform(
-    root: LegislativeNode, node_id: str, level: str, *, text: str, margin_title: str | None = None
+    root: LegislativeNode, node_id: str, level: str, *, text: str,
+    margin_title: str | None = None, new_id: str | None = None,
 ):
     """בונה את אובייקט ה-transform.py המתאים, או מחזירה (None, reason) אם
     לא נתמך. margin_title חובה (ולא ריק) רק עבור level=='section' - המשתמש
-    מקליד אותה, המערכת לא ממציאה (ראו transform.InsertSectionAfter)."""
+    מקליד אותה, המערכת לא ממציאה (ראו transform.InsertSectionAfter).
+
+    new_id: מזהה הצומת החדש. כשהלקוח מספק אחד (מזהה יציב שהוא עצמו
+    יצר, ראו apps/api/apply_changes.py) - הוא נשמר כמו שהוא, כדי
+    שהעץ המוחזר מ-/render יישא את אותו מזהה בכל קריאה חוזרת על אותה
+    הוספה (הכרחי כדי שהלקוח יוכל למפות מחדש DOM<->צומת אחרי רינדור-מחדש
+    מלא של העץ). בלי new_id (ברירת מחדל, לתאימות טסטים קיימים) -
+    _fresh_id() הישן, שאינו יציב בין קריאות (מונה גלובלי מצטבר)."""
     r = _resolve(root, node_id, level)
     if not r.supported:
         return None, r.reason
@@ -216,14 +224,14 @@ def build_insertion_transform(
         if not margin_title or not margin_title.strip():
             return None, "סעיף ראשי חדש חייב כותרת שוליים - יש להקליד אותה"
         new_section = LegislativeNode(
-            id=_fresh_id("section"), node_type="section", number="",
+            id=new_id or _fresh_id("section"), node_type="section", number="",
             margin_title=margin_title, text=text,
         )
         return InsertSectionAfter(after_section_number=r.anchor_number, new_section=new_section), None
 
     if r.kind == "add_first_subsection":
         new_child = LegislativeNode(
-            id=_fresh_id("subsection"), node_type="paragraph", number="",
+            id=new_id or _fresh_id("subsection"), node_type="paragraph", number="",
             margin_title=None, text=text,
         )
         return AddFirstSubsection(section_number=r.section_number, new_child=new_child), None
@@ -233,7 +241,7 @@ def build_insertion_transform(
         # next_appended_label) - InsertAfter הקיים (מקרה זהב 4/6) לא מחשב
         # מספור בעצמו, אז חייבים להצמיד את התווית כאן ולא להשאיר ריק.
         new_child = LegislativeNode(
-            id=_fresh_id(r.node_type), node_type=r.node_type, number=r.label,
+            id=new_id or _fresh_id(r.node_type), node_type=r.node_type, number=r.label,
             margin_title=None, text=text,
         )
         return (
