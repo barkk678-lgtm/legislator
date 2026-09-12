@@ -267,11 +267,17 @@ def apply(
                     f"וללא סעיפים קטנים קיימים - סעיף {t.section_number} "
                     "לא עומד בכך."
                 )
+            # מספור סעיפים קטנים כולל תמיד סוגריים כחלק מ-number עצמו
+            # (כך הם מגיעים מ-wikitext_parser: הארגומנט הגולמי הוא "(א)",
+            # "(ב)" עם הסוגריים - ראו _SUBSECTION_LABEL ב-wikitext_parser.py).
+            # לפני התיקון הזה number נקבע כאן בלי סוגריים ("א"/"ב") -
+            # חוסר עקביות אמיתי עם נתוני wikitext אמיתיים, שנתפס רק
+            # כשמשתמש אמיתי בדק את זה מול עץ אמיתי (לא רק fixture סינתטי).
             existing = normative_children[0]
-            existing.number = "א"
+            existing.number = "(א)"
             existing.node_type = "subsection"
             new_child = copy.deepcopy(t.new_child)
-            new_child.number = "ב"
+            new_child.number = "(ב)"
             new_child.node_type = "subsection"
             idx = section.children.index(existing)
             section.children.insert(idx + 1, new_child)

@@ -181,9 +181,9 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
         # בשקט) שהתוויות אכן א/ב, כדי לא "לתקן" קלט לא צפוי בניחוש.
         relabeled_number = after_children[0].number
         new_child = after_children[1]
-        if relabeled_number != "א":
+        if relabeled_number != "(א)":
             raise ValueError(
-                f"סעיף בלי סעיפים קטנים קיימים אמור לקבל תווית 'א' לתוכנו "
+                f"סעיף בלי סעיפים קטנים קיימים אמור לקבל תווית '(א)' לתוכנו "
                 f"הקיים (ha-hoveret-ha-sgula.pdf §7.10.6(ד)) - התקבל "
                 f"{relabeled_number!r}."
             )
@@ -192,9 +192,9 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
                 "הילד השני אחרי רילייבל אמור להיות תוכן חדש, לא צומת קיים "
                 "- דפוס לא נתמך."
             )
-        if new_child.number != "ב":
+        if new_child.number != "(ב)":
             raise ValueError(
-                f"הסעיף הקטן החדש שנוסף אחרי רילייבל אמור להיות תוית 'ב' "
+                f"הסעיף הקטן החדש שנוסף אחרי רילייבל אמור להיות תוית '(ב)' "
                 f"(ha-hoveret-ha-sgula.pdf §7.10.6(ד)) - התקבל "
                 f"{new_child.number!r}."
             )
@@ -355,18 +355,42 @@ def _render_insertion(
         # כשהיה לו מספר - ניסוח שגוי שהיה יוצא מהמערכת בפועל (עדיין לא
         # נתפס במקרה הזהב של קייטנות, ששם כל העוגנים שם היו לא-ממוספרים
         # - הגדרה או פתיח).
-        phrase_line = Line(text=f'אחרי סעיף קטן ({anchor.number}) יבוא:', depth=0)
+        #
+        # anchor.number כבר כולל סוגריים משלו ("(ג)") - כך בדיוק הוא
+        # מגיע מ-wikitext_parser (הארגומנט הגולמי בתבנית כולל את
+        # הסוגריים, ראו _SUBSECTION_LABEL/_PARAGRAPH_LABEL). קודם
+        # התיקון הזה הוספנו כאן עוד זוג סוגריים ("((ג))") - באג אמיתי
+        # שנתפס רק כשמשתמש בדק את זה מול חוק אמיתי (לא fixture סינתטי
+        # עם תוויות בלי סוגריים).
+        phrase_line = Line(text=f'אחרי סעיף קטן {anchor.number} יבוא:', depth=0)
     elif anchor.node_type == "paragraph" and anchor.number:
         # אותו תיקון, לפסקה - §7.10.6(ב), עמ' 29: "אחרי פסקה (2) יבוא:
         # '(2א)...'".
-        phrase_line = Line(text=f'אחרי פסקה ({anchor.number}) יבוא:', depth=0)
+        phrase_line = Line(text=f'אחרי פסקה {anchor.number} יבוא:', depth=0)
     else:
         # עוגן בלי מספר (הגדרה טופלה למעלה; כאן: פתיח/פסקה בלי תווית) -
         # ציטוט הטקסט, כפי שהיה תמיד (drafting-rules.md §1.2).
         phrase = _strip_anchor_phrase(anchor.text)
         phrase_line = Line(text=f'אחרי "{phrase}" יבוא:', depth=0)
 
-    text, text_after, footnotes = _wrap_new_content(insertion.new_node.text, terminator, footnote)
+    new_node = insertion.new_node
+    label_prefix = ""
+    if new_node.node_type in ("subsection", "paragraph") and new_node.number:
+        # תוקן (באג, לא פיצ'ר): התווית של הסעיף הקטן/פסקה החדשים היא
+        # חלק מנוסח החוק עצמו שמצוטט - צריכה להופיע בתוך המרכאות, בדיוק
+        # כפי שדוגמאות המדריך עצמן כתובות ("(ג1) תוכן הסעיף הקטן החדש").
+        # עד לתיקון זה, התוכן המצוטט לא כלל את התווית בכלל.
+        label_prefix = f"{new_node.number} "
+    content_source = label_prefix + new_node.text
+    adjusted_footnote = footnote
+    if footnote is not None and label_prefix:
+        # ה-offset של footnote חושב יחסית ל-new_node.text הנקי (ראו
+        # transform.apply) - עם prefix התווית צריך להזיז אותו באותו
+        # אורך, אחרת ההפניה תנחת במקום הלא נכון בטקסט המצוטט.
+        adjusted_footnote = FootnoteAnnotation(
+            node_id=footnote.node_id, offset=footnote.offset + len(label_prefix), key=footnote.key
+        )
+    text, text_after, footnotes = _wrap_new_content(content_source, terminator, adjusted_footnote)
     content_line = Line(
         text=text, text_after=text_after, footnotes=footnotes, style="TableBlockOutdent", depth=0
     )
@@ -386,7 +410,10 @@ def _render_relabel_and_insert(
     התשל"ז-1977 §6. full_title/law_footnote_key: אותה משמעות כמו
     ב-_render_mutation - מועברים רק כשזו הפעם הראשונה שהחוק מוזכר
     בהצעה (touched_count==1)."""
-    phrase = f'האמור בו יסומן "({item.relabeled_number})" ואחריו יבוא:'
+    # item.relabeled_number כבר כולל סוגריים משלו ("(א)") - תוקן (באג,
+    # לא פיצ'ר) יחד עם transform.AddFirstSubsection, שקודם קבע number
+    # בלי סוגריים ("א"), לא תואם את הפורמט האמיתי מ-wikitext_parser.
+    phrase = f'האמור בו יסומן "{item.relabeled_number}" ואחריו יבוא:'
     if full_title is not None:
         text = f"ב{full_title} (להלן – החוק העיקרי), בסעיף {section_number}, {phrase}"
         phrase_line = Line(text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0)
@@ -400,7 +427,7 @@ def _render_relabel_and_insert(
     # שדה marker נפרד, כי אין עדיין מקרה זהב אמיתי שמראה איך marker
     # מתנהג עבור תווית סעיף-קטן (marker הקיים משמש למספר-פסקת-ההוראה
     # הסידורי בתוך הצעת החוק, ראו _render_insertion, לא לתווית המשפטית).
-    labeled_content = f"({item.new_node.number}) {item.new_node.text}"
+    labeled_content = f"{item.new_node.number} {item.new_node.text}"
     content_text, content_after, footnotes = _wrap_new_content(labeled_content, ".", footnote)
     content_line = Line(
         text=content_text,

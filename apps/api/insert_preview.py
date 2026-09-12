@@ -59,6 +59,24 @@ class _Resolution:
     node_type: str | None = None  # "subsection" | "paragraph" - סוג הילד החדש ב-insert_after
 
 
+def _strip_parens(label: str) -> str:
+    """מסירה סוגריים עוטפים ("(א)" -> "א") - numbering.next_inserted_label/
+    next_appended_label עובדות על תוויות עירומות (בדיוק כמו מספרי סעיף
+    ראשי, "5"/"6"), בעוד סעיפים קטנים/פסקאות תמיד נושאים סוגריים משלהם
+    כחלק מ-number (ראו wikitext_parser._SUBSECTION_LABEL/_PARAGRAPH_LABEL -
+    הארגומנט הגולמי בתבנית כבר כולל את הסוגריים). בלי ההסרה/העטיפה
+    כאן, next_inserted_label מקבל "(א)" ומפרש את ")" כ"סיומת לא ספרתית"
+    בטעות - באג אמיתי שנתפס רק כשנבדק מול חוק אמיתי, לא fixture סינתטי
+    עם תוויות בלי סוגריים."""
+    if label.startswith("(") and label.endswith(")"):
+        return label[1:-1]
+    return label
+
+
+def _wrap_parens(label: str) -> str:
+    return f"({label})"
+
+
 def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
     if node.id == node_id:
         return node
@@ -123,19 +141,21 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
         subsections = [c for c in anchor_section.children if c.is_normative and c.node_type == "subsection"]
         if not subsections:
             # עדיין אין סעיפים קטנים בסעיף הזה - AddFirstSubsection
-            # תמיד קובע "א" לתוכן הקיים ו"ב" לחדש (§7.10.6(ד)).
+            # תמיד קובע "(א)" לתוכן הקיים ו-"(ב)" לחדש (§7.10.6(ד)).
             return _Resolution(
-                supported=True, label="ב", kind="add_first_subsection",
+                supported=True, label="(ב)", kind="add_first_subsection",
                 section_number=anchor_section.number,
             )
         current_node = _find_by_id(root, node_id)
         anchor_subsection = current_node if current_node.node_type == "subsection" else subsections[-1]
-        existing_numbers = [c.number for c in subsections]
+        existing_numbers = [_strip_parens(c.number) for c in subsections]
         idx = next((i for i, c in enumerate(subsections) if c.id == anchor_subsection.id), len(subsections) - 1)
         if idx == len(subsections) - 1:
-            label = next_appended_label(existing_numbers)
+            label = _wrap_parens(next_appended_label(existing_numbers))
         else:
-            label = next_inserted_label(anchor_subsection.number, set(existing_numbers))
+            label = _wrap_parens(
+                next_inserted_label(_strip_parens(anchor_subsection.number), set(existing_numbers))
+            )
         return _Resolution(
             supported=True, label=label, kind="insert_after",
             section_number=anchor_section.number, anchor_id=anchor_subsection.id,
@@ -159,14 +179,16 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
                 supported=False,
                 reason="אין עדיין פסקאות ממוספרות בסעיף הזה להוסיף אחריהן",
             )
-        existing_numbers = [c.number for c in paragraphs]
+        existing_numbers = [_strip_parens(c.number) for c in paragraphs]
         idx = next((i for i, c in enumerate(paragraphs) if c.id == current_node.id), None)
         if idx is None:
             return _Resolution(supported=False, reason="הפסקה הנוכחית אינה ממוספרת")
         if idx == len(paragraphs) - 1:
-            label = next_appended_label(existing_numbers)
+            label = _wrap_parens(next_appended_label(existing_numbers))
         else:
-            label = next_inserted_label(current_node.number, set(existing_numbers))
+            label = _wrap_parens(
+                next_inserted_label(_strip_parens(current_node.number), set(existing_numbers))
+            )
         return _Resolution(
             supported=True, label=label, kind="insert_after",
             section_number=parent.number, anchor_id=current_node.id, node_type="paragraph",
