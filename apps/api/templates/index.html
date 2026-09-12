@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>מנסח החקיקה — ממשק מינימלי</title>
+  <title>מנסח החקיקה — עריכה חופשית</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <h1>מנסח החקיקה</h1>
   <div class="subtitle">
-    ממשק מינימלי (משימה 10) — מקומי בלבד, שני חוקי fixture, דפוסי הוספה והחלפת מילים בלבד.
+    עריכה חופשית של נוסח החוק (משימה 10ב) — מקומי בלבד, שני חוקי fixture.
   </div>
 
   <div class="panel">
@@ -23,73 +23,86 @@
     <div class="as-of-note" id="as-of-note"></div>
     <div class="error-banner" id="amend-blocked-note" hidden></div>
 
-    <div class="panel" id="bill-form">
-      <h2>פרטי הצעת החוק</h2>
-      <div class="row">
-        <div class="field">
-          <label for="bill-title-input">שם ההצעה</label>
-          <input id="bill-title-input" type="text" />
-        </div>
-        <div class="field">
-          <label for="bill-initiator-input">שם היוזם</label>
-          <input id="bill-initiator-input" type="text" />
-        </div>
-        <div class="field">
-          <label for="bill-date-input">תאריך הנחה</label>
-          <input id="bill-date-input" type="text" placeholder="למשל 15.11.2023" />
-        </div>
-        <div class="field required" id="source-ref-field">
-          <label>מראה מקום (ס"ח)</label>
-          <input type="text" placeholder='למשל ס"ח התש"ן, עמ׳ 155.' />
-          <div class="hint">שדה חובה — בלי הערת שוליים למקור, ההצעה נכשלת בבדיקה 2 בוולידטור.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel" id="add-change-controls">
-      <h2>הוספת שינוי</h2>
-      <div class="hint">
-        סמן/י טקסט בנוסח החוק (בצד ימין למטה) בעכבר כדי להחליף אותו או להוסיף מילים אחריו,
-        או לחצו על "+ הוסף אחרי" ליד כל סעיף/פסקה כדי להוסיף תוכן חדש (הגדרה/פסקה).
-        דפוס אחר שאינו נתמך יסורב בהודעה ברורה, לא ינחש.
-      </div>
-      <div class="selection-box" id="selection-box" hidden></div>
-      <h2 style="margin-top:10px">שינויים ממתינים</h2>
-      <ul class="pending-list" id="pending-list"></ul>
-      <div class="hint" id="pending-empty-hint">עדיין לא נוסף אף שינוי.</div>
-    </div>
-
     <div class="split">
-      <div class="panel">
-        <h2>נוסח החוק (לפני)</h2>
-        <div id="before-tree"></div>
+      <div class="panel editor-panel">
+        <h2>נוסח החוק — לחצו לעריכה</h2>
+        <div class="hint">
+          לחצו על טקסט ועיטרו אותו ישירות. השינוי מתועד כשיוצאים מהשדה (blur).
+          לחצו על "+" ליד סעיף/סעיף קטן/פסקה כדי להוסיף תוכן חדש.
+        </div>
+        <div id="law-tree"></div>
       </div>
-      <div class="panel">
-        <h2>נוסח משולב (אחרי התיקון)</h2>
-        <div id="after-tree"></div>
+
+      <div class="panel docx-panel">
+        <h2>תצוגת הצעת החוק</h2>
+        <div class="row">
+          <div class="field">
+            <label for="bill-title-input">שם ההצעה</label>
+            <input id="bill-title-input" type="text" />
+          </div>
+          <div class="field">
+            <label for="bill-initiator-input">שם היוזם</label>
+            <input id="bill-initiator-input" type="text" />
+          </div>
+          <div class="field">
+            <label for="bill-date-input">תאריך הנחה</label>
+            <input id="bill-date-input" type="text" placeholder="למשל 15.11.2023" />
+          </div>
+          <div class="field required" id="source-ref-field">
+            <label>מראה מקום (ס"ח)</label>
+            <input type="text" placeholder='למשל ס"ח התש"ן, עמ׳ 155.' />
+            <div class="hint">שדה חובה — בלי הערת שוליים למקור, ההצעה נכשלת בבדיקה 2 בוולידטור.</div>
+          </div>
+        </div>
+
+        <div class="docx-approx" id="docx-approx">
+          <div class="docx-title" id="docx-title-line"></div>
+          <div class="docx-initiator" id="docx-initiator-line"></div>
+          <div class="docx-table" id="docx-lines"></div>
+        </div>
+
+        <div class="field">
+          <label>דברי הסבר</label>
+          <textarea id="explanatory-input" rows="4"
+            placeholder="פסקה אחת בכל שורה - כל שורה תוצג כפסקה נפרדת בדברי ההסבר."></textarea>
+        </div>
+
+        <button id="download-btn" class="primary">הורדת docx</button>
+        <div class="hint" id="download-hint"></div>
       </div>
     </div>
 
-    <div class="panel">
-      <h2>הוראות התיקון</h2>
-      <div class="error-banner" id="error-banner" hidden></div>
-      <div id="lines-preview"></div>
-    </div>
-
-    <div class="panel">
-      <h2>ולידציה (15 בדיקות)</h2>
-      <table class="findings-table">
+    <div class="panel validator-drawer">
+      <button id="validator-toggle" class="subtle">
+        ולידציה (15 בדיקות) <span id="validator-summary"></span> ▾
+      </button>
+      <table class="findings-table" id="findings-table" hidden>
         <thead>
           <tr><th>#</th><th>סטטוס</th><th>בדיקה</th><th>פירוט</th></tr>
         </thead>
         <tbody id="findings-body"></tbody>
       </table>
     </div>
-
-    <div class="panel">
-      <button id="download-btn" class="primary" disabled>הורדת docx</button>
-    </div>
   </div>
+
+  <!-- תבנית תפריט הוספה (משוכפלת ב-JS לכל צומת שמציג כפתור "+") -->
+  <template id="insert-menu-template">
+    <div class="insert-menu" hidden>
+      <div class="insert-menu-levels"></div>
+      <div class="insert-menu-form" hidden>
+        <div class="field required insert-margin-title-field" hidden>
+          <label>כותרת שוליים לסעיף החדש</label>
+          <input type="text" class="insert-margin-title-input" />
+        </div>
+        <div class="field">
+          <label>תוכן</label>
+          <textarea class="insert-text-input" rows="2"></textarea>
+        </div>
+        <button class="insert-submit-btn primary">הוסף</button>
+        <button class="insert-cancel-btn subtle">ביטול</button>
+      </div>
+    </div>
+  </template>
 
   <script src="/static/app.js"></script>
 </body>

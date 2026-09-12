@@ -1,0 +1,156 @@
+"""אימות end-to-end אמיתי בדפדפן (Playwright) של משימה 10ב, מול ארבעת
+קריטריוני הקבלה שהמשתמש הגדיר במפורש:
+1. צד ימין מציג נוסח חוק בלבד - בלי תיוגי סוג ("פסקה"/"הגדרה"/"סעיף
+   קטן"), ובלי צמתים לא-נורמטיביים בשום צורה.
+2. עריכה חופשית שלא קופצת - הסמן נשאר איפה שהוא בזמן הקלדה.
+3. הטבלה משמאל מתעדכנת בזמן אמת ונראית כמו הצעת חוק.
+4. ייצוא ל-docx נותן קובץ תקין.
+
+לא טסט unit רגיל (לא ב-tests/unit/) - סקריפט הרצה חד-פעמי מול שרת חי.
+"""
+
+import sys
+import zipfile
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+BASE_URL = "http://127.0.0.1:8010"
+
+
+def main():
+    ok = True
+
+    def check(name, passed, extra=""):
+        nonlocal ok
+        ok = ok and passed
+        print(("OK  " if passed else "FAIL"), name, extra if not passed else "")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
+        page = browser.new_page()
+        page.goto(BASE_URL)
+        page.select_option("#law-select", "kaytanot-1990")
+        page.wait_for_selector("#law-tree .node-text", timeout=5000)
+
+        # --- קריטריון 1: בלי תיוגי סוג, בלי לא-נורמטיבי ---
+        tree_text = page.inner_text("#law-tree")
+        # "סעיף קטן" לא נבדק כאן: הוא מופיע באופן לגיטימי בקייטנות עצמו
+        # (סעיף 3(ב): "...לפי סעיף קטן (א)...") כחלק מנוסח החוק האמיתי,
+        # לא כתיוג-סוג של הממשק - בדיוק ההבדל שהקריטריון מתכוון אליו.
+        for forbidden in ["פסקה", "הגדרה", "פסקת משנה"]:
+            check(f"אין תיוג סוג '{forbidden}' בעץ", forbidden not in tree_text)
+        # קייטנות סעיף 2 מכיל הערות עורך במקור (is_normative=False) -
+        # מתחילות ב"ראו" בוויקיטקסט. בודקים שאין להן זכר בטקסט המוצג.
+        check("אין עקבות להערת עורך ('ראו ...') בעץ", "ראו " not in tree_text)
+
+        # --- קריטריון 2: עריכה שלא קופצת ---
+        # במקום להסתמך על סמנטיקת Home/ArrowRight (לא אמינה בטקסט RTL -
+        # תלוית דפדפן/כיווניות), ממקמים את הסמן במדויק דרך Selection API
+        # ואז מקלידים עם page.keyboard.type() - זה בודק בדיוק את מה
+        # שחשוב: שהקוד שלנו (בעיקר ה-handler של focus) לא מזיז את הסמן
+        # שהמשתמש/הדפדפן כבר קבעו.
+        node_id = "kaytanot-1990/s2/p0"
+        node = page.locator(f'[data-node-id="{node_id}"]')
+        original_text = node.inner_text()
+        split_point = original_text.index("קייטנה")  # אחרי "לא ינהל אדם "
+        page.evaluate(
+            """([nodeId, offset]) => {
+                const el = document.querySelector(`[data-node-id="${nodeId}"]`);
+                el.focus();
+                const textNode = el.firstChild;
+                const range = document.createRange();
+                range.setStart(textNode, offset);
+                range.setEnd(textNode, offset);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }""",
+            [node_id, split_point],
+        )
+        page.keyboard.type("XYZ")
+        text_after_typing = node.inner_text()
+        expected = original_text[:split_point] + "XYZ" + original_text[split_point:]
+        check(
+            "הטקסט המוקלד נכנס בדיוק במקום שהוקלד (הסמן לא קפץ לסוף/התחלה)",
+            text_after_typing == expected,
+            f"-> got={text_after_typing!r} expected={expected!r}",
+        )
+        node.blur()
+        page.wait_for_timeout(500)
+
+        # --- קריטריון 3: הטבלה משמאל מתעדכנת ---
+        docx_lines_text = page.inner_text("#docx-lines")
+        check(
+            "טבלת ההצעה משמאל השתנתה (לא ריקה, לא ההודעה 'אין שינויים')",
+            "אין עדיין שינויים" not in docx_lines_text and len(docx_lines_text.strip()) > 0,
+            f"-> {docx_lines_text!r}",
+        )
+        check("טבלת ההצעה מכילה כותרת שוליים 'תיקון סעיף'", "תיקון סעיף" in docx_lines_text)
+
+        # --- בונוס: תפריט ההוספה (היררכיה + תצוגה מקדימה של מספור) ---
+        section5_header = page.locator('.node-header', has_text="עונשין")
+        if section5_header.count() == 0:
+            section5_header = page.locator(".node").filter(has_text="עונשין").locator(".node-header").first
+        add_btn = section5_header.locator(".node-add-btn")
+        section5_header.hover()
+        add_btn.click(force=True)
+        page.wait_for_selector(".insert-menu .insert-level-btn", timeout=3000)
+        page.wait_for_timeout(600)  # ממתינים לתשובות ה-preview המקבילות
+        level_btns_text = page.locator(".insert-menu .insert-level-btn").all_inner_texts()
+        check(
+            "תפריט ההוספה מציג תווית מחושבת (יהיה ...) לפני לחיצה",
+            any("יהיה" in t for t in level_btns_text),
+            f"-> {level_btns_text}",
+        )
+        section_btn = page.locator(".insert-menu .insert-level-btn", has_text="סעיף ראשי")
+        section_btn.click()
+        page.fill(".insert-margin-title-input", "ביצוע")
+        page.fill(".insert-text-input", "השר ממונה על ביצועו של חוק זה.")
+        page.click(".insert-submit-btn")
+        page.wait_for_timeout(600)
+        docx_lines_after_insert = page.inner_text("#docx-lines")
+        check(
+            "הוספת סעיף ראשי חדש מופיעה בטבלה (כותרת שוליים 'הוספת סעיף')",
+            "הוספת סעיף" in docx_lines_after_insert,
+            f"-> {docx_lines_after_insert!r}",
+        )
+        check(
+            "כותרת השוליים שהוקלדה ('ביצוע') מופיעה בטבלה",
+            "ביצוע" in docx_lines_after_insert,
+        )
+
+        # --- בונוס: מגירת הולידטור ---
+        findings_table = page.locator("#findings-table")
+        check("טבלת הולידציה מוסתרת כברירת מחדל", not findings_table.is_visible())
+        page.click("#validator-toggle")
+        check("טבלת הולידציה נפתחת בלחיצה", findings_table.is_visible())
+        rows = page.locator("#findings-body tr").count()
+        check("מוצגות כל 15 הבדיקות (כולל עבר/לא נבדק)", rows == 15, f"-> {rows}")
+
+        # --- קריטריון 4: ייצוא docx תקין ---
+        page.fill("#bill-title-input", "הצעת חוק בדיקה")
+        page.fill("#bill-initiator-input", "בודק/ת")
+        page.fill("#bill-date-input", "1.1.2024")
+        page.fill("#source-ref-field input", 'ס"ח בדיקה, עמ\' 1.')
+        with page.expect_download() as download_info:
+            page.click("#download-btn")
+        download = download_info.value
+        out_path = Path("/tmp/e2e-10b-export.docx")
+        download.save_as(out_path)
+        check("הקובץ שהורד לא ריק", out_path.stat().st_size > 1000, f"-> {out_path.stat().st_size} bytes")
+        try:
+            with zipfile.ZipFile(out_path) as z:
+                names = z.namelist()
+                check("הקובץ הוא zip תקין עם word/document.xml", "word/document.xml" in names)
+        except zipfile.BadZipFile:
+            check("הקובץ הוא zip תקין עם word/document.xml", False, "-> BadZipFile")
+
+        browser.close()
+
+    print("\nתוצאה:", "עבר" if ok else "נכשל")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
