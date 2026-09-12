@@ -42,6 +42,12 @@ def main():
     kaytanot, kaytanot_meta = load("kaytanot", "kaytanot-1990")
     checks.append(("שורש הקייטנות הוא law, לא נורמטיבי", kaytanot.node_type == "law" and not kaytanot.is_normative))
     checks.append(("8 סעיפים ישירות תחת השורש (אין פרקים)", len(kaytanot.children) == 8))
+    checks.append(
+        (
+            "full_title נלכד מ-{{ח:כותרת}} כולל שנה (en-dash)",
+            kaytanot.full_title == 'חוק הקייטנות (רישוי ופיקוח), התש"ן–1990',
+        )
+    )
 
     s1 = find_section(kaytanot, "1")
     checks.append(("סעיף 1 כותרת שוליים 'הגדרות'", s1.margin_title == "הגדרות"))

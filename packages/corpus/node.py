@@ -46,6 +46,12 @@ text_normalize.py) - טקסט שנשלף מוויקיטקסט, בלי החלפו
 text מחזיק את הגרסה המנורמלת. שני השדות נשמרים כדי שלא נגלה בעוד
 חודש שנרמלנו יותר מדי ואיבדנו מידע - קל להשוות בין השניים בכל שלב.
 
+full_title נוסף לטובת משימה 4 (amend): שם החוק המלא כפי שמופיע
+ב-{{ח:כותרת}} בוויקיטקסט, כולל שנה (למשל 'חוק הקייטנות (רישוי
+ופיקוח), התש"ן–1990'). רק לצומת ה-law. **לא** margin_title - זה שם
+שמור לכותרת שוליים של סעיף, ושימוש כפול בו יבלבל בין "שם החוק" לבין
+"כותרת שוליים של סעיף מסוים".
+
 מבנה משימה 3 (ingest): שורש העץ הוא LegislativeNode(node_type="law"),
 עם source_ref מחושב פעם אחת ו-is_normative=False (השורש הוא מטא-דאטה
 של החוק - שם, מספר מאגר, מראה מקום - לא נוסח, ואסור שייכנס ל-diff,
@@ -75,6 +81,7 @@ class LegislativeNode:
     numbering_space: str = "law"  # "law" | "comparison-table" | ...
     margin_title_raw: str | None = None  # כותרת השוליים כוויקיטקסט גולמי, אם היא מכילה תבניות
     text_raw: str = ""  # הטקסט לפני normalize_text
+    full_title: str | None = None  # רק לצומת law - שם החוק המלא, מ-{{ח:כותרת}}
 
 
 def effective_source_ref(root: LegislativeNode, target: LegislativeNode) -> str:
