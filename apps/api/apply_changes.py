@@ -50,6 +50,7 @@ def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
 class EditStatus:
     node_id: str
     ok: bool
+    field: str = "text"  # "text" | "margin_title" - ראו TextEditIn.field
     reason: str | None = None
     # לצורך דקורציית track-changes בצד הלקוח (ראו diff_translate) -
     # ריקים אם ok=False.
@@ -83,15 +84,18 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
     edit_statuses: list[EditStatus] = []
 
     for edit in edits:
+        field = getattr(edit, "field", "text")
         original_node = _find_by_id(before, edit.node_id)
         if original_node is None:
-            edit_statuses.append(EditStatus(node_id=edit.node_id, ok=False, reason="צומת לא נמצא"))
+            edit_statuses.append(
+                EditStatus(node_id=edit.node_id, ok=False, field=field, reason="צומת לא נמצא")
+            )
             continue
 
-        is_title = getattr(edit, "field", "text") == "margin_title"
+        is_title = field == "margin_title"
         if is_title and original_node.node_type != "section":
             edit_statuses.append(EditStatus(
-                node_id=edit.node_id, ok=False,
+                node_id=edit.node_id, ok=False, field=field,
                 reason="כותרת שוליים קיימת רק לסעיפים ראשיים",
             ))
             continue
@@ -99,7 +103,9 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
         original_text = (original_node.margin_title or "") if is_title else original_node.text
         result = translate_text_edit(original_text, edit.text)
         if isinstance(result, Unsupported):
-            edit_statuses.append(EditStatus(node_id=edit.node_id, ok=False, reason=result.reason))
+            edit_statuses.append(
+                EditStatus(node_id=edit.node_id, ok=False, field=field, reason=result.reason)
+            )
             continue
 
         if is_title:
@@ -117,7 +123,8 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
             current, ann = apply(current, [t])
             annotations.extend(ann)
             edit_statuses.append(EditStatus(
-                node_id=edit.node_id, ok=True, old_phrase=old_phrase, new_phrase=new_phrase,
+                node_id=edit.node_id, ok=True, field=field,
+                old_phrase=old_phrase, new_phrase=new_phrase,
             ))
         elif isinstance(result, SupportedInsertWords):
             t = InsertWordsAfter(
@@ -128,7 +135,7 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
             current, ann = apply(current, [t])
             annotations.extend(ann)
             edit_statuses.append(EditStatus(
-                node_id=edit.node_id, ok=True,
+                node_id=edit.node_id, ok=True, field=field,
                 anchor_substring=result.anchor_substring, inserted_text=result.inserted_text,
             ))
         elif isinstance(result, SupportedReplaceWords):
@@ -138,7 +145,7 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
             current, ann = apply(current, [t])
             annotations.extend(ann)
             edit_statuses.append(EditStatus(
-                node_id=edit.node_id, ok=True,
+                node_id=edit.node_id, ok=True, field=field,
                 old_phrase=result.old_phrase, new_phrase=result.new_phrase,
             ))
 
