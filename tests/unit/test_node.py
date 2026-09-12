@@ -41,6 +41,50 @@ def main():
         text="",
         status="merged",
     )
+    section_34kd = LegislativeNode(
+        id="penal-1977/s34kd",
+        node_type="section",
+        number="34כד",
+        margin_title="הגדרות",
+        margin_title_raw=None,
+        text="",
+        raw_amendment_note=(
+            "תיקון: [1939], [תשי״ז], [תשל״ה], תשמ״ח־3, תשנ״ד־3, "
+            "תשנ״ה־4, תשנ״ו־6, תשנ״ח־2|אחר=[א/5]"
+        ),
+    )
+    comparison_table_item = LegislativeNode(
+        id="penal-1977/comparison-table/a",
+        node_type="section",
+        number="א",
+        margin_title="",
+        text="",
+        numbering_space="comparison-table",
+    )
+    chapter = LegislativeNode(
+        id="penal-1977/part-a",
+        node_type="part",
+        number="א",
+        margin_title="חלק א׳: כללי",
+        text="",
+    )
+    siman = LegislativeNode(
+        id="penal-1977/ch-c/siman-a",
+        node_type="siman",
+        number="א",
+        margin_title="סימן א׳: הוראות כלליות",
+        text="",
+    )
+    section_with_nested_title = LegislativeNode(
+        id="penal-1977/s34kg",
+        node_type="section",
+        number="34כג",
+        margin_title="כלליות החלק המקדמי והחלק הכללי",
+        margin_title_raw=(
+            "כלליות {{ח:פנימי|חלק 0|החלק המקדמי}} {{ח:פנימי|חלק א|והחלק הכללי}}"
+        ),
+        text="",
+    )
     checks = [
         ("root.number הוא מספר החוק, לא מספר הצעת החוק", root.number == "1"),
         ("children מכיל את הבן", root.children == [child]),
@@ -49,6 +93,26 @@ def main():
         ("הערת עורך מסומנת is_normative=False", note.is_normative is False),
         ("status ברירת מחדל active", child.status == "active"),
         ("סעיף ששולב מסומן status=merged", merged_section.status == "merged"),
+        ("raw_amendment_note ברירת מחדל None", child.raw_amendment_note is None),
+        (
+            "raw_amendment_note נשמר גולמית בלי פענוח",
+            section_34kd.raw_amendment_note is not None
+            and "34כד" not in section_34kd.raw_amendment_note
+            and "תשנ״ח־2" in section_34kd.raw_amendment_note,
+        ),
+        ("numbering_space ברירת מחדל law", child.numbering_space == "law"),
+        (
+            "פריט בלוח השוואה מסומן numbering_space=comparison-table",
+            comparison_table_item.numbering_space == "comparison-table",
+        ),
+        ("node_type תומך ב-part", chapter.node_type == "part"),
+        ("node_type תומך ב-siman", siman.node_type == "siman"),
+        (
+            "margin_title_raw שומר את הוויקיטקסט הגולמי כשיש תבניות מקוננות",
+            section_with_nested_title.margin_title == "כלליות החלק המקדמי והחלק הכללי"
+            and "{{ח:פנימי" in section_with_nested_title.margin_title_raw,
+        ),
+        ("margin_title_raw ברירת מחדל None", child.margin_title_raw is None),
     ]
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
