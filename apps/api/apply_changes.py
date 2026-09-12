@@ -19,7 +19,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 from node import LegislativeNode  # noqa: E402
-from transform import Annotation, InsertWordsAfter, ReplaceWords, apply  # noqa: E402
+from transform import (  # noqa: E402
+    Annotation,
+    InsertWordsAfter,
+    ReplaceMarginTitleWords,
+    ReplaceWords,
+    apply,
+)
 
 from diff_translate import (  # noqa: E402
     SupportedInsertWords,
@@ -81,11 +87,39 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
         if original_node is None:
             edit_statuses.append(EditStatus(node_id=edit.node_id, ok=False, reason="צומת לא נמצא"))
             continue
-        result = translate_text_edit(original_node.text, edit.text)
+
+        is_title = getattr(edit, "field", "text") == "margin_title"
+        if is_title and original_node.node_type != "section":
+            edit_statuses.append(EditStatus(
+                node_id=edit.node_id, ok=False,
+                reason="כותרת שוליים קיימת רק לסעיפים ראשיים",
+            ))
+            continue
+
+        original_text = (original_node.margin_title or "") if is_title else original_node.text
+        result = translate_text_edit(original_text, edit.text)
         if isinstance(result, Unsupported):
             edit_statuses.append(EditStatus(node_id=edit.node_id, ok=False, reason=result.reason))
             continue
-        if isinstance(result, SupportedInsertWords):
+
+        if is_title:
+            # §7.8: אין דפוס "הוספת מילים" נפרד לכותרת שוליים, רק
+            # "במקום X יבוא Y" - הוספה טהורה מתורגמת ל-old=anchor,
+            # new=anchor+inserted (עדיין ReplaceMarginTitleWords יחיד).
+            if isinstance(result, SupportedInsertWords):
+                old_phrase = result.anchor_substring
+                new_phrase = result.anchor_substring + result.inserted_text
+            else:
+                old_phrase, new_phrase = result.old_phrase, result.new_phrase
+            t = ReplaceMarginTitleWords(
+                section_number=original_node.number, old_phrase=old_phrase, new_phrase=new_phrase,
+            )
+            current, ann = apply(current, [t])
+            annotations.extend(ann)
+            edit_statuses.append(EditStatus(
+                node_id=edit.node_id, ok=True, old_phrase=old_phrase, new_phrase=new_phrase,
+            ))
+        elif isinstance(result, SupportedInsertWords):
             t = InsertWordsAfter(
                 target_id=edit.node_id,
                 anchor_substring=result.anchor_substring,

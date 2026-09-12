@@ -74,11 +74,13 @@ def api_law(law_id: str) -> dict:
 
 
 def _bill_from_meta(bill_meta: BillMetaIn, lines: list) -> Bill:
+    """submitted_date לא מגיע מהמשתמש - Bill מספק placeholder משלו
+    (ראו render_bill.Bill.submitted_date): תאריך ההגשה נקבע בפועל על
+    ידי מזכירות הכנסת, לא ידוע ולא נקבע כאן."""
     return Bill(
         knesset="הכנסת העשרים וחמש",
         title=bill_meta.title,
         initiator=bill_meta.initiator,
-        submitted_date=bill_meta.submitted_date,
         lines=lines,
         explanatory=bill_meta.explanatory,
     )
@@ -95,7 +97,10 @@ def _render(law_id: str, req: RenderRequest):
     result = apply_pending_changes(before, req.edits, req.insertions)
     lines = amend(before, result.after, result.annotations, law_footnote_key=cfg.footnote_key)
     bill = _bill_from_meta(req.bill, lines)
-    refs = {cfg.footnote_key: req.bill.source_ref}
+    # מראה המקום (ס"ח) ידוע מראש לכל חוק ב-law_registry - לא שדה קלט
+    # מהמשתמש (10ב). אם לא ידוע (known_source_ref=None), נשאר ריק -
+    # הוולידטור (בדיקה 2) יתריע במפורש, לא ננחש ערך.
+    refs = {cfg.footnote_key: cfg.known_source_ref or ""}
     findings = validate(bill, before, refs)
     return before, result, lines, bill, findings
 
@@ -126,7 +131,7 @@ def api_insert_preview(law_id: str, req: InsertPreviewRequestIn) -> dict:
 def api_docx(law_id: str, req: RenderRequest):
     before, result, lines, bill, findings = _render(law_id, req)
     cfg = LAWS[law_id]
-    refs = {cfg.footnote_key: req.bill.source_ref}
+    refs = {cfg.footnote_key: cfg.known_source_ref or ""}
 
     out_path = Path(tempfile.mkstemp(suffix=".docx")[1])
     write_docx(bill, refs, SKELETON, out_path)

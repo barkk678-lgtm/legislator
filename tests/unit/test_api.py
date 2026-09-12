@@ -19,10 +19,10 @@ client = TestClient(app)
 
 _KAYTANOT_REF = 'ס"ח התש"ן, עמ\' 155.'
 _GOOD_BILL = {
+    # אין submitted_date/source_ref כאן בכוונה (10ב): שניהם לא שדות
+    # קלט מהמשתמש יותר - ראו schemas.BillMetaIn.
     "title": 'הצעת חוק הקייטנות (רישוי ופיקוח) (תיקון – החמרת הענישה), התש"ף–2023',
     "initiator": "יעקב אשר",
-    "submitted_date": "15.11.2023",
-    "source_ref": _KAYTANOT_REF,
     "explanatory": ["מטרת הצעת החוק להחמיר את הענישה."],
 }
 
@@ -91,6 +91,15 @@ def main():
     checks.append(("render מחזיר 15 ממצאי ולידציה תמיד", len(render_resp["findings"]) == 15))
     checks.append(("touched_sections כולל סעיף 5", render_resp["touched_sections"] == ["5"]))
 
+    # מראה מקום נשלף אוטומטית מ-law_registry (לא מהמשתמש, ראו schemas.
+    # BillMetaIn) - בדיקה 2 בוולידטור (מראה מקום) אמורה לעבור בלי שום
+    # קלט מהמשתמש לגבי זה.
+    check2 = next((f for f in render_resp["findings"] if f["check_number"] == 2), None)
+    checks.append(
+        ("מראה מקום אוטומטי -> בדיקה 2 עוברת בלי קלט מהמשתמש",
+         check2 is not None and check2["status"] == "עבר"),
+    )
+
     # מקרה שבור: "עריכה" בלי שום שינוי בפועל (טקסט זהה למקור) - מדווחת
     # כ-ok=False עם סיבה, לא קורסת ולא מנחשת (תרחיש "לא נתמך" הפשוט
     # ביותר; דוגמאות מורכבות יותר - "משפט חוזר על עצמו" וכו' - כבר
@@ -109,6 +118,22 @@ def main():
             and bad_render["edit_statuses"][0]["ok"] is False
             and bad_render["edit_statuses"][0]["reason"],
         )
+    )
+
+    # עריכת כותרת שוליים (§7.8) - field="margin_title", לא "text".
+    title_edit_req = {
+        "edits": [{"node_id": "kaytanot-1990/s5", "text": "עונשין חמורים", "field": "margin_title"}],
+        "insertions": [],
+        "bill": _GOOD_BILL,
+    }
+    title_render = client.post("/api/laws/kaytanot-1990/render", json=title_edit_req).json()
+    checks.append(
+        ("עריכת כותרת שוליים מדווחת כ-ok",
+         len(title_render["edit_statuses"]) == 1 and title_render["edit_statuses"][0]["ok"] is True),
+    )
+    checks.append(
+        ("עריכת כותרת שוליים מנוסחת לפי §7.8",
+         len(title_render["lines"]) == 1 and "בכותרת השוליים" in title_render["lines"][0]["text"]),
     )
 
     # POST /insert-preview - תצוגה מקדימה של תווית לפני ביצוע

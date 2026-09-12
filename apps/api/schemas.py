@@ -16,10 +16,15 @@ from pydantic import BaseModel
 class TextEditIn(BaseModel):
     """עריכה חופשית של טקסט צומת בודד - הטקסט *הנוכחי* (אחרי עריכה),
     לא before/after. ה-before נלקח בשרת מהעץ המקורי (load_law) - לא
-    סומכים על הלקוח שישלח את זה נכון."""
+    סומכים על הלקוח שישלח את זה נכון.
+
+    field: "text" (גוף הסעיף/פסקה/סעיף קטן) או "margin_title" (כותרת
+    השוליים של סעיף - §7.8, ha-hoveret-ha-sgula.pdf). שני שדות שונים
+    לגמרי מבחינה משפטית (דפוסי ניסוח נפרדים), גם כשמדובר באותו צומת."""
 
     node_id: str
     text: str
+    field: Literal["text", "margin_title"] = "text"
 
 
 class InsertSectionIn(BaseModel):
@@ -45,10 +50,13 @@ InsertionIn = InsertSectionIn | InsertSubsectionIn | InsertParagraphIn
 
 
 class BillMetaIn(BaseModel):
+    """אין submitted_date/source_ref כאן בכוונה (10ב): תאריך ההגשה נקבע
+    בפועל על ידי מזכירות הכנסת (לא המשתמש) - render_bill.Bill מספק
+    placeholder משלו. מראה המקום (ס"ח) ידוע מראש לכל חוק ב-law_registry -
+    main.py שולף אותו משם, לא מהמשתמש."""
+
     title: str
     initiator: str
-    submitted_date: str
-    source_ref: str  # מראה מקום - שדה חובה (ראו law_registry.LawConfig)
     explanatory: list[str] = []  # דברי הסבר - שדה חדש במשימה 10ב
 
 
