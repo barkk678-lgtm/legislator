@@ -7,9 +7,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps" / "api"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 
 from node import LegislativeNode  # noqa: E402
-from insert_preview import preview_insertion_label  # noqa: E402
+from insert_preview import build_insertion_transform, preview_insertion_label  # noqa: E402
+from transform import apply  # noqa: E402
 
 
 def _tree() -> LegislativeNode:
@@ -80,6 +82,44 @@ def main():
     # פסקה בתוך סעיף קטן - לא נתמך (אין ילד כזה בעץ הזה, אבל בודקים גם
     # ניסיון להוסיף פסקה "על" סעיף קטן עצמו, כשאין פסקאות בו).
     check("פסקה, על סעיף קטן (א) עצמו - לא נתמך", "law/s5/a", "paragraph", False)
+
+    # אינטגרציה: build_insertion_transform + apply() בפועל, לכל שלושת
+    # ה-kind-ים - סוגר את הלולאה בין מה שמוצג מראש למה שקורה בפועל.
+    t, err = build_insertion_transform(
+        _tree(), "law/s5", "section", text="תוכן חדש.", margin_title="כותרת חדשה"
+    )
+    ok = ok and err is None
+    after, _ = apply(_tree(), [t])
+    new_numbers = [c.number for c in after.children if c.node_type == "section"]
+    passed_section = "5א" in new_numbers
+    ok = ok and passed_section
+    print(("OK  " if passed_section else "FAIL"), "אינטגרציה: InsertSectionAfter -> 5א בעץ")
+
+    t2, err2 = build_insertion_transform(_tree(), "law/s6", "subsection", text="תוכן ב.")
+    ok = ok and err2 is None
+    after2, _ = apply(_tree(), [t2])
+    section6_after = next(c for c in after2.children if c.number == "6")
+    labels2 = [c.number for c in section6_after.children if c.is_normative]
+    passed_subsection = labels2 == ["א", "ב"]
+    ok = ok and passed_subsection
+    print(("OK  " if passed_subsection else "FAIL"), "אינטגרציה: AddFirstSubsection -> א,ב",
+          "" if passed_subsection else f"-> {labels2}")
+
+    t3, err3 = build_insertion_transform(_tree(), "law/s5/a", "subsection", text="תוכן חדש.")
+    ok = ok and err3 is None
+    after3, _ = apply(_tree(), [t3])
+    section5_after = next(c for c in after3.children if c.number == "5")
+    labels3 = [c.number for c in section5_after.children if c.is_normative]
+    passed_insert_after = labels3 == ["א", "א1", "ב"]
+    ok = ok and passed_insert_after
+    print(("OK  " if passed_insert_after else "FAIL"), "אינטגרציה: InsertAfter (סעיף קטן) -> א,א1,ב",
+          "" if passed_insert_after else f"-> {labels3}")
+
+    # שגוי: הוספת סעיף ראשי בלי כותרת שוליים -> None + סיבה, לא ניחוש.
+    t_bad, err_bad = build_insertion_transform(_tree(), "law/s5", "section", text="תוכן.")
+    passed_bad = t_bad is None and err_bad is not None
+    ok = ok and passed_bad
+    print(("OK  " if passed_bad else "FAIL"), "בלי כותרת שוליים -> None + סיבה")
 
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1

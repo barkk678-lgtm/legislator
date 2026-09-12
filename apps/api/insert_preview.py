@@ -1,15 +1,15 @@
-"""מחשבת את התווית שתיווצר אם מוסיפים תוכן ברמה נתונה (סעיף ראשי/סעיף
-קטן/פסקה) בהקשר של צומת עוגן נתון - בלי לבצע את ההוספה בפועל. ראו
-TASKS.md משימה 10ב (היררכיית הוספה בממשק: "הוסף סעיף קטן (יהיה ג1)").
+"""פותרת "היכן ואיך" הוספת תוכן חדש (סעיף ראשי/סעיף קטן/פסקה) בהקשר של
+צומת עוגן נתון - גם לתצוגה מקדימה (התווית שתיווצר, בלי לבצע כלום) וגם
+לבניית טרנספורמציית transform.py בפועל בעת שליחה. ראו TASKS.md משימה 10ב
+(היררכיית הוספה בממשק: "הוסף סעיף קטן (יהיה ג1)").
 
 טהור: אין כאן לוגיקה משפטית, רק קריאה לפונקציות הקיימות ב-numbering.py
-לפי המיקום המבוקש. אסור לנחש תווית - כל תווית מחושבת כאן היא בדיוק מה
-ש-transform.py (InsertSectionAfter/AddFirstSubsection/InsertAfter) יפיקו
-בפועל אם ההוספה תבוצע - לכן חשוב שהלוגיקה כאן תישאר תואמת ל-transform.py,
-לא עותק עצמאי שעלול לסטות ממנו.
+לפי המיקום המבוקש. שתי הפעולות (תצוגה מקדימה, בנייה בפועל) עוברות דרך
+אותה פונקציית פתרון יחידה (_resolve) - כדי שהתווית שמוצגת למשתמש *לפני*
+הלחיצה תמיד תהיה בדיוק התווית שתיווצר בפועל אחריה, לא שני מסלולי חישוב
+נפרדים שעלולים לסטות זה מזה.
 
-**היקף מכוון (לא כל צירוף אפשרי):** מותאם בדיוק למה שהמנוע תומך בו
-היום:
+**היקף מכוון (לא כל צירוף אפשרי) - תואם בדיוק למה שהמנוע תומך בו היום:**
 - "section": תמיד זמין - מוסיף סעיף ראשי חדש אחרי הסעיף האב של הצומת
   הנוכחי (InsertSectionAfter, §7.12).
 - "subsection": זמין כשהצומת הנוכחי הוא סעיף או סעיף קטן (לא פסקה/
@@ -18,7 +18,7 @@ TASKS.md משימה 10ב (היררכיית הוספה בממשק: "הוסף סע
 - "paragraph": זמין רק כשהצומת הנוכחי הוא פסקה שהיא ילד ישיר של סעיף
   (לא של סעיף קטן) - הכנסת פסקה לתוך סעיף קטן קיים אינה נתמכת עדיין
   (transform.InsertAfter מוצא רק node_type=="section", לא "subsection";
-  זה פער אמיתי, לא הוסתר - ראו not_supported_reason).
+  זה פער אמיתי, לא הוסתר - ראו reason).
 - "subparagraph": לא נתמך בכלל כרגע - אין מקרה זהב.
 """
 
@@ -27,8 +27,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 from node import LegislativeNode  # noqa: E402
 from numbering import next_appended_label, next_inserted_label, sort_section_numbers  # noqa: E402
+from transform import AddFirstSubsection, InsertAfter, InsertSectionAfter  # noqa: E402
+
+_FRESH_ID_COUNTER = {"n": 0}
+
+
+def _fresh_id(prefix: str) -> str:
+    _FRESH_ID_COUNTER["n"] += 1
+    return f"{prefix}/new-{_FRESH_ID_COUNTER['n']}"
 
 
 @dataclass
@@ -36,6 +45,18 @@ class InsertPreview:
     supported: bool
     label: str | None = None  # התווית שתיווצר, אם supported
     reason: str | None = None  # למה לא נתמך, אם not supported
+
+
+@dataclass
+class _Resolution:
+    supported: bool
+    label: str | None = None
+    reason: str | None = None
+    kind: str | None = None  # "section" | "add_first_subsection" | "insert_after"
+    section_number: str | None = None  # רלוונטי ל-add_first_subsection/insert_after
+    anchor_number: str | None = None  # רלוונטי ל-section (InsertSectionAfter)
+    anchor_id: str | None = None  # רלוונטי ל-insert_after (subsection/paragraph)
+    node_type: str | None = None  # "subsection" | "paragraph" - סוג הילד החדש ב-insert_after
 
 
 def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
@@ -76,14 +97,14 @@ def _ancestor_of_type(root: LegislativeNode, node_id: str, node_type: str) -> Le
         current_id = parent.id
 
 
-def preview_insertion_label(root: LegislativeNode, node_id: str, level: str) -> InsertPreview:
+def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
     if _find_by_id(root, node_id) is None:
-        return InsertPreview(supported=False, reason=f"צומת לא נמצא: {node_id!r}")
+        return _Resolution(supported=False, reason=f"צומת לא נמצא: {node_id!r}")
 
     if level == "section":
         anchor_section = _ancestor_of_type(root, node_id, "section")
         if anchor_section is None:
-            return InsertPreview(supported=False, reason="לא נמצא סעיף אב להוספה אחריו")
+            return _Resolution(supported=False, reason="לא נמצא סעיף אב להוספה אחריו")
         siblings = [c for c in root.children if c.node_type == "section"]
         existing_numbers = [c.number for c in siblings]
         idx = next(i for i, c in enumerate(siblings) if c.id == anchor_section.id)
@@ -91,17 +112,22 @@ def preview_insertion_label(root: LegislativeNode, node_id: str, level: str) -> 
             label = next_appended_label(sort_section_numbers(existing_numbers))
         else:
             label = next_inserted_label(anchor_section.number, set(existing_numbers))
-        return InsertPreview(supported=True, label=label)
+        return _Resolution(
+            supported=True, label=label, kind="section", anchor_number=anchor_section.number
+        )
 
     if level == "subsection":
         anchor_section = _ancestor_of_type(root, node_id, "section")
         if anchor_section is None:
-            return InsertPreview(supported=False, reason="לא נמצא סעיף אב")
+            return _Resolution(supported=False, reason="לא נמצא סעיף אב")
         subsections = [c for c in anchor_section.children if c.is_normative and c.node_type == "subsection"]
         if not subsections:
             # עדיין אין סעיפים קטנים בסעיף הזה - AddFirstSubsection
             # תמיד קובע "א" לתוכן הקיים ו"ב" לחדש (§7.10.6(ד)).
-            return InsertPreview(supported=True, label="ב")
+            return _Resolution(
+                supported=True, label="ב", kind="add_first_subsection",
+                section_number=anchor_section.number,
+            )
         current_node = _find_by_id(root, node_id)
         anchor_subsection = current_node if current_node.node_type == "subsection" else subsections[-1]
         existing_numbers = [c.number for c in subsections]
@@ -110,13 +136,17 @@ def preview_insertion_label(root: LegislativeNode, node_id: str, level: str) -> 
             label = next_appended_label(existing_numbers)
         else:
             label = next_inserted_label(anchor_subsection.number, set(existing_numbers))
-        return InsertPreview(supported=True, label=label)
+        return _Resolution(
+            supported=True, label=label, kind="insert_after",
+            section_number=anchor_section.number, anchor_id=anchor_subsection.id,
+            node_type="subsection",
+        )
 
     if level == "paragraph":
         current_node = _find_by_id(root, node_id)
         parent = _find_parent(root, node_id)
         if current_node.node_type != "paragraph" or parent is None or parent.node_type != "section":
-            return InsertPreview(
+            return _Resolution(
                 supported=False,
                 reason=(
                     "הוספת פסקה נתמכת רק כשהיא ילד ישיר של סעיף (לא של סעיף "
@@ -125,18 +155,68 @@ def preview_insertion_label(root: LegislativeNode, node_id: str, level: str) -> 
             )
         paragraphs = [c for c in parent.children if c.is_normative and c.node_type == "paragraph" and c.number]
         if not paragraphs:
-            return InsertPreview(
+            return _Resolution(
                 supported=False,
                 reason="אין עדיין פסקאות ממוספרות בסעיף הזה להוסיף אחריהן",
             )
         existing_numbers = [c.number for c in paragraphs]
         idx = next((i for i, c in enumerate(paragraphs) if c.id == current_node.id), None)
         if idx is None:
-            return InsertPreview(supported=False, reason="הפסקה הנוכחית אינה ממוספרת")
+            return _Resolution(supported=False, reason="הפסקה הנוכחית אינה ממוספרת")
         if idx == len(paragraphs) - 1:
             label = next_appended_label(existing_numbers)
         else:
             label = next_inserted_label(current_node.number, set(existing_numbers))
-        return InsertPreview(supported=True, label=label)
+        return _Resolution(
+            supported=True, label=label, kind="insert_after",
+            section_number=parent.number, anchor_id=current_node.id, node_type="paragraph",
+        )
 
-    return InsertPreview(supported=False, reason=f"רמה לא נתמכת: {level!r}")
+    return _Resolution(supported=False, reason=f"רמה לא נתמכת: {level!r}")
+
+
+def preview_insertion_label(root: LegislativeNode, node_id: str, level: str) -> InsertPreview:
+    r = _resolve(root, node_id, level)
+    return InsertPreview(supported=r.supported, label=r.label, reason=r.reason)
+
+
+def build_insertion_transform(
+    root: LegislativeNode, node_id: str, level: str, *, text: str, margin_title: str | None = None
+):
+    """בונה את אובייקט ה-transform.py המתאים, או מחזירה (None, reason) אם
+    לא נתמך. margin_title חובה (ולא ריק) רק עבור level=='section' - המשתמש
+    מקליד אותה, המערכת לא ממציאה (ראו transform.InsertSectionAfter)."""
+    r = _resolve(root, node_id, level)
+    if not r.supported:
+        return None, r.reason
+
+    if r.kind == "section":
+        if not margin_title or not margin_title.strip():
+            return None, "סעיף ראשי חדש חייב כותרת שוליים - יש להקליד אותה"
+        new_section = LegislativeNode(
+            id=_fresh_id("section"), node_type="section", number="",
+            margin_title=margin_title, text=text,
+        )
+        return InsertSectionAfter(after_section_number=r.anchor_number, new_section=new_section), None
+
+    if r.kind == "add_first_subsection":
+        new_child = LegislativeNode(
+            id=_fresh_id("subsection"), node_type="paragraph", number="",
+            margin_title=None, text=text,
+        )
+        return AddFirstSubsection(section_number=r.section_number, new_child=new_child), None
+
+    if r.kind == "insert_after":
+        # r.label כבר מחושב על ידי _resolve (numbering.next_inserted_label/
+        # next_appended_label) - InsertAfter הקיים (מקרה זהב 4/6) לא מחשב
+        # מספור בעצמו, אז חייבים להצמיד את התווית כאן ולא להשאיר ריק.
+        new_child = LegislativeNode(
+            id=_fresh_id(r.node_type), node_type=r.node_type, number=r.label,
+            margin_title=None, text=text,
+        )
+        return (
+            InsertAfter(section_number=r.section_number, anchor_id=r.anchor_id, new_child=new_child),
+            None,
+        )
+
+    return None, "מקרה לא צפוי"
