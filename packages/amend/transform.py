@@ -30,12 +30,36 @@ class InsertAfter:
 
 @dataclass
 class InsertWordsAfter:
-    """מוסיף inserted_text מיד אחרי המופע הראשון של anchor_substring
-    בתוך הטקסט של הצומת עם target_id."""
+    """מוסיף inserted_text מיד אחרי anchor_substring בתוך הטקסט של הצומת
+    עם target_id. anchor_substring חייב להופיע פעם אחת בדיוק בטקסט -
+    אפס הופעות או יותר מאחת הן שגיאה, לא ניחוש איזו הופעה התכוונו אליה
+    (אותו עיקרון כמו ReplaceWords למטה)."""
 
     target_id: str
     anchor_substring: str
     inserted_text: str
+
+
+@dataclass
+class ReplaceWords:
+    """מחליף ביטוי קיים (old_phrase) בטקסט של הצומת עם target_id בביטוי
+    חדש (new_phrase). שני הביטויים הם בחירה מפורשת של המנסח - גבול
+    הביטוי נקבע לפי משמעות משפטית (מה ראוי לצטט לשם בהירות בהוראת
+    התיקון), לא נגזר מדיף טקסטואלי אוטומטי בין לפני/אחרי. ראו
+    packages/amend/engine.py (_diff_replace) ודיון ב-TASKS.md משימה 4א:
+    דיף מינימלי (prefix/suffix משותפים) מנחש גבולות ביטוי, וזו בדיוק
+    התקלה שכבר קרתה בשקט עבור _diff_text/הכנסה (סעיף 5 קייטנות: "מאסר
+    ששה חדשים" -> "מאסר שנה" - דיף מינימלי היה משמיט את "מאסר" המשותף,
+    בעוד שהניסוח המשפטי הרצוי כולל אותו).
+
+    old_phrase חייב להופיע פעם אחת בדיוק בטקסט המקורי: אפס הופעות או
+    יותר מאחת הן שגיאה, לא ניחוש. הופעה כפולה מכוונת (להחליף בכל
+    המופעים) היא דפוס נפרד - "החלפה בכל מקום", drafting-rules.md §1.1
+    שורה 3 - שלא ממומש עדיין."""
+
+    target_id: str
+    old_phrase: str
+    new_phrase: str
 
 
 def _find_section(node: LegislativeNode, number: str) -> LegislativeNode | None:
@@ -59,7 +83,8 @@ def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
 
 
 def apply(
-    before: LegislativeNode, transformations: list[InsertAfter | InsertWordsAfter]
+    before: LegislativeNode,
+    transformations: list[InsertAfter | InsertWordsAfter | ReplaceWords],
 ) -> LegislativeNode:
     """מחזיר עץ "אחרי" חדש (before לא משתנה), אחרי החלת כל הטרנספורמציות
     בסדר שבו הן מופיעות ברשימה."""
@@ -80,11 +105,43 @@ def apply(
             target = _find_by_id(after, t.target_id)
             if target is None:
                 raise ValueError(f"צומת {t.target_id} לא נמצא")
-            pos = target.text.find(t.anchor_substring)
-            if pos < 0:
+            count = target.text.count(t.anchor_substring)
+            if count == 0:
                 raise ValueError(f"'{t.anchor_substring}' לא נמצא בטקסט {t.target_id}")
+            if count > 1:
+                raise ValueError(
+                    f"'{t.anchor_substring}' מופיע {count} פעמים בטקסט "
+                    f"{t.target_id} - דו-משמעי, לא ניתן לקבוע עוגן יחיד "
+                    "בלי לנחש."
+                )
+            pos = target.text.find(t.anchor_substring)
             insert_at = pos + len(t.anchor_substring)
             target.text = target.text[:insert_at] + t.inserted_text + target.text[insert_at:]
+        elif isinstance(t, ReplaceWords):
+            target = _find_by_id(after, t.target_id)
+            if target is None:
+                raise ValueError(f"צומת {t.target_id} לא נמצא")
+            count = target.text.count(t.old_phrase)
+            if count == 0:
+                raise ValueError(f"'{t.old_phrase}' לא נמצא בטקסט {t.target_id}")
+            if count > 1:
+                raise ValueError(
+                    f"'{t.old_phrase}' מופיע {count} פעמים בטקסט {t.target_id} "
+                    "- דו-משמעי. אם הכוונה להחליף בכל המופעים, זה דפוס נפרד "
+                    "('החלפה בכל מקום', drafting-rules.md §1.1 שורה 3) שלא "
+                    "ממומש עדיין."
+                )
+            pos = target.text.find(t.old_phrase)
+            # סמן פנימי בלבד (כמו ⟦footnote:key⟧) - מעביר את הביטויים
+            # המפורשים ל-engine._diff_replace בלי שהיא תצטרך לנחש אותם
+            # מתוך דיף. נקרא ונמחק שם; לא אמור להגיע לרינדור.
+            target.text = (
+                target.text[:pos]
+                + f"⟦replaced-from:{t.old_phrase}⟧"
+                + t.new_phrase
+                + "⟦/replaced⟧"
+                + target.text[pos + len(t.old_phrase) :]
+            )
         else:
             raise TypeError(f"טרנספורמציה לא מוכרת: {t!r}")
     return after

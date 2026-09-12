@@ -25,6 +25,7 @@ from render_bill import Line  # noqa: E402
 
 _FOOTNOTE_MARKER_RE = re.compile(r"⟦footnote:(\w+)⟧")
 _QUOTED_TERM_RE = re.compile(r'^"([^"]+)"')
+_REPLACE_MARKER_RE = re.compile(r"⟦replaced-from:(?P<old>.*?)⟧(?P<new>.*?)⟦/replaced⟧")
 
 
 def _quoted_term(text: str) -> str:
@@ -72,6 +73,47 @@ def _diff_text(before: str, after: str) -> tuple[str, str]:
     anchor = before[:prefix_len].rstrip()
     inserted = after[prefix_len : len(after) - suffix_len]
     return anchor, inserted
+
+
+def _diff_replace(before: str, after: str) -> tuple[str, str]:
+    """מחזיר (old_phrase, new_phrase) עבור החלפת מילים מפורשת (דפוס
+    "החלפת מילים", drafting-rules.md §1.1 שורה 1). בכוונה **לא** דיף:
+    בניגוד ל-_diff_text (הכנסה), שם גבול ההכנסה נקבע באופן חד-משמעי
+    על ידי המשותף (prefix/suffix) לפני/אחרי, בהחלפה אין דרך לגזור את
+    גבול הביטוי מהטקסט בלבד - "מאסר ששה חדשים" -> "מאסר שנה" ו"ששה
+    חדשים" -> "שנה" מייצרים בדיוק אותו before/after, וההבדל ביניהם הוא
+    החלטת ניסוח משפטית (מה ראוי לצטט לשם בהירות), לא עובדה טקסטואלית.
+    אלגוריתם שהיה "מחליט" לבד איפה הביטוי מתחיל ונגמר הוא ניחוש גם אם
+    הוא דטרמיניסטי - הפרה של חוק ברזל 2 (ראו TASKS.md משימה 4א).
+
+    לכן: הביטויים המפורשים מגיעים מ-transform.ReplaceWords, מוטבעים
+    ב-after כסמן פנימי (⟦replaced-from:old⟧new⟦/replaced⟧, ראו
+    transform.apply). הפונקציה הזו רק *מוודאת עקביות* בין הסמן לבין
+    before/after בפועל - לא גוזרת את הגבול בעצמה."""
+    match = _REPLACE_MARKER_RE.search(after)
+    if not match:
+        raise NotImplementedError(
+            "מוטציה שאינה הכנסה טהורה, וללא סמן replaced-from - לא "
+            "נתמך. אם מדובר בהחלפת מילים, יש לבנות את ה'אחרי' דרך "
+            "transform.ReplaceWords, לא באופן ידני."
+        )
+    old_phrase = match.group("old")
+    new_phrase = match.group("new")
+    occurrences = before.count(old_phrase)
+    if occurrences != 1:
+        raise ValueError(
+            f"'{old_phrase}' אמור להופיע פעם אחת בדיוק בטקסט ה'לפני' "
+            f"אבל מופיע {occurrences} פעמים - חוסר עקביות בין הסמן "
+            "לטקסט בפועל."
+        )
+    reconstructed_before = after[: match.start()] + old_phrase + after[match.end() :]
+    if reconstructed_before != before:
+        raise ValueError(
+            "שחזור ה'לפני' מתוך סמן replaced-from לא תואם את הטקסט "
+            "בפועל - חוסר עקביות בין transform.ReplaceWords לבין "
+            "before/after שהתקבלו."
+        )
+    return old_phrase, new_phrase
 
 
 @dataclass
@@ -166,6 +208,12 @@ def _render_insertion(insertion: _Insertion, terminator: str, ordinal: int) -> l
 
 
 def _render_mutation(section_number: str, mutation: _Mutation) -> Line:
+    if _REPLACE_MARKER_RE.search(mutation.after_text):
+        # דפוס "החלפת מילים" (drafting-rules.md §1.1 שורה 1) - הביטויים
+        # מגיעים מסומנים מ-transform.ReplaceWords, לא מדיף (_diff_replace).
+        old, new = _diff_replace(mutation.before_text, mutation.after_text)
+        text = f'בסעיף {section_number} לחוק העיקרי, במקום "{old}" יבוא "{new}".'
+        return Line(text=text, depth=0)
     anchor, inserted = _diff_text(mutation.before_text, mutation.after_text)
     anchor, inserted = anchor.strip(), inserted.strip()
     text = f'בסעיף {section_number} לחוק העיקרי, אחרי המילים "{anchor}" יבוא "{inserted}".'
