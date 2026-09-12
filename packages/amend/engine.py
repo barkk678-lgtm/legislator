@@ -211,20 +211,40 @@ def _render_insertion(
 
 
 def _render_mutation(
-    section_number: str, mutation: _Mutation, replacement: ReplacementAnnotation | None
+    section_number: str,
+    mutation: _Mutation,
+    replacement: ReplacementAnnotation | None,
+    *,
+    full_title: str | None = None,
+    law_footnote_key: str | None = None,
 ) -> Line:
+    """full_title/law_footnote_key: מועברים רק כשזו הפעם הראשונה שהחוק
+    מוזכר בהצעה (touched_count==1), גם כשמדובר במוטציה בודדת. תוקן ב-
+    TASKS.md משימה 6א: לפני התיקון, הענף "מוטציה בודדת מתלכדת לשורה
+    אחת" (למטה, ב-amend()) מעולם לא בנה את הכותרת "(להלן – החוק
+    העיקרי)" - בין אם זה היה הסעיף הראשון שנוגעים בו ובין אם לא. זו
+    הייתה טעות מבנית: התנאי הנכון הוא "פעם ראשונה שהחוק מוזכר בהצעה",
+    לא "איזה ענף מטפל בסעיף הזה". הוולידטור (בדיקה 3) תפס את זה על
+    הצעה שמתקנת סעיף יחיד בהחלפת מילים - בדיוק המקרה הנפוץ ביותר
+    בהצעות פרטיות טרומיות.
+
+    כשהקיצור "(להלן – החוק העיקרי)" מוגדר באותה שורה, הוא לא משמש שוב
+    בה: "בסעיף N," ולא "בסעיף N לחוק העיקרי," (ראו מקרה הזהב, סעיף 5)."""
     if replacement is not None:
         # דפוס "החלפת מילים" (drafting-rules.md §1.1 שורה 1) - הביטויים
         # מגיעים מ-ReplacementAnnotation, לא נגזרים מדיף.
         _validate_replacement(mutation.before_text, mutation.after_text, replacement)
-        text = (
-            f'בסעיף {section_number} לחוק העיקרי, במקום "{replacement.old_phrase}" '
-            f'יבוא "{replacement.new_phrase}".'
-        )
-        return Line(text=text, depth=0)
-    anchor, inserted = _diff_text(mutation.before_text, mutation.after_text)
-    anchor, inserted = anchor.strip(), inserted.strip()
-    text = f'בסעיף {section_number} לחוק העיקרי, אחרי המילים "{anchor}" יבוא "{inserted}".'
+        body = f'במקום "{replacement.old_phrase}" יבוא "{replacement.new_phrase}".'
+    else:
+        anchor, inserted = _diff_text(mutation.before_text, mutation.after_text)
+        anchor, inserted = anchor.strip(), inserted.strip()
+        body = f'אחרי המילים "{anchor}" יבוא "{inserted}".'
+
+    if full_title is not None:
+        text = f"ב{full_title} (להלן – החוק העיקרי), בסעיף {section_number}, {body}"
+        return Line(text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0)
+
+    text = f"בסעיף {section_number} לחוק העיקרי, {body}"
     return Line(text=text, depth=0)
 
 
@@ -289,7 +309,19 @@ def amend(
             # חופפים (סעיף 2 הוא גם מוטציה יחידה וגם לא-ראשון) ואי אפשר
             # להפריד ביניהם ממקרה אחד.
             replacement = replacements_by_id.get(instructions[0].node_id)
-            mutation_line = _render_mutation(number, instructions[0], replacement)
+            if touched_count == 1:
+                # תוקן במשימה 6א: התנאי ל"החוק מוזכר בפעם הראשונה" הוא
+                # touched_count==1, בלי קשר לאיזה ענף מטפל בסעיף - ראו
+                # תיעוד ב-_render_mutation.
+                mutation_line = _render_mutation(
+                    number,
+                    instructions[0],
+                    replacement,
+                    full_title=(before.full_title or "").replace("–", "-"),
+                    law_footnote_key=law_footnote_key,
+                )
+            else:
+                mutation_line = _render_mutation(number, instructions[0], replacement)
             mutation_line.side_heading = f"תיקון סעיף {number}"
             if touched_count > 1:
                 mutation_line.number = f"{touched_count}."
