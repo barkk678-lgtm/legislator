@@ -78,6 +78,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   padding-inline-start: 8px;
   margin-bottom: 10px;
 }
+.source-ref-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
 
 .node { margin-inline-start: 14px; margin-bottom: 6px; }
 .node > .node-header {
@@ -88,12 +93,37 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .node.status-repealed > .node-header,
 .node.status-merged > .node-header { color: var(--muted); font-style: italic; }
+
+.node-body-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.node-body-row > .node-text,
+.node-body-row > .node-text-empty { flex: 1; min-width: 0; }
+
 .node-add-btn {
   font-size: 0.72rem;
   padding: 1px 7px;
   visibility: hidden;
+  flex-shrink: 0;
 }
-.node-header:hover .node-add-btn { visibility: visible; }
+.node-body-row:hover .node-add-btn { visibility: visible; }
+
+/* תוכן שהוסף כרגע (סעיף/סעיף קטן/פסקה בכל היררכיה) - נראה בדיוק כמו
+   כל צומת אחר, פרט לרקע הצהוב, וניתן לעריכה חופשית כמו כל תוכן אחר
+   (ראו משוב המשתמש אחרי בדיקה ידנית, TASKS.md 10ב). */
+.node.inserted > .node-header,
+.node.inserted > .node-body-row > .node-text {
+  background: var(--touched-bg);
+  border-radius: 4px;
+  padding-inline: 4px;
+}
+.remove-insertion-btn {
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  margin-inline-start: auto;
+}
 
 .editor-note-flag {
   font-size: 0.72rem;
@@ -206,6 +236,24 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   outline: 1px dashed var(--danger);
 }
 
+.node-number { color: var(--muted); font-weight: 700; }
+.node-margin-title {
+  outline: none;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.node-margin-title[contenteditable="true"]:focus {
+  background: var(--accent-bg);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.node-margin-title del { color: var(--danger); text-decoration: line-through; }
+.node-margin-title ins { color: var(--accent); text-decoration: underline; }
+.node-margin-title.edit-unsupported {
+  background: var(--danger-bg);
+  outline: 1px dashed var(--danger);
+}
+.node-margin-title.readonly { color: var(--muted); font-weight: 400; font-style: italic; }
+
 .insert-host { position: relative; }
 .insert-menu {
   position: relative;
@@ -223,14 +271,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .insert-menu-form { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .insert-menu-form button { margin-inline-end: 6px; }
 
-.pending-insertion-card {
+.insertion-error-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   margin: 4px 0;
   padding: 5px 8px;
-  background: var(--touched-bg);
+  background: var(--danger-bg);
+  color: var(--danger);
   border-radius: 5px;
   font-size: 0.85rem;
 }

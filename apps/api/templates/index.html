@@ -21,6 +21,7 @@
 
   <div id="law-panels" hidden>
     <div class="as-of-note" id="as-of-note"></div>
+    <div class="source-ref-note" id="source-ref-note"></div>
     <div class="error-banner" id="amend-blocked-note" hidden></div>
 
     <div class="split">
@@ -28,7 +29,8 @@
         <h2>נוסח החוק — לחצו לעריכה</h2>
         <div class="hint">
           לחצו על טקסט ועיטרו אותו ישירות. השינוי מתועד כשיוצאים מהשדה (blur).
-          לחצו על "+" ליד סעיף/סעיף קטן/פסקה כדי להוסיף תוכן חדש.
+          לחצו על "+" בסוף שורת הסעיף/סעיף קטן/פסקה כדי להוסיף תוכן חדש אחריו.
+          תוכן שהוסף כרגע מסומן ברקע צהוב, ועדיין ניתן לעריכה חופשית כמו כל תוכן אחר.
         </div>
         <div id="law-tree"></div>
       </div>
@@ -43,15 +45,6 @@
           <div class="field">
             <label for="bill-initiator-input">שם היוזם</label>
             <input id="bill-initiator-input" type="text" />
-          </div>
-          <div class="field">
-            <label for="bill-date-input">תאריך הנחה</label>
-            <input id="bill-date-input" type="text" placeholder="למשל 15.11.2023" />
-          </div>
-          <div class="field required" id="source-ref-field">
-            <label>מראה מקום (ס"ח)</label>
-            <input type="text" placeholder='למשל ס"ח התש"ן, עמ׳ 155.' />
-            <div class="hint">שדה חובה — בלי הערת שוליים למקור, ההצעה נכשלת בבדיקה 2 בוולידטור.</div>
           </div>
         </div>
 

@@ -65,6 +65,7 @@ class InsertionError:
     anchor_node_id: str
     kind: str
     reason: str
+    client_id: str
 
 
 @dataclass
@@ -158,7 +159,10 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
         )
         if t is None:
             insertion_errors.append(
-                InsertionError(anchor_node_id=ins.anchor_node_id, kind=ins.kind, reason=err)
+                InsertionError(
+                    anchor_node_id=ins.anchor_node_id, kind=ins.kind, reason=err,
+                    client_id=ins.client_id,
+                )
             )
             continue
         current, ann = apply(current, [t])

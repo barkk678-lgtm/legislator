@@ -50,13 +50,16 @@ def main():
         # ואז מקלידים עם page.keyboard.type() - זה בודק בדיוק את מה
         # שחשוב: שהקוד שלנו (בעיקר ה-handler של focus) לא מזיז את הסמן
         # שהמשתמש/הדפדפן כבר קבעו.
+        # data-node-id מופיע גם על מעטפת ה-.node וגם על שדה הטקסט/כותרת
+        # השוליים שבתוכה (10ב) - הסלקטור חייב לפרט .node-text כדי
+        # לפגוע דווקא בשדה הניתן-לעריכה, לא במעטפת החיצונית.
         node_id = "kaytanot-1990/s2/p0"
-        node = page.locator(f'[data-node-id="{node_id}"]')
+        node = page.locator(f'.node-text[data-node-id="{node_id}"]')
         original_text = node.inner_text()
         split_point = original_text.index("קייטנה")  # אחרי "לא ינהל אדם "
         page.evaluate(
             """([nodeId, offset]) => {
-                const el = document.querySelector(`[data-node-id="${nodeId}"]`);
+                const el = document.querySelector(`.node-text[data-node-id="${nodeId}"]`);
                 el.focus();
                 const textNode = el.firstChild;
                 const range = document.createRange();
@@ -88,12 +91,48 @@ def main():
         )
         check("טבלת ההצעה מכילה כותרת שוליים 'תיקון סעיף'", "תיקון סעיף" in docx_lines_text)
 
+        # --- בדיקת סדר כותרת: מספר לפני כותרת שוליים (לא ההפך) ---
+        # ".node-header" (בניגוד ל-".node") לא "בולע" טקסט של צאצאים -
+        # לכן אפשר לסנן לפיו בבטחה, ואז לעלות למעטפת ה-.node שלו כדי
+        # להגיע לשורת הטקסט/כפתור ה-"+" (אחים של הכותרת, לא בתוכה).
+        section5_header = page.locator(".node-header").filter(has_text="עונשין").first
+        section5_node = section5_header.locator("xpath=..")
+        header_children_classes = section5_header.locator(":scope > *").evaluate_all(
+            "els => els.map(e => e.className)"
+        )
+        first_is_number = len(header_children_classes) > 0 and "node-number" in header_children_classes[0]
+        title_after_number = any("node-margin-title" in c for c in header_children_classes[1:])
+        check(
+            "בכותרת הסעיף: מספר קודם לכותרת שוליים (סדר קריאה נכון מימין לשמאל)",
+            first_is_number and title_after_number,
+            f"-> {header_children_classes}",
+        )
+
+        # --- כפתור "+" בסוף שורת הטקסט (לא ליד הכותרת) ---
+        add_btn_in_body_row = section5_node.locator(":scope > .node-body-row > .node-add-btn").count() == 1
+        add_btn_in_header = section5_header.locator(".node-add-btn").count() == 0
+        check(
+            "כפתור '+' יושב בשורת הטקסט של הסעיף, לא ליד הכותרת",
+            add_btn_in_body_row and add_btn_in_header,
+        )
+
+        # --- כותרת שוליים ניתנת לעריכה (§7.8) ---
+        title_el = section5_header.locator('.node-margin-title[contenteditable="true"]').first
+        title_el.click()
+        page.keyboard.press("Control+A")
+        page.keyboard.type("עונשין חמורים")
+        title_el.blur()
+        page.wait_for_timeout(600)
+        docx_after_title_edit = page.inner_text("#docx-lines")
+        check(
+            "עריכת כותרת שוליים מתועדת בטבלה לפי §7.8 ('בכותרת השוליים')",
+            "בכותרת השוליים" in docx_after_title_edit,
+            f"-> {docx_after_title_edit!r}",
+        )
+
         # --- בונוס: תפריט ההוספה (היררכיה + תצוגה מקדימה של מספור) ---
-        section5_header = page.locator('.node-header', has_text="עונשין")
-        if section5_header.count() == 0:
-            section5_header = page.locator(".node").filter(has_text="עונשין").locator(".node-header").first
-        add_btn = section5_header.locator(".node-add-btn")
-        section5_header.hover()
+        add_btn = section5_node.locator(":scope > .node-body-row > .node-add-btn")
+        section5_node.locator(":scope > .node-body-row").hover()
         add_btn.click(force=True)
         page.wait_for_selector(".insert-menu .insert-level-btn", timeout=3000)
         page.wait_for_timeout(600)  # ממתינים לתשובות ה-preview המקבילות
@@ -120,6 +159,27 @@ def main():
             "ביצוע" in docx_lines_after_insert,
         )
 
+        # --- הצומת שהוכנס: מופיע כצומת אמיתי, מודגש בצהוב, וניתן
+        # להמשיך ולערוך אותו (לא נעול, לא רק תקציר סטטי) ---
+        inserted_node = page.locator(".node.inserted").first
+        check("הצומת שהוכנס מופיע בעץ עם מחלקת 'inserted' (רקע צהוב)", inserted_node.count() == 1)
+        inserted_text_el = inserted_node.locator(".node-text").first
+        check(
+            "הצומת שהוכנס עדיין ניתן לעריכה (contenteditable)",
+            inserted_text_el.get_attribute("contenteditable") == "true",
+        )
+        inserted_text_el.click()
+        page.keyboard.press("Control+A")
+        page.keyboard.type("השר הנוגע בדבר ממונה על ביצועו של חוק זה.")
+        inserted_text_el.blur()
+        page.wait_for_timeout(600)
+        docx_after_editing_inserted = page.inner_text("#docx-lines")
+        check(
+            "עריכת התוכן שהוכנס משתקפת בטבלה (הצומת החדש לא נעול)",
+            "הנוגע בדבר" in docx_after_editing_inserted,
+            f"-> {docx_after_editing_inserted!r}",
+        )
+
         # --- בונוס: מגירת הולידטור ---
         findings_table = page.locator("#findings-table")
         check("טבלת הולידציה מוסתרת כברירת מחדל", not findings_table.is_visible())
@@ -131,8 +191,6 @@ def main():
         # --- קריטריון 4: ייצוא docx תקין ---
         page.fill("#bill-title-input", "הצעת חוק בדיקה")
         page.fill("#bill-initiator-input", "בודק/ת")
-        page.fill("#bill-date-input", "1.1.2024")
-        page.fill("#source-ref-field input", 'ס"ח בדיקה, עמ\' 1.')
         with page.expect_download() as download_info:
             page.click("#download-btn")
         download = download_info.value

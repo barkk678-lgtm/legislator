@@ -2,8 +2,10 @@
 /* לקוח משימה 10ב: עריכה חופשית. אין כאן שום לוגיקה משפטית - כל
  * החלטה (מה נתמך, איזו הוראת תיקון נגזרת, איזו תווית תיווצר) מגיעה
  * מהשרת (diff_translate.py/insert_preview.py/apply_changes.py). ה-JS
- * רק שולח את מלוא המצב הנוכחי (edits+insertions) בכל בקשה, ומציג את
- * מה שהשרת מחזיר.
+ * רק שולח את מלוא המצב הנוכחי (edits+insertions) בכל בקשה, ומרנדר
+ * מחדש את מלוא העץ מתוך "tree" שחוזר מהשרת - כך שתוכן שהוסף הופך
+ * לצומת אמיתי, ניתן לעריכה, לא לתקציר סטטי (ראו TASKS.md 10ב, משוב
+ * המשתמש אחרי בדיקה ידנית).
  */
 
 const LEVEL_ORDER = ["section", "subsection", "paragraph", "subparagraph"];
@@ -15,13 +17,16 @@ const LEVEL_LABELS = {
 };
 
 let currentLawId = null;
-let originalTextById = {}; // node_id -> טקסט מקורי (מהעץ שנטען מהשרת)
-let everEditedNodeIds = new Set(); // כל node_id שנערך אי-פעם (גם אם חזר למקור)
-let edits = {}; // node_id -> טקסט נוכחי (רק לצמתים ששונים מהמקור)
+let originalTextById = {}; // node_id -> טקסט מקורי (מהעץ הפריסטיני, נטען פעם אחת)
+let originalMarginTitleById = {}; // node_id -> כותרת שוליים מקורית
+let everEditedFieldKeys = new Set(); // "node_id:field" שנערך אי-פעם (גם אם חזר למקור)
+let edits = {}; // "node_id:field" -> {node_id, field, text}
 let insertions = []; // [{clientId, kind, anchor_node_id, text, margin_title?, label}]
 let insertionCounter = 0;
-let nodeElements = {}; // node_id -> אלמנט ה-DOM של node-text
+let insertionClientIds = new Set(); // clientId-ים של הוספות ממתינות/שהתבצעו
+let fieldElements = {}; // "node_id:field" -> אלמנט ה-DOM הניתן לעריכה
 let insertPreviewSeq = 0; // מונע עדכון תפריט הוספה שכבר נסגר
+let renderGeneration = 0; // מונע rebuild מתוך תשובה ישנה שנדחתה על ידי בקשה מאוחרת יותר
 
 function escapeHtml(s) {
   const div = document.createElement("div");
@@ -33,8 +38,6 @@ function billMeta() {
   return {
     title: document.getElementById("bill-title-input").value,
     initiator: document.getElementById("bill-initiator-input").value,
-    submitted_date: document.getElementById("bill-date-input").value,
-    source_ref: document.querySelector("#source-ref-field input").value,
     explanatory: document
       .getElementById("explanatory-input")
       .value.split("\n")
@@ -44,12 +47,15 @@ function billMeta() {
 }
 
 function editsPayload() {
-  return Object.entries(edits).map(([node_id, text]) => ({ node_id, text }));
+  return Object.values(edits).map(({ node_id, field, text }) => ({ node_id, field, text }));
 }
 
 function insertionsPayload() {
   return insertions.map((ins) => {
-    const item = { kind: ins.kind, anchor_node_id: ins.anchor_node_id, text: ins.text };
+    const item = {
+      kind: ins.kind, anchor_node_id: ins.anchor_node_id, text: ins.text,
+      client_id: ins.clientId,
+    };
     if (ins.kind === "section") item.margin_title = ins.margin_title;
     return item;
   });
@@ -75,35 +81,35 @@ async function loadLawList() {
   });
 }
 
-function buildOriginalTextIndex(node) {
+function buildOriginalIndex(node) {
   originalTextById[node.id] = node.text;
-  for (const child of node.children) buildOriginalTextIndex(child);
+  originalMarginTitleById[node.id] = node.margin_title || "";
+  for (const child of node.children) buildOriginalIndex(child);
 }
 
 async function onLawChange(lawId) {
   currentLawId = lawId;
   edits = {};
   insertions = [];
-  everEditedNodeIds = new Set();
-  nodeElements = {};
+  insertionClientIds = new Set();
+  everEditedFieldKeys = new Set();
+  fieldElements = {};
   originalTextById = {};
+  originalMarginTitleById = {};
 
   const law = await (await fetch(`/api/laws/${lawId}`)).json();
-  buildOriginalTextIndex(law.tree);
+  buildOriginalIndex(law.tree);
 
   document.getElementById("law-panels").hidden = false;
   document.getElementById("as-of-note").textContent = law.as_of_display || "";
-
-  const sourceRefInput = document.querySelector("#source-ref-field input");
-  sourceRefInput.value = law.known_source_ref || "";
+  document.getElementById("source-ref-note").textContent = law.known_source_ref
+    ? `מראה מקום: ${law.known_source_ref}`
+    : "מראה מקום: לא ידוע לחוק זה - הוולידטור יתריע (בדיקה 2).";
 
   const billTitleInput = document.getElementById("bill-title-input");
-  if (!billTitleInput.value) billTitleInput.value = `הצעת חוק ${law.title} (תיקון), התש"ף–2024`;
+  if (!billTitleInput.value) billTitleInput.value = "";
 
-  const treeContainer = document.getElementById("law-tree");
-  treeContainer.innerHTML = "";
-  treeContainer.appendChild(renderNode(law.tree, 0));
-
+  rebuildTree(law.tree);
   await refreshPreview();
 }
 
@@ -117,6 +123,7 @@ function levelsForNodeType(nodeType) {
 function renderNode(node, depth) {
   const wrapper = document.createElement("div");
   wrapper.className = "node";
+  wrapper.dataset.nodeId = node.id;
   wrapper.style.marginInlineStart = `${depth * 14}px`;
 
   if (node.node_type === "law") {
@@ -125,33 +132,89 @@ function renderNode(node, depth) {
     heading.textContent = node.full_title || "";
     wrapper.appendChild(heading);
   } else {
+    const isInserted = insertionClientIds.has(node.id);
+    if (isInserted) wrapper.classList.add("inserted");
+
     const header = document.createElement("div");
     header.className = "node-header";
-    const label = [node.margin_title, node.number].filter(Boolean).join(" ");
-    header.textContent = label;
-    if (node.node_type === "section" || node.node_type === "subsection" || node.node_type === "paragraph") {
-      const addBtn = document.createElement("button");
-      addBtn.className = "node-add-btn subtle";
-      addBtn.textContent = "+";
-      addBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        toggleInsertMenu(node, wrapper);
-      });
-      header.appendChild(addBtn);
+
+    // מספר לפני כותרת שוליים (סדר קריאה נכון מימין לשמאל) - לא ההפך.
+    const numberSpan = document.createElement("span");
+    numberSpan.className = "node-number";
+    numberSpan.textContent = node.number || "";
+    header.appendChild(numberSpan);
+
+    if (node.node_type === "section") {
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "node-margin-title";
+      titleSpan.contentEditable = "true";
+      titleSpan.dataset.nodeId = node.id;
+      titleSpan.dataset.field = "margin_title";
+      titleSpan.textContent = node.margin_title || "";
+      titleSpan.dataset.plainValue = node.margin_title || "";
+      titleSpan.addEventListener("focus", onFieldFocus);
+      titleSpan.addEventListener("blur", onFieldBlur);
+      header.appendChild(titleSpan);
+      fieldElements[`${node.id}:margin_title`] = titleSpan;
+    } else if (node.margin_title) {
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "node-margin-title readonly";
+      titleSpan.textContent = node.margin_title;
+      header.appendChild(titleSpan);
     }
+
+    if (isInserted) {
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "subtle remove-insertion-btn";
+      removeBtn.textContent = "✕ הסר הוספה";
+      removeBtn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        insertions = insertions.filter((i) => i.clientId !== node.id);
+        insertionClientIds.delete(node.id);
+        await refreshPreview();
+      });
+      header.appendChild(removeBtn);
+    }
+
     wrapper.appendChild(header);
+
+    const bodyRow = document.createElement("div");
+    bodyRow.className = "node-body-row";
 
     if (node.text) {
       const textEl = document.createElement("div");
       textEl.className = "node-text";
       textEl.contentEditable = "true";
       textEl.dataset.nodeId = node.id;
+      textEl.dataset.field = "text";
       textEl.textContent = node.text;
-      textEl.addEventListener("focus", onNodeFocus);
-      textEl.addEventListener("blur", onNodeBlur);
-      wrapper.appendChild(textEl);
-      nodeElements[node.id] = textEl;
+      textEl.dataset.plainValue = node.text;
+      textEl.addEventListener("focus", onFieldFocus);
+      textEl.addEventListener("blur", onFieldBlur);
+      bodyRow.appendChild(textEl);
+      fieldElements[`${node.id}:text`] = textEl;
+    } else {
+      const spacer = document.createElement("div");
+      spacer.className = "node-text-empty";
+      bodyRow.appendChild(spacer);
     }
+
+    // כפתור "+" בסוף שורת הטקסט של הצומת עצמו (לא ליד הכותרת) - ראו
+    // משוב המשתמש: המקום להוסיף סעיף/סעיף קטן חדש הוא איפה שנגמר
+    // התוכן של הצומת הנוכחי, בכל היררכיה.
+    if (node.node_type === "section" || node.node_type === "subsection" || node.node_type === "paragraph") {
+      const addBtn = document.createElement("button");
+      addBtn.className = "node-add-btn subtle";
+      addBtn.textContent = "+";
+      addBtn.title = "הוספת תוכן חדש אחרי צומת זה";
+      addBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        toggleInsertMenu(node, wrapper);
+      });
+      bodyRow.appendChild(addBtn);
+    }
+
+    wrapper.appendChild(bodyRow);
 
     const insertHost = document.createElement("div");
     insertHost.className = "insert-host";
@@ -164,9 +227,15 @@ function renderNode(node, depth) {
   return wrapper;
 }
 
-function onNodeFocus(ev) {
+function rebuildTree(tree) {
+  fieldElements = {};
+  const treeContainer = document.getElementById("law-tree");
+  treeContainer.innerHTML = "";
+  treeContainer.appendChild(renderNode(tree, 0));
+}
+
+function onFieldFocus(ev) {
   const el = ev.target;
-  const nodeId = el.dataset.nodeId;
   // מסירים דקורציה (del/ins) רק אם היא בפועל קיימת (יש אלמנטי ילד) -
   // el.textContent = ... מחליף את צומת הטקסט הפנימי גם כשהתוכן זהה
   // בייטים, מה שהורס את מיקום הסמן שהקליק כבר קבע (הבאג המקורי: כל
@@ -174,43 +243,62 @@ function onNodeFocus(ev) {
   // בלי דקורציה - לא נוגעים ב-DOM בכלל, נותנים לדפדפן למקם את הסמן
   // איפה שהמשתמש לחץ.
   if (el.childElementCount > 0) {
-    el.textContent = edits[nodeId] ?? originalTextById[nodeId];
+    el.textContent = el.dataset.plainValue ?? "";
   }
   el.classList.remove("edit-unsupported");
 }
 
-async function onNodeBlur(ev) {
+async function onFieldBlur(ev) {
   const el = ev.target;
   const nodeId = el.dataset.nodeId;
+  const field = el.dataset.field;
   const currentText = el.textContent;
-  const original = originalTextById[nodeId];
+
+  // צומת שהוא עצמו הוספה ממתינה: אין "מקור" להשוות אליו - עריכת
+  // התוכן החדש מעדכנת ישירות את ההוספה הממתינה, לא נכנסת למנגנון
+  // ה-diff מול טקסט קיים.
+  const ins = insertions.find((i) => i.clientId === nodeId);
+  if (ins) {
+    if (field === "margin_title") ins.margin_title = currentText;
+    else ins.text = currentText;
+    await refreshPreview();
+    return;
+  }
+
+  const key = `${nodeId}:${field}`;
+  const original = field === "margin_title" ? originalMarginTitleById[nodeId] : originalTextById[nodeId];
   if (currentText === original) {
-    delete edits[nodeId];
+    delete edits[key];
   } else {
-    edits[nodeId] = currentText;
-    everEditedNodeIds.add(nodeId);
+    edits[key] = { node_id: nodeId, field, text: currentText };
+    everEditedFieldKeys.add(key);
   }
   await refreshPreview();
 }
 
-function applyDecoration(nodeId, status) {
-  const el = nodeElements[nodeId];
+function applyDecoration(key, status) {
+  const el = fieldElements[key];
   if (!el) return;
-  const original = originalTextById[nodeId];
-  if (!(nodeId in edits)) {
+  const [nodeId, field] = key.split(":");
+  const original = field === "margin_title" ? originalMarginTitleById[nodeId] : originalTextById[nodeId];
+  if (!(key in edits)) {
     el.textContent = original;
+    el.dataset.plainValue = original;
     el.classList.remove("edit-unsupported");
     el.removeAttribute("title");
     return;
   }
+  const editedText = edits[key].text;
   if (!status || !status.ok) {
-    el.textContent = edits[nodeId];
+    el.textContent = editedText;
+    el.dataset.plainValue = editedText;
     el.classList.add("edit-unsupported");
     el.title = (status && status.reason) || "לא ניתן לבטא את השינוי הזה כהוראת תיקון";
     return;
   }
   el.classList.remove("edit-unsupported");
   el.removeAttribute("title");
+  el.dataset.plainValue = editedText;
   if (status.old_phrase) {
     const idx = original.indexOf(status.old_phrase);
     const before = original.slice(0, idx);
@@ -228,8 +316,39 @@ function applyDecoration(nodeId, status) {
   }
 }
 
+function findNodeWrapperById(nodeId) {
+  for (const wrapper of document.querySelectorAll("#law-tree .node")) {
+    if (wrapper.dataset.nodeId === nodeId) return wrapper;
+  }
+  return null;
+}
+
+function renderInsertionErrors(errors) {
+  document.querySelectorAll(".insertion-error-card").forEach((c) => c.remove());
+  for (const err of errors) {
+    const anchorWrapper = findNodeWrapperById(err.anchor_node_id);
+    const host = anchorWrapper ? anchorWrapper.querySelector(":scope > .insert-host") : null;
+    if (!host) continue;
+    const card = document.createElement("div");
+    card.className = "insertion-error-card";
+    card.textContent = `הוספת ${LEVEL_LABELS[err.kind] || err.kind} נכשלה: ${err.reason}`;
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "subtle";
+    removeBtn.textContent = "הסר";
+    removeBtn.addEventListener("click", async () => {
+      insertions = insertions.filter((i) => i.clientId !== err.client_id);
+      insertionClientIds.delete(err.client_id);
+      card.remove();
+      await refreshPreview();
+    });
+    card.appendChild(removeBtn);
+    host.appendChild(card);
+  }
+}
+
 async function refreshPreview() {
   if (!currentLawId) return;
+  const myGeneration = ++renderGeneration;
   const req = { edits: editsPayload(), insertions: insertionsPayload(), bill: billMeta() };
   const resp = await fetch(`/api/laws/${currentLawId}/render`, {
     method: "POST",
@@ -237,15 +356,26 @@ async function refreshPreview() {
     body: JSON.stringify(req),
   });
   const data = await resp.json();
+  // תשובה ישנה שנחסמה על ידי בקשה מאוחרת יותר (למשל: המשתמש כבר
+  // המשיך לערוך ושלח בקשה נוספת לפני שזו חזרה) - לא נוגעים ב-DOM.
+  if (myGeneration !== renderGeneration) return;
 
-  const statusByNodeId = {};
-  for (const s of data.edit_statuses) statusByNodeId[s.node_id] = s;
-  for (const nodeId of everEditedNodeIds) applyDecoration(nodeId, statusByNodeId[nodeId]);
+  // בונים מחדש את כל עץ העריכה רק אם המשתמש לא ממש עכשיו בתוך שדה
+  // ניתן-לעריכה - אחרת רינדור-מחדש היה מוחק את התו שהוא הרגע הקליד
+  // (מרוץ בין תשובת render איטית לבין פוקוס חדש שכבר הוזז).
+  const activeIsField = document.activeElement && document.activeElement.isContentEditable;
+  if (!activeIsField) {
+    rebuildTree(data.tree);
+    const statusByKey = {};
+    for (const s of data.edit_statuses) statusByKey[`${s.node_id}:${s.field}`] = s;
+    for (const key of everEditedFieldKeys) applyDecoration(key, statusByKey[key]);
+  }
 
+  renderInsertionErrors(data.insertion_errors);
   renderDocxApprox(data.lines);
   renderFindings(data.findings);
   document.getElementById("download-hint").textContent = data.insertion_errors.length
-    ? `שים לב: ${data.insertion_errors.length} הוספות לא בוצעו (ראו כרטיסי ההוספה)`
+    ? `שים לב: ${data.insertion_errors.length} הוספות לא בוצעו (ראו כרטיסי השגיאה בעץ)`
     : "";
 }
 
@@ -378,43 +508,20 @@ function showInsertForm(menu, node, level, label) {
       textInput.focus();
       return;
     }
+    const clientId = `ins-${++insertionCounter}`;
     insertions.push({
-      clientId: ++insertionCounter,
+      clientId,
       kind: level,
       anchor_node_id: node.id,
       text: textInput.value,
       margin_title: level === "section" ? titleInput.value : undefined,
       label,
     });
+    insertionClientIds.add(clientId);
     menu.remove();
     await refreshPreview();
-    renderPendingInsertionCard(node);
   };
   menu.querySelector(".insert-cancel-btn").onclick = () => menu.remove();
-}
-
-function renderPendingInsertionCard(anchorNode) {
-  const el = nodeElements[anchorNode.id];
-  const wrapper = el ? el.closest(".node") : null;
-  const host = wrapper ? wrapper.querySelector(":scope > .insert-host") : null;
-  if (!host) return;
-  const mine = insertions.filter((i) => i.anchor_node_id === anchorNode.id);
-  host.querySelectorAll(".pending-insertion-card").forEach((c) => c.remove());
-  for (const ins of mine) {
-    const card = document.createElement("div");
-    card.className = "pending-insertion-card";
-    card.textContent = `+ ${LEVEL_LABELS[ins.kind]} חדש (${ins.label}): ${ins.text.slice(0, 40)}`;
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "subtle";
-    removeBtn.textContent = "הסר";
-    removeBtn.addEventListener("click", async () => {
-      insertions = insertions.filter((i) => i.clientId !== ins.clientId);
-      card.remove();
-      await refreshPreview();
-    });
-    card.appendChild(removeBtn);
-    host.appendChild(card);
-  }
 }
 
 document.getElementById("download-btn").addEventListener("click", async () => {
@@ -445,10 +552,9 @@ document.getElementById("validator-toggle").addEventListener("click", () => {
   table.hidden = !table.hidden;
 });
 
-for (const inputId of ["bill-title-input", "bill-initiator-input", "bill-date-input"]) {
+for (const inputId of ["bill-title-input", "bill-initiator-input"]) {
   document.getElementById(inputId).addEventListener("blur", refreshPreview);
 }
-document.querySelector("#source-ref-field input").addEventListener("blur", refreshPreview);
 document.getElementById("explanatory-input").addEventListener("blur", refreshPreview);
 
 loadLawList();
