@@ -10,6 +10,7 @@ BILL.lines *הוא* הפלט של amend(), והשוואה מולו הייתה ט
 יתפוס את זה גם אם אף אחד לא ישווה שוב ידנית מול ה-docx האמיתי.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -21,6 +22,17 @@ from render_bill import Line  # noqa: E402
 from engine import amend  # noqa: E402
 from test_kaytanot import load_before, build_after  # noqa: E402
 
+_META = json.loads(
+    (
+        Path(__file__).resolve().parents[2]
+        / "tests"
+        / "fixtures"
+        / "wikitext"
+        / "kaytanot.meta.json"
+    ).read_text(encoding="utf-8")
+)
+_AS_OF = _META["revision_timestamp"]  # ראו TASKS.md משימה 5א
+
 EXPECTED_LINES = [
     Line(
         side_heading="תיקון סעיף 1",
@@ -28,15 +40,24 @@ EXPECTED_LINES = [
         text_after=' (להלן – החוק העיקרי), בסעיף 1 – ',
         footnotes=["kaytanot"],
         depth=0,
+        source_node_id="kaytanot-1990",
+        as_of=_AS_OF,
     ),
-    Line(text='אחרי "בחוק זה" יבוא:', depth=0),
+    Line(text='אחרי "בחוק זה" יבוא:', depth=0, source_node_id="kaytanot-1990/s1/p0", as_of=_AS_OF),
     Line(
         text='""ארגון נוער או תנועת נוער" – ארגון או תנועה או חוגי סיור '
         "הנתמכים על ידי משרד החינוך לפי מבחנים לצורך תמיכה;\";",
         style="TableBlockOutdent",
         depth=0,
+        source_node_id="kaytanot-1990/s1/p0",
+        as_of=_AS_OF,
     ),
-    Line(text='אחרי ההגדרה "ילד" יבוא:', depth=0),
+    Line(
+        text='אחרי ההגדרה "ילד" יבוא:',
+        depth=0,
+        source_node_id="kaytanot-1990/s1/p2",
+        as_of=_AS_OF,
+    ),
     Line(
         text='""מבחנים לצורך תמיכה" – מבחנים לצורך תמיכה של משרד חינוך '
         "בפעילות ארגוני ילדים ונוער במוסדות ציבור לפי חוק יסודות "
@@ -48,12 +69,22 @@ EXPECTED_LINES = [
         footnotes=["budget"],
         style="TableBlockOutdent",
         depth=0,
+        source_node_id="kaytanot-1990/s1/p2",
+        as_of=_AS_OF,
     ),
-    Line(marker="(3)", text="בסופו יבוא:", depth=0),
+    Line(
+        marker="(3)",
+        text="בסופו יבוא:",
+        depth=0,
+        source_node_id="kaytanot-1990/s1/p4",
+        as_of=_AS_OF,
+    ),
     Line(
         text='""קייטנה מפוקחת" – פעילות קיץ שמנהל ארגון נוער או תנועת נוער.".',
         style="TableBlockOutdent",
         depth=0,
+        source_node_id="kaytanot-1990/s1/p4",
+        as_of=_AS_OF,
     ),
     Line(
         side_heading="תיקון סעיף 2",
@@ -61,6 +92,8 @@ EXPECTED_LINES = [
         text='בסעיף 2 לחוק העיקרי, אחרי המילים "לא ינהל אדם קייטנה" יבוא '
         '"שאינה קייטנה מפוקחת".',
         depth=0,
+        source_node_id="kaytanot-1990/s2/p0",
+        as_of=_AS_OF,
     ),
 ]
 

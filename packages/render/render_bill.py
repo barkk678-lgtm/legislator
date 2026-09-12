@@ -106,6 +106,12 @@ class Line:
     # דפוס "סעיף פנימי": כותרת שוליים + מספר של סעיף מצוטט
     inner_heading: str = ""
     inner_number: str = ""
+    # provenance (חוק ברזל 3, משימה 5א) - ממולא על ידי amend(), לא
+    # קורא אף פעם על ידי render_line/write_docx. אופציונלי: None
+    # תקין לשורות שאינן מצטטות נוסח קיים (למשל שם הצעה/דברי הסבר,
+    # שמנוסחים בחופשיות לפי CLAUDE.md - חוק ברזל 4).
+    source_node_id: str | None = None
+    as_of: str | None = None
 
 
 @dataclass

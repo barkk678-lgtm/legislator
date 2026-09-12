@@ -136,13 +136,20 @@ def _slug(label: str | None, fallback_index: int) -> str:
 
 
 def parse_wikitext(
-    text: str, *, law_id: str, source_ref: str = ""
+    text: str, *, law_id: str, source_ref: str = "", as_of: str | None = None
 ) -> LegislativeNode:
     """מפרסר ויקיטקסט (מבנה ספר החוקים הפתוח) לעץ LegislativeNode.
 
     source_ref, אם ניתן, נשמר רק בשורש (ראו node.effective_source_ref) -
     הוא בדרך כלל מורכב חיצונית מ-{{ח:תיבה}} + תאריך ה-revision של הדף,
     ולא מפוענח כאן.
+
+    as_of (משימה 5א), אם ניתן, נשמר גם הוא רק בשורש (ראו
+    node.effective_as_of) - revision timestamp גולמי (למשל
+    "2024-09-30T13:00:35Z"), כפי שנשלף על ידי
+    wikitext_client.extract_revision_timestamp. לא מפוענח/מנוסח כאן -
+    הניסוח "נוסח כפי שהופיע ביום X" הוא תפקיד שכבת התצוגה, לא של
+    הפרסר.
     """
     root = LegislativeNode(
         id=law_id,
@@ -152,6 +159,7 @@ def parse_wikitext(
         text="",
         source_ref=source_ref,
         is_normative=False,  # השורש הוא מטא-דאטה של החוק, לא נוסח
+        as_of=as_of,
     )
 
     # מחסנית של (רמה_מבנית, צומת, מרחב_מספור_נוכחי)

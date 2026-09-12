@@ -13,6 +13,7 @@ _diff_replace ול-ReplaceWords.
 עם side_heading="תיקון סעיף 5".
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -28,19 +29,25 @@ from engine import amend  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WIKITEXT_FIXTURE = ROOT / "tests" / "fixtures" / "wikitext" / "kaytanot.wikitext"
+WIKITEXT_META = ROOT / "tests" / "fixtures" / "wikitext" / "kaytanot.meta.json"
+_META = json.loads(WIKITEXT_META.read_text(encoding="utf-8"))
 
 EXPECTED_LINES = [
     Line(
         side_heading="תיקון סעיף 5",
         text='בסעיף 5 לחוק העיקרי, במקום "מאסר ששה חדשים" יבוא "מאסר שנה".',
         depth=0,
+        source_node_id="kaytanot-1990/s5/p0",
+        as_of=_META["revision_timestamp"],
     ),
 ]
 
 
 def load_before() -> LegislativeNode:
+    """as_of (משימה 5א) מגיע מ-revision_timestamp האמיתי ב-.meta.json -
+    ראו test_kaytanot.load_before לאותו עיקרון."""
     text = WIKITEXT_FIXTURE.read_text(encoding="utf-8")
-    return parse_wikitext(text, law_id="kaytanot-1990")
+    return parse_wikitext(text, law_id="kaytanot-1990", as_of=_META["revision_timestamp"])
 
 
 def build_after(before: LegislativeNode) -> tuple[LegislativeNode, list]:

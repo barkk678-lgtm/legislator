@@ -11,6 +11,7 @@ tests/unit/test_amend_kaytanot.py משווה את פלט amend() ישירות מ
 BILL.lines - זו הבדיקה שסוגרת את הלולאה, לפני שהרנדור בכלל נכנס לתמונה.
 """
 
+import json
 import sys
 import zipfile
 from pathlib import Path
@@ -33,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ORIGINAL = ROOT / "reference" / "golden-kaytanot.docx"
 SKELETON = ROOT / "reference" / "skeleton-pshia.docx"
 WIKITEXT_FIXTURE = ROOT / "tests" / "fixtures" / "wikitext" / "kaytanot.wikitext"
+WIKITEXT_META = ROOT / "tests" / "fixtures" / "wikitext" / "kaytanot.meta.json"
 
 REFS = {
     "kaytanot": "ס\"ח התש\"ן, עמ' 155.",
@@ -42,9 +44,12 @@ REFS = {
 
 def load_before() -> LegislativeNode:
     """טוען את עץ 'לפני' האמיתי מ-fixture ויקיטקסט (task 3, ingest) -
-    לא בנוי ביד, לא מהקובץ הזהב עצמו."""
+    לא בנוי ביד, לא מהקובץ הזהב עצמו. as_of (משימה 5א) מגיע מ-
+    revision_timestamp האמיתי שנשמר ב-.meta.json בזמן שליפת ה-fixture -
+    לא ממציא ערך, ולא משאיר את השדה ריק כשיש לנו את הערך האמיתי."""
     text = WIKITEXT_FIXTURE.read_text(encoding="utf-8")
-    return parse_wikitext(text, law_id="kaytanot-1990")
+    meta = json.loads(WIKITEXT_META.read_text(encoding="utf-8"))
+    return parse_wikitext(text, law_id="kaytanot-1990", as_of=meta["revision_timestamp"])
 
 
 def build_after(before: LegislativeNode) -> tuple[LegislativeNode, list]:

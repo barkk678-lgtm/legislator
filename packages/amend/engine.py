@@ -17,6 +17,12 @@ annotations: הידע ה"בתהליך" (ביטוי ישן/חדש שהוחלף, �
 transform.py) שמצביעות על צמתים לפי id - לא מוטבע כסמן טקסטואלי בתוך
 .text. לכן .text בכל צומת, בכל עץ, מכיל נוסח חוק בלבד תמיד; ראו
 tests/unit/test_no_marker_leak.py למחסום המבני שאוכף את זה.
+
+provenance (חוק ברזל 3, משימה 5א): כל Line שהמנוע מייצר מקבל
+source_node_id ו-as_of (ראו _stamp_provenance) - הצומת ב"לפני" שממנו
+נגזרה השורה, ותאריך הנוסח שלו (node.effective_as_of). שני השדות לא
+משפיעים על הרינדור - הם קיימים כדי שהוולידטור (משימה 6) יוכל לוודא
+שלכל שורה יש provenance, לא כדי לשנות התנהגות.
 """
 
 import re
@@ -26,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
-from node import LegislativeNode  # noqa: E402
+from node import LegislativeNode, effective_as_of  # noqa: E402
 from numbering import sort_section_numbers  # noqa: E402
 from render_bill import Line  # noqa: E402
 from transform import Annotation, FootnoteAnnotation, ReplacementAnnotation  # noqa: E402
@@ -118,9 +124,13 @@ class _Insertion:
 
 @dataclass
 class _Mutation:
-    node_id: str
+    before_node: LegislativeNode
     before_text: str
     after_text: str
+
+    @property
+    def node_id(self) -> str:
+        return self.before_node.id
 
 
 def _diff_section(before_section: LegislativeNode, after_section: LegislativeNode):
@@ -148,7 +158,7 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
     for child in after_children:
         prior = before_by_id.get(child.id)
         if prior is not None and prior.text != child.text:
-            instructions.append(_Mutation(node_id=child.id, before_text=prior.text, after_text=child.text))
+            instructions.append(_Mutation(before_node=prior, before_text=prior.text, after_text=child.text))
 
     return instructions
 
@@ -218,6 +228,26 @@ def _render_mutation(
     return Line(text=text, depth=0)
 
 
+def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
+    if node.id == node_id:
+        return node
+    for child in node.children:
+        found = _find_by_id(child, node_id)
+        if found:
+            return found
+    return None
+
+
+def _stamp_provenance(line: Line, source: LegislativeNode, before_root: LegislativeNode) -> Line:
+    """ממלאת source_node_id/as_of על Line (חוק ברזל 3, משימה 5א) - הצומת
+    ב'לפני' שממנו נגזרה השורה (מוטציה: הצומת שהוחלף/הוכנסו בו מילים;
+    הכנסה: העוגן שאחריו מוכנס תוכן חדש; כותרת סעיף: הסעיף/השורש עצמו).
+    לא נוגעת ברינדור - שני השדות לא נקראים על ידי render_bill.py."""
+    line.source_node_id = source.id
+    line.as_of = effective_as_of(before_root, source)
+    return line
+
+
 def amend(
     before: LegislativeNode,
     after: LegislativeNode,
@@ -263,6 +293,7 @@ def amend(
             mutation_line.side_heading = f"תיקון סעיף {number}"
             if touched_count > 1:
                 mutation_line.number = f"{touched_count}."
+            _stamp_provenance(mutation_line, instructions[0].before_node, before)
             lines.append(mutation_line)
             continue
 
@@ -283,6 +314,7 @@ def amend(
                 footnotes=[law_footnote_key],
                 depth=0,
             )
+            _stamp_provenance(header, before, before)
         else:
             header = Line(
                 side_heading=f"תיקון סעיף {number}",
@@ -290,15 +322,35 @@ def amend(
                 text=f"בסעיף {number} לחוק העיקרי – ",
                 depth=0,
             )
+            _stamp_provenance(header, before_sections[number], before)
         lines.append(header)
 
         for i, instruction in enumerate(instructions):
             if isinstance(instruction, _Insertion):
                 terminator = "." if i == len(instructions) - 1 else ";"
                 footnote = footnotes_by_id.get(instruction.new_node.id)
-                lines.extend(_render_insertion(instruction, terminator, ordinal=i + 1, footnote=footnote))
+                insertion_lines = _render_insertion(
+                    instruction, terminator, ordinal=i + 1, footnote=footnote
+                )
+                # instruction.anchor הוא צומת מעץ ה"אחרי" (ראו _diff_section) -
+                # provenance צריך את המקבילה שלו ב"לפני" בפועל, כדי ש-
+                # effective_as_of יוכל לטפס מהשורש האמיתי. אם העוגן עצמו הוכנס
+                # זה עתה (הכנסה משורשרת אחרי הוספה חדשה) - אין לו מקבילה
+                # ב"לפני" ואין מקרה זהב עדיין למצב הזה.
+                before_anchor = _find_by_id(before, instruction.anchor.id)
+                if before_anchor is None:
+                    raise NotImplementedError(
+                        f"עוגן {instruction.anchor.id!r} אינו צומת קיים ב'לפני' "
+                        "(כנראה הכנסה משורשרת אחרי הוספה חדשה) - אין מקרה זהב "
+                        "עדיין ל-provenance במצב הזה."
+                    )
+                for insertion_line in insertion_lines:
+                    _stamp_provenance(insertion_line, before_anchor, before)
+                lines.extend(insertion_lines)
             else:
                 replacement = replacements_by_id.get(instruction.node_id)
-                lines.append(_render_mutation(number, instruction, replacement))
+                mutation_line = _render_mutation(number, instruction, replacement)
+                _stamp_provenance(mutation_line, instruction.before_node, before)
+                lines.append(mutation_line)
 
     return lines

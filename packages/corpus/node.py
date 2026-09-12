@@ -52,6 +52,15 @@ full_title נוסף לטובת משימה 4 (amend): שם החוק המלא כפ
 שמור לכותרת שוליים של סעיף, ושימוש כפול בו יבלבל בין "שם החוק" לבין
 "כותרת שוליים של סעיף מסוים".
 
+as_of (משימה 5א) הוא "תאריך הנוסח" מחוק ברזל 3: מתי בדיוק הוויקיטקסט
+הזה נערך לאחרונה (revision timestamp, ראו wikitext_client.
+extract_revision_timestamp) - **לא** "מעודכן ליום X" (ראו ההבחנה
+המפורשת ב-docs/data-sources.md: אין ערבות שהחוק לא תוקן בעולם האמיתי
+אחרי התאריך הזה, רק שכך הוא הופיע בוויקיטקסט ביום זה). כמו source_ref:
+יושב בשורש בלבד, וצמתים אחרים יורשים אותו דרך effective_as_of()
+למטה - לא מוצג ישירות למשתמש כמו שהוא (בלי הניסוח "נוסח כפי שהופיע
+ביום..."), זה תפקיד השכבה שמציגה, לא של המודל.
+
 מבנה משימה 3 (ingest): שורש העץ הוא LegislativeNode(node_type="law"),
 עם source_ref מחושב פעם אחת ו-is_normative=False (השורש הוא מטא-דאטה
 של החוק - שם, מספר מאגר, מראה מקום - לא נוסח, ואסור שייכנס ל-diff,
@@ -82,6 +91,7 @@ class LegislativeNode:
     margin_title_raw: str | None = None  # כותרת השוליים כוויקיטקסט גולמי, אם היא מכילה תבניות
     text_raw: str = ""  # הטקסט לפני normalize_text
     full_title: str | None = None  # רק לצומת law - שם החוק המלא, מ-{{ח:כותרת}}
+    as_of: str | None = None  # יושב בשורש בלבד - ראו effective_as_of()
 
 
 def effective_source_ref(root: LegislativeNode, target: LegislativeNode) -> str:
@@ -95,6 +105,21 @@ def effective_source_ref(root: LegislativeNode, target: LegislativeNode) -> str:
     while stack:
         node, inherited = stack.pop()
         current = node.source_ref or inherited
+        if node is target:
+            return current
+        for child in node.children:
+            stack.append((child, current))
+    raise ValueError("target אינו צומת בעץ שמשורשו root")
+
+
+def effective_as_of(root: LegislativeNode, target: LegislativeNode) -> str | None:
+    """מוצא את as_of בפועל של target, בטיפוס במעלה העץ מהשורש - אותו
+    דפוס בדיוק כמו effective_source_ref (as_of יושב רק בשורש, צמתים
+    אחרים יורשים אותו לפי מיקומם בעץ)."""
+    stack: list[tuple[LegislativeNode, str | None]] = [(root, root.as_of)]
+    while stack:
+        node, inherited = stack.pop()
+        current = node.as_of or inherited
         if node is target:
             return current
         for child in node.children:

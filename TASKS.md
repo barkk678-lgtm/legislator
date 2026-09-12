@@ -171,6 +171,48 @@ Fixtures אמיתיים תחת `tests/fixtures/wikitext/`: קייטנות, מא�
 
 ---
 
+### ✅ 5א · שרשרת provenance (חוק ברזל 3)
+
+**רקע:** תכנון משימה 6 (ולידטור) חשף שבדיקה 15 ("אין בפלט טקסט חוק
+שאין לו provenance") לא ניתנת למימוש: `Line` לא נשא שום שדה provenance,
+ו-revision timestamp (המקור היחיד ל"תאריך הנוסח") נשלף בעבר רק בזמן
+בניית ה-fixtures (נשמר ב-`.meta.json`) ומעולם לא זרם דרך `parse_wikitext`
+או `amend()`. זו לא הייתה "בעיה שהוולידטור יחשוף" - זו הפרה קיימת של
+חוק ברזל 3: המערכת הפיקה הצעות חוק בלי אפשרות לדעת מאיזה נוסח ומאיזה
+תאריך הן נגזרו. תוקן **לפני** משימה 6, לא כ-n/a בתוכה.
+
+**שרשרת provenance שנוספה:**
+1. `wikitext_client.extract_revision_timestamp(export_xml)` - שולפת
+   `revision/timestamp` מ-XML של `Special:Export` (קוד אמיתי, נבדק
+   ב-`tests/unit/test_wikitext_client.py` מול XML סינתטי הבנוי מהערכים
+   האמיתיים ב-`kaytanot.meta.json`) - במקום סקריפט scratchpad חד-פעמי
+   שאבד.
+2. `LegislativeNode.as_of` (שדה חדש, יושב בשורש בלבד, כמו `source_ref`)
+   + `node.effective_as_of()` (אותו דפוס בדיוק כמו `effective_source_ref`).
+3. `parse_wikitext(..., as_of=...)` - פרמטר אופציונלי חדש, מציב על
+   השורש בלבד. לא מפענח/מנסח - "נוסח כפי שהופיע ביום X" הוא תפקיד
+   שכבת התצוגה.
+4. `Line.source_node_id` ו-`Line.as_of` (שדות חדשים, אופציונליים,
+   ברירת מחדל `None`) ב-`render_bill.py`. **לא נקראים על ידי
+   `render_line`/`write_docx`** - נבדק: מבחני הזהב (`test_kaytanot.py`,
+   `test_kaytanot_section5.py`) מפיקים docx זהה בייטים למקור אחרי
+   השינוי, בלי לגעת בלוגיקת הרינדור עצמה.
+5. `amend()` ממלאת את שני השדות על **כל** `Line` שהיא מייצרת
+   (`_stamp_provenance`) - הצומת ב"לפני" שממנו נגזרה השורה (מוטציה:
+   הצומת שהוחלף/הוכנסו בו מילים; הכנסה: העוגן שאחריו מוכנס תוכן חדש -
+   נלקח מ"לפני" בפועל, לא מ-`instruction.anchor` שמגיע מעץ ה"אחרי";
+   כותרת סעיף: הסעיף/השורש עצמו) ו-`effective_as_of` שלו. אם אין
+   `as_of` בעץ המקור - זורם `None`, לא ערך מומצא (חוק ברזל 3: "אם
+   המערכת לא יודעת... היא אומרת זאת, לא מנחשת").
+
+**מבחנים:** `tests/unit/test_wikitext_client.py` (שליפת timestamp,
+כולל מקרה שבור: אין revision/timestamp ב-XML), `tests/unit/test_provenance.py`
+(כל שורה מקבלת source_node_id+as_of; המקרה השבור המרכזי: בלי as_of
+במקור, זורם `None` ולא מומצא ערך), ושני מקרי הזהב עודכנו להשוות גם
+את שני השדות החדשים (לא רק n/a - השוואת `Line` מלאה, כולל provenance).
+
+---
+
 ## 6 · ולידטור ← **המשימה הבאה**
 
 15 בדיקות. הרשימה המלאה ב-`docs/validator-checklist.md`.

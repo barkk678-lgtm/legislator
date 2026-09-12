@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 
 USER_AGENT = "mansach-hachukika-research/0.1 (educational legislative-drafting-tool)"
 API_URL = "https://he.wikisource.org/w/api.php"
@@ -61,3 +62,30 @@ def fetch_wikitext(title: str) -> dict:
     url = EXPORT_URL_TEMPLATE.format(title=title_encoded)
     xml_bytes = _get(url)
     return {"title": title, "export_xml": xml_bytes.decode("utf-8")}
+
+
+def _local_tag(tag: str) -> str:
+    """שם התג בלי namespace ({http://...}tag -> tag) - Special:Export
+    מכריז xmlns גרסתי (export-0.11 וכו') שמשתנה בין דפים/גרסאות ויקי,
+    ואין טעם להתאים אליו במפורש כדי לשלוף שדה יחיד."""
+    return tag.rsplit("}", 1)[-1]
+
+
+def extract_revision_timestamp(export_xml: str) -> str:
+    """שולפת את revision/timestamp מתוך XML של Special:Export - זה
+    המקור היחיד שיש לנו ל-as_of (חוק ברזל 3, ראו docs/data-sources.md
+    וnode.py: 'נוסח כפי שהופיע בוויקיטקסט ביום X', לא 'מעודכן ליום X').
+    לא שולפת page id/revision id - as_of לא זקוק להם היום.
+
+    היה קודם לכן שדה שנשלף באופן חד-פעמי (ידני, בסקריפט scratchpad
+    שאבד) בזמן בניית ה-fixtures, ולא הפך לקוד אמיתי בפרויקט - ולכן
+    מעולם לא זרם הלאה ל-LegislativeNode.as_of. זו הפעם הראשונה שזו
+    פונקציה אמיתית וניתנת לבדיקה (ראו tests/unit/test_wikitext_client.py)."""
+    root = ET.fromstring(export_xml)
+    for elem in root.iter():
+        if _local_tag(elem.tag) == "revision":
+            for child in elem:
+                if _local_tag(child.tag) == "timestamp" and child.text:
+                    return child.text
+            raise ValueError("נמצא revision ללא timestamp ב-export XML")
+    raise ValueError("לא נמצא revision ב-export XML")
