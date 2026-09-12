@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "corpus"))
 from node import LegislativeNode  # noqa: E402
+from numbering import next_appended_label, next_inserted_label, sort_section_numbers  # noqa: E402
 
 
 @dataclass
@@ -60,6 +61,34 @@ class AddFirstSubsection:
 
     section_number: str
     new_child: LegislativeNode
+    footnotes: list[tuple[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class InsertSectionAfter:
+    """מוסיף סעיף ראשי חדש (לא סעיף קטן/פסקה בתוך סעיף קיים, אלא ילד
+    חדש ברמת שורש החוק עצמו) מיד אחרי הסעיף עם after_section_number -
+    ha-hoveret-ha-sgula.pdf §7.12, עמ' 31 [PDF 60]: "בחוק [שם החוק],
+    אחרי סעיף [מספר הסעיף] לחוק העיקרי יבוא: 'כותרת שוליים [מספר הסעיף
+    החדש] [תוכן הסעיף].'"
+
+    new_section.number **אסור** להיקבע מראש - מחושב אוטומטית כאן
+    (next_inserted_label/next_appended_label, §8.1 ב-docs/drafting-rules.md)
+    לפי מיקום ההוספה, בדיוק כמו סעיף קטן/פסקה חדשים - כדי לא לפגוע
+    בהפניות קיימות לסעיפים שאחרי נקודת ההוספה (אותו נימוק בדיוק כמו
+    §7.10.6(א)).
+
+    היקף מכוון, לא כללי (drafting-rules.md §8.5): הוספה בודדת בלבד.
+    הוספת כמה סעיפים ראשיים חדשים רצופים זה אחרי זה (או פרק שלם) לא
+    נתמכת כאן - transform.apply() עצמו לא חוסם את זה (אפשר לצרף כמה
+    InsertSectionAfter ברשימה אחת), אבל engine.amend() (שממנו מגיעה
+    ההבחנה בין סעיף קיים לסעיף חדש) חוסם זאת במפורש - ראו שם.
+
+    footnotes: אותה משמעות בדיוק כמו ב-InsertAfter - (anchor_substring,
+    key) בתוך new_section.text (הנקי), חייב להופיע פעם אחת בדיוק."""
+
+    after_section_number: str
+    new_section: LegislativeNode
     footnotes: list[tuple[str, str]] = field(default_factory=list)
 
 
@@ -144,7 +173,9 @@ def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
 
 def apply(
     before: LegislativeNode,
-    transformations: list[InsertAfter | AddFirstSubsection | InsertWordsAfter | ReplaceWords],
+    transformations: list[
+        InsertAfter | InsertSectionAfter | AddFirstSubsection | InsertWordsAfter | ReplaceWords
+    ],
 ) -> tuple[LegislativeNode, list[Annotation]]:
     """מחזיר (עץ "אחרי" חדש, רשימת אנוטציות) - before לא משתנה. .text
     בעץ המוחזר מכיל תמיד נוסח חוק בלבד; כל מידע "בתהליך" עובר דרך
@@ -178,6 +209,51 @@ def apply(
                 annotations.append(
                     FootnoteAnnotation(
                         node_id=new_child.id, offset=pos + len(anchor_substring), key=key
+                    )
+                )
+        elif isinstance(t, InsertSectionAfter):
+            siblings = after.children
+            idx = next(
+                (
+                    i
+                    for i, c in enumerate(siblings)
+                    if c.node_type == "section" and c.number == t.after_section_number
+                ),
+                None,
+            )
+            if idx is None:
+                raise ValueError(f"סעיף {t.after_section_number} לא נמצא ב'לפני'")
+            if t.new_section.number:
+                raise ValueError(
+                    "InsertSectionAfter.new_section.number חייב להישאר ריק - "
+                    "המספור מחושב אוטומטית (drafting-rules.md §8.1), לא נקבע מראש."
+                )
+            existing_numbers = [c.number for c in siblings if c.node_type == "section"]
+            following = next(
+                (c for c in siblings[idx + 1 :] if c.node_type == "section"), None
+            )
+            if following is None:
+                label = next_appended_label(sort_section_numbers(existing_numbers))
+            else:
+                label = next_inserted_label(t.after_section_number, set(existing_numbers))
+            new_section = copy.deepcopy(t.new_section)
+            new_section.number = label
+            new_section.node_type = "section"
+            siblings.insert(idx + 1, new_section)
+            for anchor_substring, key in t.footnotes:
+                count = new_section.text.count(anchor_substring)
+                if count == 0:
+                    raise ValueError(f"'{anchor_substring}' לא נמצא בטקסט {new_section.id}")
+                if count > 1:
+                    raise ValueError(
+                        f"'{anchor_substring}' מופיע {count} פעמים בטקסט "
+                        f"{new_section.id} - דו-משמעי, לא ניתן לקבוע מיקום יחיד "
+                        "בלי לנחש."
+                    )
+                pos = new_section.text.find(anchor_substring)
+                annotations.append(
+                    FootnoteAnnotation(
+                        node_id=new_section.id, offset=pos + len(anchor_substring), key=key
                     )
                 )
         elif isinstance(t, AddFirstSubsection):

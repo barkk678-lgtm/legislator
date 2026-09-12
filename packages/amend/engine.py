@@ -265,6 +265,76 @@ def _wrap_new_content(
     return before_marker, after_marker, [footnote.key]
 
 
+def _wrap_closing_quote_only(
+    text: str, terminator: str, footnote: FootnoteAnnotation | None
+) -> tuple[str, str, list[str]]:
+    """כמו _wrap_new_content, אבל בלי מרכאה פותחת - לדפוס "סעיף פנימי"
+    (הוספת סעיף ראשי חדש, drafting-rules.md §8.5) המרכאה הפותחת כבר
+    יושבת כתו הראשון של כותרת השוליים (inner_heading, תא נפרד), לא
+    בתחילת תא התוכן עצמו - ראו _render_new_section. offset של footnote
+    לא זז ב-1 כאן (בניגוד ל-_wrap_new_content) כי לא נוסף תו לפני
+    הטקסט."""
+    wrapped = f'{text}"{terminator}'
+    if footnote is None:
+        return wrapped, "", []
+    split_at = footnote.offset
+    before_marker = wrapped[:split_at]
+    after_marker = wrapped[split_at:]
+    return before_marker, after_marker, [footnote.key]
+
+
+def _render_new_section(
+    anchor_number: str,
+    new_section: LegislativeNode,
+    footnote: FootnoteAnnotation | None,
+    *,
+    full_title: str | None = None,
+    law_footnote_key: str | None = None,
+) -> list[Line]:
+    """מנסחת הוספת סעיף ראשי חדש - ha-hoveret-ha-sgula.pdf §7.12, עמ' 31
+    [PDF 60]: "בחוק [שם החוק], אחרי סעיף [מספר הסעיף] לחוק העיקרי יבוא:
+    'כותרת שוליים [מספר הסעיף החדש] [תוכן הסעיף].'" full_title/
+    law_footnote_key: אותה משמעות כמו ב-_render_mutation/
+    _render_relabel_and_insert - מועברים רק כשזו הפעם הראשונה שהחוק
+    מוזכר בהצעה (touched_count==1).
+
+    **מרכאות (השאלה הפתוחה ב-drafting-rules.md §8.5, הוכרעה 2026-09-12
+    מול reference/skeleton-pshia.docx - הצעה פרטית טרומית אמיתית,
+    פ/6158/25, הכנסת 25, לא ניחוש):** כן נושא מרכאות, כמו כל דפוסי
+    ההוספה האחרים - אבל מרכאה אחת בודדת שעוטפת את כל הבלוק המצוטט
+    כיחידה (מהתו הראשון של כותרת השוליים ועד התו האחרון של תוכן
+    הסעיף), לא מרכאות נפרדות בכל תא. לכן הפותחת מוטבעת כאן כתו הראשון
+    של inner_heading, והסוגרת (דרך _wrap_closing_quote_only) כתו
+    האחרון של תא התוכן."""
+    phrase = f"אחרי סעיף {anchor_number} לחוק העיקרי יבוא:"
+    if full_title is not None:
+        text = f"ב{full_title} (להלן – החוק העיקרי), {phrase}"
+        phrase_line = Line(
+            text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0
+        )
+    else:
+        phrase_line = Line(text=phrase, depth=0)
+
+    # terminator ריק, בניגוד ל-_render_insertion/_render_relabel_and_insert:
+    # שם ה-"." החיצוני נחוץ כי התוכן המצוטט עצמו נגמר לפעמים ב-";"
+    # (פריט ברשימת הוספות בתוך סעיף קיים וזקוק לחותם משפטי חיצוני).
+    # כאן זו הוראה עצמאית ("אחרי סעיף X לחוק העיקרי יבוא:"), לא פריט
+    # ברשימה - אומת מול reference/skeleton-pshia.docx: המרכאה הסוגרת
+    # שם היא התו האחרון ממש בתא, בלי תו נוסף אחריה (התוכן המצוטט עצמו
+    # כבר מסתיים בנקודה משלו, כמשפט משפטי שלם).
+    body_text, body_after, footnotes = _wrap_closing_quote_only(new_section.text, "", footnote)
+    content_line = Line(
+        text=body_text,
+        text_after=body_after,
+        footnotes=footnotes,
+        style="TableBlock",
+        inner_heading=f'"{new_section.margin_title or ""}',
+        inner_number=f"{new_section.number}.",
+        depth=0,
+    )
+    return [phrase_line, content_line]
+
+
 def _render_insertion(
     insertion: _Insertion, terminator: str, ordinal: int, footnote: FootnoteAnnotation | None
 ) -> list[Line]:
@@ -425,9 +495,54 @@ def amend(
     before_sections = {c.number: c for c in before.children if c.node_type == "section"}
     after_sections = {c.number: c for c in after.children if c.node_type == "section"}
 
+    # תוקן (פער, לא רק דפוס לא ממומש - ראו drafting-rules.md §8.5): עד
+    # כאן הלולאה עברה רק על before_sections.keys(), כך שסעיף ראשי חדש
+    # לגמרי (לא קיים ב"לפני" בכלל, לא רק שינוי בתוך סעיף קיים) היה
+    # בלתי-נראה למנוע - מפיק אפס פלט בשקט, לא שגיאה. all_numbers כולל
+    # גם מספרי סעיפים חדשים; sort_section_numbers כבר יודע למיין "8א"
+    # מיד אחרי "8" (packages/corpus/numbering.py), כך שהשכן הקודם של
+    # סעיף חדש ב-all_numbers הוא תמיד העוגן הסמנטי הנכון - *אלא אם* גם
+    # הוא עצמו חדש (הוספה רצופה של יותר מסעיף אחד), שנחסמת במפורש למטה
+    # (עדיין לא ממומש - §8.5 מציינת זאת מפורשות כהיקף שלא נכלל).
+    all_numbers = sort_section_numbers(list(set(before_sections) | set(after_sections)))
+
     lines: list[Line] = []
     touched_count = 0
-    for number in sort_section_numbers(list(before_sections.keys())):
+    for idx, number in enumerate(all_numbers):
+        if number not in before_sections:
+            if idx == 0:
+                raise NotImplementedError(
+                    f"סעיף {number} חדש בלי אף סעיף קודם קיים ב'לפני' אינו "
+                    "נתמך - אין עוגן קיים להוראת 'אחרי סעיף X לחוק העיקרי "
+                    "יבוא'."
+                )
+            anchor_number = all_numbers[idx - 1]
+            if anchor_number not in before_sections:
+                raise NotImplementedError(
+                    "הוספה רצופה של יותר מסעיף ראשי חדש אחד (שני סעיפים "
+                    "חדשים זה אחרי זה, או פרק שלם) אינה נתמכת עדיין - "
+                    "drafting-rules.md §8.5 מציינת זאת במפורש כהיקף שלא "
+                    "נכלל, לא כניחוש."
+                )
+            touched_count += 1
+            new_section = after_sections[number]
+            footnote = footnotes_by_id.get(new_section.id)
+            if touched_count == 1:
+                new_lines = _render_new_section(
+                    anchor_number, new_section, footnote,
+                    full_title=before.full_title or "", law_footnote_key=law_footnote_key,
+                )
+            else:
+                new_lines = _render_new_section(anchor_number, new_section, footnote)
+            new_lines[0].side_heading = f"הוספת סעיף {number}"
+            if touched_count > 1:
+                new_lines[0].number = f"{touched_count}."
+            anchor_before_node = before_sections[anchor_number]
+            for new_line in new_lines:
+                _stamp_provenance(new_line, anchor_before_node, before)
+            lines.extend(new_lines)
+            continue
+
         instructions = _diff_section(before_sections[number], after_sections[number])
         if not instructions:
             continue
