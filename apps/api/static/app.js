@@ -98,7 +98,11 @@ function renderNode(node, ctx, sectionNumber) {
   label.textContent = labelText;
   header.appendChild(label);
 
-  if (ctx.selectable && currentSection && node.node_type !== "law") {
+  // "+ הוסף אחרי" מותר רק על עוגן שהוא ילד בתוך סעיף (InsertAfter דורש
+  // anchor_id בתוך רשימת הילדים של הסעיף) - לא על הסעיף/החוק עצמם,
+  // שאינם חברים ברשימת הילדים של עצמם. נתפס בבדיקה ידנית בדפדפן.
+  const canAnchorInsert = node.node_type !== "law" && node.node_type !== "section";
+  if (ctx.selectable && currentSection && canAnchorInsert) {
     const addBtn = document.createElement("button");
     addBtn.className = "node-add-btn subtle";
     addBtn.textContent = "+ הוסף אחרי";
