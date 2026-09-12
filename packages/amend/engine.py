@@ -199,7 +199,22 @@ def _render_insertion(
     elif anchor.node_type == "definition":
         term = _quoted_term(anchor.text)
         phrase_line = Line(text=f'אחרי ההגדרה "{term}" יבוא:', depth=0)
+    elif anchor.node_type == "subsection" and anchor.number:
+        # תוקן (באג, לא פיצ'ר): עוגן ממוספר (סעיף קטן/פסקה) מעוגן לפי
+        # התווית שלו, לא לפי ציטוט הטקסט המלא - ha-hoveret-ha-sgula.pdf
+        # §7.10.6(ב), עמ' 29: "אחרי סעיף קטן (ג) יבוא: '(ג1)...'". עד
+        # לתיקון זה, _render_insertion ציטט תמיד את טקסט העוגן המלא גם
+        # כשהיה לו מספר - ניסוח שגוי שהיה יוצא מהמערכת בפועל (עדיין לא
+        # נתפס במקרה הזהב של קייטנות, ששם כל העוגנים שם היו לא-ממוספרים
+        # - הגדרה או פתיח).
+        phrase_line = Line(text=f'אחרי סעיף קטן ({anchor.number}) יבוא:', depth=0)
+    elif anchor.node_type == "paragraph" and anchor.number:
+        # אותו תיקון, לפסקה - §7.10.6(ב), עמ' 29: "אחרי פסקה (2) יבוא:
+        # '(2א)...'".
+        phrase_line = Line(text=f'אחרי פסקה ({anchor.number}) יבוא:', depth=0)
     else:
+        # עוגן בלי מספר (הגדרה טופלה למעלה; כאן: פתיח/פסקה בלי תווית) -
+        # ציטוט הטקסט, כפי שהיה תמיד (drafting-rules.md §1.2).
         phrase = _strip_anchor_phrase(anchor.text)
         phrase_line = Line(text=f'אחרי "{phrase}" יבוא:', depth=0)
 
