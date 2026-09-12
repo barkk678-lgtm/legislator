@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 
-from node import LegislativeNode  # noqa: E402
+from node import LegislativeNode, effective_source_ref  # noqa: E402
 
 
 def main():
@@ -85,6 +85,23 @@ def main():
         ),
         text="",
     )
+
+    # עץ קטן לבדיקת effective_source_ref: law -> chapter -> section
+    leaf = LegislativeNode(
+        id="kaytanot-1990/s1/def1", node_type="definition", number="(1)",
+        margin_title=None, text="", text_raw='”ילד“ – ...',
+    )
+    section = LegislativeNode(
+        id="kaytanot-1990/s1", node_type="section", number="1",
+        margin_title="הגדרות", text="", children=[leaf],
+    )
+    law_root = LegislativeNode(
+        id="kaytanot-1990", node_type="law", number="", margin_title=None,
+        text="", children=[section],
+        source_ref='ס"ח התש"ן, עמ\' 155 (נוסח כפי שהופיע בוויקיטקסט ביום 2024-09-30)',
+        is_normative=False,
+    )
+
     checks = [
         ("root.number הוא מספר החוק, לא מספר הצעת החוק", root.number == "1"),
         ("children מכיל את הבן", root.children == [child]),
@@ -113,6 +130,19 @@ def main():
             and "{{ח:פנימי" in section_with_nested_title.margin_title_raw,
         ),
         ("margin_title_raw ברירת מחדל None", child.margin_title_raw is None),
+        ("text_raw ברירת מחדל ריק", child.text_raw == ""),
+        ("text_raw שומר את הטקסט לפני נרמול", leaf.text_raw == '”ילד“ – ...'),
+        ("שורש ה-law מסומן is_normative=False", law_root.is_normative is False),
+        (
+            "effective_source_ref על השורש עצמו מחזיר את המחרוזת שהוגדרה בו",
+            effective_source_ref(law_root, law_root) == law_root.source_ref,
+        ),
+        (
+            "effective_source_ref על נכד ירושה מהשורש, בלי להעתיק אליו",
+            section.source_ref == "" and leaf.source_ref == ""
+            and effective_source_ref(law_root, leaf) == law_root.source_ref
+            and effective_source_ref(law_root, section) == law_root.source_ref,
+        ),
     ]
     ok = all(passed for _, passed in checks)
     for name, passed in checks:

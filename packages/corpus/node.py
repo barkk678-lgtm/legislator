@@ -40,6 +40,20 @@ margin_title מכיל תבניות מקוננות לפעמים (למשל הפנ�
 בתוך כותרת השוליים עצמה, כפי שנצפה בסעיף 34כג בעונשין). margin_title
 שומר את הטקסט השטוח (מפוענח/מוצג), ו-margin_title_raw שומר את
 הוויקיטקסט הגולמי של הכותרת אם הוא מכיל תבניות.
+
+text_raw שומר את הטקסט לפני normalize_text (ראו packages/corpus/
+text_normalize.py) - טקסט שנשלף מוויקיטקסט, בלי החלפות תווים.
+text מחזיק את הגרסה המנורמלת. שני השדות נשמרים כדי שלא נגלה בעוד
+חודש שנרמלנו יותר מדי ואיבדנו מידע - קל להשוות בין השניים בכל שלב.
+
+מבנה משימה 3 (ingest): שורש העץ הוא LegislativeNode(node_type="law"),
+עם source_ref מחושב פעם אחת ו-is_normative=False (השורש הוא מטא-דאטה
+של החוק - שם, מספר מאגר, מראה מקום - לא נוסח, ואסור שייכנס ל-diff,
+בדיוק כמו הערת עורך). source_ref *לא* מועתק לכל צומת בעץ - הוא יושב
+רק בשורש, וצמתים אחרים משאירים אותו ריק (""); effective_source_ref()
+למטה מטפס במעלה העץ כדי למצוא אותו בזמן קריאה, כדי שלא נצטרך לעדכן
+מאות עותקים כשהוא משתנה. raw_amendment_note לעומת זאת יושב ברמת
+הסעיף עצמו, כי הוא באמת שונה בין סעיפים.
 """
 
 from dataclasses import dataclass, field
@@ -49,14 +63,33 @@ from typing import Literal
 @dataclass
 class LegislativeNode:
     id: str  # מזהה יציב: "penal-1977/s4/a/1"
-    node_type: str  # part|chapter|siman|section|subsection|paragraph|subparagraph|definition
+    node_type: str  # law|part|chapter|siman|section|subsection|paragraph|subparagraph|definition
     number: str  # "4", "3א", "34כד", "(א)", "(1)" - מספור החוק המתוקן בלבד
     margin_title: str | None  # כותרת שוליים, טקסט שטוח - רק לסעיף ראשי
-    text: str
+    text: str  # טקסט מנורמל (ראו text_normalize.normalize_text)
     children: list["LegislativeNode"] = field(default_factory=list)
-    source_ref: str = ""  # מקור + תאריך נוסח
-    is_normative: bool = True  # False = הערת עורך, לא נוסח חוק
+    source_ref: str = ""  # יושב בשורש בלבד - ראו effective_source_ref()
+    is_normative: bool = True  # False = הערת עורך/מטא-דאטה, לא נוסח חוק
     status: Literal["active", "repealed", "merged"] = "active"
     raw_amendment_note: str | None = None  # הארגומנט הגולמי "תיקון: ...אחר=..." בלי פענוח
     numbering_space: str = "law"  # "law" | "comparison-table" | ...
     margin_title_raw: str | None = None  # כותרת השוליים כוויקיטקסט גולמי, אם היא מכילה תבניות
+    text_raw: str = ""  # הטקסט לפני normalize_text
+
+
+def effective_source_ref(root: LegislativeNode, target: LegislativeNode) -> str:
+    """מוצא את source_ref בפועל של target, בטיפוס במעלה העץ מהשורש.
+
+    source_ref נשמר רק בצמתים שבהם הוא הוגדר בפועל (כרגע: שורש ה-law
+    בלבד) - צמתים אחרים יורשים אותו לפי המיקום שלהם בעץ, כדי שלא
+    נשמור את אותה מחרוזת פעמים רבות ונצטרך לעדכן את כולן יחד.
+    """
+    stack: list[tuple[LegislativeNode, str]] = [(root, root.source_ref)]
+    while stack:
+        node, inherited = stack.pop()
+        current = node.source_ref or inherited
+        if node is target:
+            return current
+        for child in node.children:
+            stack.append((child, current))
+    raise ValueError("target אינו צומת בעץ שמשורשו root")
