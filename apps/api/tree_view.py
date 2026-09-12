@@ -23,6 +23,10 @@ TYPE_HE = {
 
 
 def node_view(node: LegislativeNode) -> dict:
+    """ראו TASKS.md משימה 10ב: צמתים עם is_normative=False מוסתרים
+    לגמרי מהעץ שנשלח ללקוח (לא רק ב-CSS בצד הלקוח) - אין להם שום
+    ייצוג בתגובה, לא רק "אינם מוצגים". השורש עצמו (is_normative=False
+    בעצמו, מטא-דאטה של החוק) עדיין מיוצג - הסינון חל רק על ילדים."""
     return {
         "id": node.id,
         "node_type": node.node_type,
@@ -31,9 +35,8 @@ def node_view(node: LegislativeNode) -> dict:
         "margin_title": node.margin_title,
         "full_title": node.full_title,  # משמעותי רק בשורש (node_type=="law")
         "text": node.text,
-        "is_normative": node.is_normative,
         "status": node.status,
-        "children": [node_view(c) for c in node.children],
+        "children": [node_view(c) for c in node.children if c.is_normative],
     }
 
 
@@ -46,8 +49,16 @@ def _serialize(node: LegislativeNode) -> str:
 
 
 def touched_section_numbers(before: LegislativeNode, after: LegislativeNode) -> set[str]:
-    """סעיפים שהטקסט שלהם (או של מי מצאצאיהם) שונה בין העצים - כדי
-    להדגיש בתצוגת ה'אחרי' איפה יש שינוי, בלי תלות בפרטי amend()."""
+    """סעיפים שהטקסט שלהם (או של מי מצאצאיהם) שונה בין העצים, וגם
+    סעיפים ראשיים חדשים לגמרי (לא היו קיימים ב-before בכלל, §7.12) -
+    כדי להדגיש בתצוגת ה'אחרי' איפה יש שינוי, בלי תלות בפרטי amend().
+
+    **באג שנתפס ותוקן (2026-09):** הלולאה המקורית עברה רק על
+    before_sections.items() - סעיף חדש שקיים רק ב-after (הוספת סעיף
+    ראשי חדש) לא נספר בכלל כ"touched", למרות שהוא בעליל שונה. אותה
+    מחלקת טעות בדיוק כמו amend()'s before_sections.keys()-only loop
+    שתוקנה קודם ב-engine.py - נתפס כאן על ידי בדיקת אינטגרציה אמיתית
+    ב-tests/unit/test_api.py, לא רק עיון בקוד."""
     before_sections = {c.number: c for c in before.children if c.node_type == "section"}
     after_sections = {c.number: c for c in after.children if c.node_type == "section"}
     touched = set()
@@ -55,6 +66,7 @@ def touched_section_numbers(before: LegislativeNode, after: LegislativeNode) -> 
         after_sec = after_sections.get(number)
         if after_sec is None or _serialize(before_sec) != _serialize(after_sec):
             touched.add(number)
+    touched.update(set(after_sections) - set(before_sections))
     return touched
 
 
