@@ -317,7 +317,7 @@ def amend(
                     number,
                     instructions[0],
                     replacement,
-                    full_title=(before.full_title or "").replace("–", "-"),
+                    full_title=before.full_title or "",
                     law_footnote_key=law_footnote_key,
                 )
             else:
@@ -335,13 +335,14 @@ def amend(
             # לא רק ניחוש ממקרה אחד.
             header = Line(
                 side_heading=f"תיקון סעיף {number}",
-                # מוכלל ממקרה יחיד, ו**חשוד במיוחד**: full_title (מ-{{ח:כותרת}})
-                # משתמש ב-en dash ("–") אבל האזכור כאן בגוף ההוראה משתמש במקף
-                # רגיל ("-"). זו עשויה להיות תקלה חד-פעמית בקובץ הזהב עצמו,
-                # לא מוסכמה כללית - drafting-rules.md §6 קובע en dash כנכון
-                # לשנה עברית, בלי חריג לאזכור חוזר. לא לסמוך על זה בלי מקרה
-                # זהב שני שמאשש (או סותר) את ההמרה.
-                text="ב" + (before.full_title or "").replace("–", "-"),
+                # הוכרע במשימה 6א: full_title (מ-{{ח:כותרת}}) משתמש תמיד
+                # ב-en-dash (–) לשנה עברית, בלי המרה למקף רגיל - ראו
+                # drafting-rules.md §6.1. קובץ הזהב עצמו (golden-kaytanot.docx)
+                # מכיל מקף רגיל בשורה הזו בלבד, לעומת en-dash בשלושה מקומות
+                # עצמאיים אחרים באותו מסמך (כולל אזכור נפרד של אותה שנה בדברי
+                # ההסבר) - שגיאת הקלדה חד-פעמית בקובץ המקור, לא מוסכמה.
+                # המערכת לא משחזרת את השגיאה הזו.
+                text="ב" + (before.full_title or ""),
                 text_after=f" (להלן – החוק העיקרי), בסעיף {number} – ",
                 footnotes=[law_footnote_key],
                 depth=0,

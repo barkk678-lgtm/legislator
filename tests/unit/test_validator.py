@@ -110,9 +110,16 @@ def main():
     broken5 = validate(_bill([_good_line(text='ה״חוק')]), before, refs)
     checks.append(("5: גרש עברי ״ -> נכשל", _status(broken5, 5) == "נכשל"))
 
-    # 6: מקף רגיל בשנה עברית במקום en-dash
+    # 6: מקף רגיל בשנה עברית בטקסט שהמנוע בנה (style רגיל) -> נכשל
     broken6 = validate(_bill([_good_line(text='התש"ן-1990')]), before, refs)
     checks.append(("6: מקף רגיל בשנה עברית -> נכשל", _status(broken6, 6) == "נכשל"))
+
+    # 6: אותו מקף רגיל, אבל בתוך נוסח מצוטט חדש (TableBlockOutdent) -
+    # לא נבדק, כי חוק ברזל 1 אוסר על המנוע לשנות ציטוט מקורי
+    quoted6 = validate(
+        _bill([_good_line(text='התש"ן-1990', style="TableBlockOutdent")]), before, refs
+    )
+    checks.append(('6: מקף רגיל בתוך TableBlockOutdent -> לא נבדק (עבר)', _status(quoted6, 6) == "עבר"))
 
     # 7: שם הצעה לא בפורמט התקני
     broken7 = validate(_bill([_good_line()], title="חוק סתם"), before, refs)

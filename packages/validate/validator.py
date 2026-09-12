@@ -137,18 +137,44 @@ _HYPHEN_YEAR_RE = re.compile(r"[א-ת]-\d{4}")
 
 
 def _check_6(bill: Bill) -> Finding:
+    """בודקת רק טקסט שהמנוע עצמו מנסח (כותרות, side_heading, שורות
+    ניסוח מנהלתיות) - לא תוכן מצוטט חדש (style="TableBlockOutdent",
+    ראו template-spec.md: "הסגנון לכל שורה שמתחילה במרכאות ומצטטת
+    נוסח חדש"). תוקן במשימה 6א אחרי שהתגלה מקרה אמיתי: הגדרה חדשה
+    שהוכנסה (InsertAfter.new_child, נוסח מצוטט מקורי) הזכירה אותה
+    שנה עברית שלוש פעמים באותו משפט עם en-dash פעם אחת ומקף רגיל
+    פעמיים - חוסר עקביות אמיתי בטקסט המקור (Special:Export, לא משהו
+    שהמנוע בנה), לא תקלה. חוק ברזל 1 אוסר על המנוע "לתקן" נוסח מצוטט
+    כזה - השוואת דייקנות בטקסט המנוע בלבד היא הבדיקה הנכונה.
+
+    **מגבלת היקף ידועה:** שורות מוטציה (_render_mutation) משלבות ניסוח
+    מנהלתי וציטוט בתוך אותה שורה, באותו style="TableBlock" - הבדיקה
+    לא מבחינה ביניהם בתוך שורה כזו. לא רלוונטי לשני מקרי הזהב הנוכחיים
+    (אין שנה עברית בתוך הציטוט של שורת מוטציה), אבל עלול להצריך הכללה
+    כשיגיע מקרה זהב עם שנה עברית בתוך ביטוי מוחלף/מוכנס."""
     bad_idxs = [
         i
         for i, ln in enumerate(bill.lines)
-        if _HYPHEN_YEAR_RE.search(ln.text) or _HYPHEN_YEAR_RE.search(ln.text_after)
+        if ln.style != "TableBlockOutdent"
+        and (
+            _HYPHEN_YEAR_RE.search(ln.text)
+            or _HYPHEN_YEAR_RE.search(ln.text_after)
+            or _HYPHEN_YEAR_RE.search(ln.side_heading)
+        )
     ]
     if bad_idxs:
         return _finding(
             6,
             "נכשל",
-            f"נמצא מקף רגיל (-) בשנה עברית בשורות: {bad_idxs} - צריך en-dash (–, U+2013)",
+            f"נמצא מקף רגיל (-) בשנה עברית בניסוח שהמנוע עצמו בנה, בשורות: "
+            f"{bad_idxs} - צריך en-dash (–, U+2013)",
         )
-    return _finding(6, "עבר", "כל שנה עברית משתמשת ב-en-dash (–), לא במקף רגיל")
+    return _finding(
+        6,
+        "עבר",
+        "כל שנה עברית בטקסט שהמנוע בנה משתמשת ב-en-dash (–) - לא נבדק תוכן "
+        "מצוטט חדש (TableBlockOutdent), שחייב להישאר בדיוק כפי שסופק",
+    )
 
 
 _BILL_TITLE_RE = re.compile(r"^הצעת חוק .+ \(תיקון – .+\), התש[^–]+–\d{4}$")

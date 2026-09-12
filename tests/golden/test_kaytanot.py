@@ -155,14 +155,37 @@ def table_shape(path: Path):
     return rows
 
 
+def _known_source_typo_correction(rows):
+    """מתקנת שגיאת הקלדה **מתועדת** אחת בקובץ המקור, לא סטייה כללית
+    ממנו: golden-kaytanot.docx כותב את שנת החוק בשורה הראשונה של
+    הטבלה עם מקף רגיל ('התש"ן-1990'), בעוד ששלושה אזכורים עצמאיים
+    אחרים של שנה עברית באותו מסמך (כותרת ההצעה, דברי ההסבר, שמזכירים
+    את אותה שנה 1990 בנפרד) משתמשים ב-en-dash. הוכרע במשימה 6א (ראו
+    docs/drafting-rules.md §5.7) שזו שגיאת הקלדה חד-פעמית במקור, לא
+    מוסכמה - engine.py לא משחזר אותה יותר. כדי שמבחן הזהב הזה ימשיך
+    להשוות תוכן אמיתי (לא רק "עבר תמיד"), אנחנו מתקנים את ה-*ציפייה*
+    בנקודה המתועדת הזו בלבד, ולא בשום מקום אחר - כל סטייה נוספת
+    מ-ORIGINAL עדיין תיכשל כרגיל."""
+    fixed = []
+    for row in rows:
+        fixed.append(
+            [
+                (w, sp, st, text.replace('התש"ן-1990', 'התש"ן–1990'))
+                for (w, sp, st, text) in row
+            ]
+        )
+    return fixed
+
+
 def main():
     out = Path("/tmp/kaytanot_rebuilt.docx")
     write_docx(BILL, REFS, SKELETON, out)
 
     got = table_shape(out)
-    want = table_shape(ORIGINAL)
+    want = _known_source_typo_correction(table_shape(ORIGINAL))
 
     print(f"שורות: נוצרו {len(got)}, במקור {len(want)}\n")
+    print("(השוואה מול ORIGINAL עם תיקון שגיאת הקלדה המתועד ב-§5.7 - ראו _known_source_typo_correction)\n")
     ok = True
     for i in range(max(len(got), len(want))):
         g = got[i] if i < len(got) else None
