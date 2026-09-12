@@ -45,6 +45,25 @@ class InsertAfter:
 
 
 @dataclass
+class AddFirstSubsection:
+    """הופך סעיף שאין בו עדיין סעיפים קטנים (תוכנו כולו ילד יחיד בלי
+    תווית) לסעיף עם סעיף קטן (א) [תוכנו הקיים, ללא כל שינוי בטקסט
+    עצמו] וסעיף קטן (ב) חדש - ha-hoveret-ha-sgula.pdf §7.10.6(ד).
+
+    **אסור להשתמש בזה אם התוכן הקיים גם צריך להשתנות** (לא רק לקבל
+    תווית) - למדריך יש דפוס נפרד לכך (פיצול לשתי הוראות ממוספרות,
+    ראו התיעוד המצוטט ב-docs/drafting-rules.md), שלא ממומש כאן.
+
+    section_number: הסעיף שיש לו כרגע ילד נורמטיבי יחיד בלי תווית.
+    new_child: התוכן החדש - מקבל number="ב" אוטומטית (וגם node_type
+    "subsection"); אסור לקבוע לו number/node_type מראש."""
+
+    section_number: str
+    new_child: LegislativeNode
+    footnotes: list[tuple[str, str]] = field(default_factory=list)
+
+
+@dataclass
 class InsertWordsAfter:
     """מוסיף inserted_text מיד אחרי anchor_substring בתוך הטקסט של הצומת
     עם target_id. anchor_substring חייב להופיע פעם אחת בדיוק בטקסט -
@@ -125,7 +144,7 @@ def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
 
 def apply(
     before: LegislativeNode,
-    transformations: list[InsertAfter | InsertWordsAfter | ReplaceWords],
+    transformations: list[InsertAfter | AddFirstSubsection | InsertWordsAfter | ReplaceWords],
 ) -> tuple[LegislativeNode, list[Annotation]]:
     """מחזיר (עץ "אחרי" חדש, רשימת אנוטציות) - before לא משתנה. .text
     בעץ המוחזר מכיל תמיד נוסח חוק בלבד; כל מידע "בתהליך" עובר דרך
@@ -144,6 +163,41 @@ def apply(
             if idx is None:
                 raise ValueError(f"עוגן {t.anchor_id} לא נמצא בסעיף {t.section_number}")
             new_child = copy.deepcopy(t.new_child)
+            section.children.insert(idx + 1, new_child)
+            for anchor_substring, key in t.footnotes:
+                count = new_child.text.count(anchor_substring)
+                if count == 0:
+                    raise ValueError(f"'{anchor_substring}' לא נמצא בטקסט {new_child.id}")
+                if count > 1:
+                    raise ValueError(
+                        f"'{anchor_substring}' מופיע {count} פעמים בטקסט "
+                        f"{new_child.id} - דו-משמעי, לא ניתן לקבוע מיקום יחיד "
+                        "בלי לנחש."
+                    )
+                pos = new_child.text.find(anchor_substring)
+                annotations.append(
+                    FootnoteAnnotation(
+                        node_id=new_child.id, offset=pos + len(anchor_substring), key=key
+                    )
+                )
+        elif isinstance(t, AddFirstSubsection):
+            section = _find_section(after, t.section_number)
+            if section is None:
+                raise ValueError(f"סעיף {t.section_number} לא נמצא ב'לפני'")
+            normative_children = [c for c in section.children if c.is_normative]
+            if len(normative_children) != 1 or normative_children[0].number:
+                raise ValueError(
+                    f"AddFirstSubsection דורש סעיף עם תוכן נורמטיבי יחיד "
+                    f"וללא סעיפים קטנים קיימים - סעיף {t.section_number} "
+                    "לא עומד בכך."
+                )
+            existing = normative_children[0]
+            existing.number = "א"
+            existing.node_type = "subsection"
+            new_child = copy.deepcopy(t.new_child)
+            new_child.number = "ב"
+            new_child.node_type = "subsection"
+            idx = section.children.index(existing)
             section.children.insert(idx + 1, new_child)
             for anchor_substring, key in t.footnotes:
                 count = new_child.text.count(anchor_substring)

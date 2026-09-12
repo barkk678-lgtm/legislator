@@ -133,6 +133,25 @@ class _Mutation:
         return self.before_node.id
 
 
+@dataclass
+class _RelabelAndInsert:
+    """סעיף שאין בו עדיין סעיפים קטנים מקבל את הראשון שלו - ראו
+    ha-hoveret-ha-sgula.pdf §7.10.6(ד) ב-_diff_section. before_node הוא
+    התוכן הקיים כפי שהוא ב"לפני" (בלי תווית); relabeled_number הוא
+    התווית שהוא מקבל ("א"); new_node הוא הסעיף הקטן החדש שנוסף אחריו
+    ("ב"). זה שני תיקונים נפרדים מבחינה משפטית (סימון + הוספה) שמתלכדים
+    לפסקה אחת בניסוח, בדיוק כמו שדפוסי הוספה אחרים מתלכדים - ראו
+    _render_relabel_and_insert."""
+
+    before_node: LegislativeNode
+    relabeled_number: str
+    new_node: LegislativeNode
+
+    @property
+    def node_id(self) -> str:
+        return self.before_node.id
+
+
 def _diff_section(before_section: LegislativeNode, after_section: LegislativeNode):
     """משווה את הילדים הישירים (הנורמטיביים) של סעיף בין לפני/אחרי.
     לא יורד רקורסיבית לתוך תת-סעיפים - מספיק למקרה הזהב הנוכחי, שבו
@@ -140,6 +159,52 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
     before_children = [c for c in before_section.children if c.is_normative]
     after_children = [c for c in after_section.children if c.is_normative]
     before_ids = [c.id for c in before_children]
+
+    if (
+        len(before_children) == 1
+        and not before_children[0].number
+        and len(after_children) == 2
+        and after_children[0].id == before_children[0].id
+        and after_children[0].number
+        # התנאי האחרון (התוכן הקיים קיבל תווית) הוא ההבחנה החיונית בין
+        # דפוס זה לבין הכנסה רגילה של ילד חדש אחרי עוגן לא-ממוספר (למשל
+        # הגדרה חדשה אחרי משפט פתיח) - שם after_children[0].number
+        # נשאר ריק, כמו ב"לפני". בלעדיו, כל הכנסה כזו הייתה מסווגת
+        # (בטעות) כרילייבל - נתפס על ידי tests/unit/test_provenance.py.
+    ):
+        # סעיף שאין בו עדיין סעיפים קטנים (תוכנו כולו ילד יחיד בלי תווית)
+        # מקבל את הסעיף הקטן הראשון שלו - דפוס מובחן מהותית מ"הוספת ילד
+        # חדש" הרגיל, כי הוא גם משנה את תווית התוכן הקיים (לא רק מוסיף
+        # שכן). ha-hoveret-ha-sgula.pdf §7.10.6(ד), עמ' 29-30 [PDF 58-59],
+        # לפי הדוגמה מחוק העונשין, התשל"ז-1977 §6: "בסעיף 6, האמור בו
+        # יסומן '(א)' ואחריו יבוא: '(ב) ...'." - נבדק במפורש (לא מונח
+        # בשקט) שהתוויות אכן א/ב, כדי לא "לתקן" קלט לא צפוי בניחוש.
+        relabeled_number = after_children[0].number
+        new_child = after_children[1]
+        if relabeled_number != "א":
+            raise ValueError(
+                f"סעיף בלי סעיפים קטנים קיימים אמור לקבל תווית 'א' לתוכנו "
+                f"הקיים (ha-hoveret-ha-sgula.pdf §7.10.6(ד)) - התקבל "
+                f"{relabeled_number!r}."
+            )
+        if new_child.id in before_ids:
+            raise NotImplementedError(
+                "הילד השני אחרי רילייבל אמור להיות תוכן חדש, לא צומת קיים "
+                "- דפוס לא נתמך."
+            )
+        if new_child.number != "ב":
+            raise ValueError(
+                f"הסעיף הקטן החדש שנוסף אחרי רילייבל אמור להיות תוית 'ב' "
+                f"(ha-hoveret-ha-sgula.pdf §7.10.6(ד)) - התקבל "
+                f"{new_child.number!r}."
+            )
+        return [
+            _RelabelAndInsert(
+                before_node=before_children[0],
+                relabeled_number=relabeled_number,
+                new_node=new_child,
+            )
+        ]
 
     instructions: list[_Insertion | _Mutation] = []
     for i, child in enumerate(after_children):
@@ -234,6 +299,45 @@ def _render_insertion(
     text, text_after, footnotes = _wrap_new_content(insertion.new_node.text, terminator, footnote)
     content_line = Line(
         text=text, text_after=text_after, footnotes=footnotes, style="TableBlockOutdent", depth=0
+    )
+    return [phrase_line, content_line]
+
+
+def _render_relabel_and_insert(
+    section_number: str,
+    item: _RelabelAndInsert,
+    footnote: FootnoteAnnotation | None,
+    *,
+    full_title: str | None = None,
+    law_footnote_key: str | None = None,
+) -> list[Line]:
+    """מנסחת "האמור בו יסומן... ואחריו יבוא:" - ha-hoveret-ha-sgula.pdf
+    §7.10.6(ד), עמ' 29-30 [PDF 58-59], לפי הדוגמה מחוק העונשין,
+    התשל"ז-1977 §6. full_title/law_footnote_key: אותה משמעות כמו
+    ב-_render_mutation - מועברים רק כשזו הפעם הראשונה שהחוק מוזכר
+    בהצעה (touched_count==1)."""
+    phrase = f'האמור בו יסומן "({item.relabeled_number})" ואחריו יבוא:'
+    if full_title is not None:
+        text = f"ב{full_title} (להלן – החוק העיקרי), בסעיף {section_number}, {phrase}"
+        phrase_line = Line(text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0)
+    else:
+        text = f"בסעיף {section_number} לחוק העיקרי, {phrase}"
+        phrase_line = Line(text=text, depth=0)
+
+    # התווית של הסעיף הקטן החדש ("(ב)") היא חלק מנוסח החוק עצמו שמצוטט -
+    # מופיעה בתוך המרכאות, בדיוק כפי שדוגמאות המדריך עצמן כתובות (למשל
+    # "(ג1) תוכן הסעיף הקטן החדש", "(ב) תוכן הסעיף הקטן החדש") - לא
+    # שדה marker נפרד, כי אין עדיין מקרה זהב אמיתי שמראה איך marker
+    # מתנהג עבור תווית סעיף-קטן (marker הקיים משמש למספר-פסקת-ההוראה
+    # הסידורי בתוך הצעת החוק, ראו _render_insertion, לא לתווית המשפטית).
+    labeled_content = f"({item.new_node.number}) {item.new_node.text}"
+    content_text, content_after, footnotes = _wrap_new_content(labeled_content, ".", footnote)
+    content_line = Line(
+        text=content_text,
+        text_after=content_after,
+        footnotes=footnotes,
+        style="TableBlockOutdent",
+        depth=0,
     )
     return [phrase_line, content_line]
 
@@ -355,6 +459,29 @@ def amend(
                 mutation_line.number = f"{touched_count}."
             _stamp_provenance(mutation_line, instructions[0].before_node, before)
             lines.append(mutation_line)
+            continue
+
+        if len(instructions) == 1 and isinstance(instructions[0], _RelabelAndInsert):
+            # סעיף שאין בו עדיין סעיפים קטנים מקבל את הראשון שלו - ראו
+            # ha-hoveret-ha-sgula.pdf §7.10.6(ד) ב-_diff_section. מתלכד
+            # לפסקה אחת (שתי שורות: פתיח + תוכן מצוטט), באותו אופן
+            # שהתלכדות _Mutation למעלה מתלכדת - ראו שם.
+            item = instructions[0]
+            footnote = footnotes_by_id.get(item.new_node.id)
+            if touched_count == 1:
+                relabel_lines = _render_relabel_and_insert(
+                    number, item, footnote,
+                    full_title=before.full_title or "",
+                    law_footnote_key=law_footnote_key,
+                )
+            else:
+                relabel_lines = _render_relabel_and_insert(number, item, footnote)
+            relabel_lines[0].side_heading = f"תיקון סעיף {number}"
+            if touched_count > 1:
+                relabel_lines[0].number = f"{touched_count}."
+            for relabel_line in relabel_lines:
+                _stamp_provenance(relabel_line, item.before_node, before)
+            lines.extend(relabel_lines)
             continue
 
         if touched_count == 1:
