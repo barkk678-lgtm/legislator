@@ -40,8 +40,16 @@ def _strip_anchor_phrase(text: str) -> str:
 
 def _diff_text(before: str, after: str) -> tuple[str, str]:
     """מחזיר (anchor_phrase, inserted_phrase) עבור הכנסה רציפה אחת של
-    מילים בתוך טקסט קיים. לא תומך בשינויים כלליים (מחיקה/החלפה) -
-    זה מספיק להכנסת מילים, שזה הדפוס עם מקרה הזהב."""
+    מילים בתוך טקסט קיים (דפוס "הוספת מילים", drafting-rules.md §1.2).
+
+    מגן מפורש: אם אחרי הסרת ה-prefix/suffix המשותפים נשאר משהו בצד
+    ה"לפני" - זו לא הכנסה טהורה אלא **החלפה** (משהו הוסר, לא רק נוסף).
+    זוהה בפועל ב-2026-09: מקרה בוחן "מאסר ששה חדשים" -> "מאסר שנה"
+    (סעיף 5 בקייטנות) גרם לפונקציה הזו "לחשוב" שרק "נה" הוכנס אחרי
+    "...מאסר ש", בגלל חפיפה מקרית של האות "ש" - שורה משפטית שגויה
+    שהייתה נכנסת לרנדרר בלי שום שגיאה. ראו packages/amend/transform.py
+    (ReplaceWords) ו-_diff_replace() לדפוס "החלפת מילים" הנתמך (משימה 4א).
+    """
     max_prefix = min(len(before), len(after))
     prefix_len = 0
     while prefix_len < max_prefix and before[prefix_len] == after[prefix_len]:
@@ -53,6 +61,14 @@ def _diff_text(before: str, after: str) -> tuple[str, str]:
         and before[len(before) - 1 - suffix_len] == after[len(after) - 1 - suffix_len]
     ):
         suffix_len += 1
+    before_middle = before[prefix_len : len(before) - suffix_len]
+    if before_middle:
+        raise NotImplementedError(
+            "החלפת מילים אינה נתמכת עדיין על ידי _diff_text - נדרש דפוס "
+            f'"במקום X יבוא Y" (drafting-rules.md §1.1). זוהה טקסט קיים '
+            f"שהוסר ולא רק נוסף: {before_middle!r}. השתמשו ב-_diff_replace "
+            "או בדפוס ReplaceWords, לא בפונקציה הזו."
+        )
     anchor = before[:prefix_len].rstrip()
     inserted = after[prefix_len : len(after) - suffix_len]
     return anchor, inserted
@@ -61,7 +77,13 @@ def _diff_text(before: str, after: str) -> tuple[str, str]:
 @dataclass
 class _Insertion:
     anchor: LegislativeNode
-    anchor_is_last_child: bool  # קובע ניסוח: "בסופו יבוא" מול "אחרי X יבוא"
+    # קובע ניסוח: "בסופו יבוא" מול "אחרי X יבוא". מוכלל ממקרה יחיד: בקייטנות
+    # ההוספה האחרונה ברשימת ההוראות גם מעוגנת בילד האחרון של הסעיף - לא
+    # נבדק מצב שבו הם נבדלים (הוספה אחרונה שמעוגנת אחרי הגדרה אמצעית, לא
+    # בסוף ממש). ראו amend() למטה: is_last_instruction (למספור/terminator)
+    # מחושב בנפרד מ-anchor_is_last_child (לניסוח) בדיוק כדי לא לבלבל בין
+    # שני המושגים גם אם הם חופפים כרגע.
+    anchor_is_last_child: bool
     new_node: LegislativeNode
 
 
@@ -108,7 +130,11 @@ def _wrap_new_content(text: str, terminator: str) -> tuple[str, str, list[str]]:
     ברשימת ההוספות של הסעיף, '.' לפריט האחרון) מתווסף גם מחוץ למרכאות
     הסוגרות - בלי קשר לסימן הפיסוק הפנימי של התוכן עצמו (שנקבע על ידי
     מחבר הטקסט, לא על ידי המנוע - כך נמדד בקובץ הזהב: לתוכן עם כמה
-    משפטים מחוברים בפסיקים אין בהכרח סימן פיסוק לפני המרכאה הסוגרת)."""
+    משפטים מחוברים בפסיקים אין בהכרח סימן פיסוק לפני המרכאה הסוגרת).
+
+    מוכלל ממקרה יחיד: אומת מול 3 הוספות בקייטנות (שתיים עם ';' פנימי
+    לפני הסגירה, אחת בלי) - 3 דוגמאות מאותו קובץ, לא 3 מקורות עצמאיים.
+    """
     wrapped = f'"{text}"{terminator}'
     match = _FOOTNOTE_MARKER_RE.search(wrapped)
     if not match:
@@ -167,7 +193,11 @@ def amend(before: LegislativeNode, after: LegislativeNode, *, law_footnote_key: 
 
         if len(instructions) == 1 and isinstance(instructions[0], _Mutation):
             # מוסק מדוגמה אחת: מוטציה בודדת מתלכדת לשורה אחת (סעיף 2),
-            # לעומת הוספות שמקבלות שורת פתיח נפרדת (סעיף 1).
+            # לעומת הוספות שמקבלות שורת פתיח נפרדת (סעיף 1). לא ברור
+            # מה בדיוק מפעיל את ההתלכדות - "מוטציה יחידה" (בלי קשר לסעיף)
+            # או "סעיף שאינו הראשון שנוגעים בו"? בקייטנות שני התנאים
+            # חופפים (סעיף 2 הוא גם מוטציה יחידה וגם לא-ראשון) ואי אפשר
+            # להפריד ביניהם ממקרה אחד.
             mutation_line = _render_mutation(number, instructions[0])
             mutation_line.side_heading = f"תיקון סעיף {number}"
             if touched_count > 1:
@@ -176,8 +206,17 @@ def amend(before: LegislativeNode, after: LegislativeNode, *, law_footnote_key: 
             continue
 
         if touched_count == 1:
+            # הכלל "רק הסעיף הראשון שנוגעים בו מקבל את שם החוק המלא" תואם
+            # drafting-rules.md §7.3 במפורש - הכי מבוסס ברשימת הכללים כאן,
+            # לא רק ניחוש ממקרה אחד.
             header = Line(
                 side_heading=f"תיקון סעיף {number}",
+                # מוכלל ממקרה יחיד, ו**חשוד במיוחד**: full_title (מ-{{ח:כותרת}})
+                # משתמש ב-en dash ("–") אבל האזכור כאן בגוף ההוראה משתמש במקף
+                # רגיל ("-"). זו עשויה להיות תקלה חד-פעמית בקובץ הזהב עצמו,
+                # לא מוסכמה כללית - drafting-rules.md §6 קובע en dash כנכון
+                # לשנה עברית, בלי חריג לאזכור חוזר. לא לסמוך על זה בלי מקרה
+                # זהב שני שמאשש (או סותר) את ההמרה.
                 text="ב" + (before.full_title or "").replace("–", "-"),
                 text_after=f" (להלן – החוק העיקרי), בסעיף {number} – ",
                 footnotes=[law_footnote_key],
