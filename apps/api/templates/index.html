@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>מנסח החקיקה — ממשק מינימלי</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <h1>מנסח החקיקה</h1>
+  <div class="subtitle">
+    ממשק מינימלי (משימה 10) — מקומי בלבד, שני חוקי fixture, דפוסי הוספה והחלפת מילים בלבד.
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <label for="law-select">חוק</label>
+      <select id="law-select"></select>
+    </div>
+  </div>
+
+  <div id="law-panels" hidden>
+    <div class="as-of-note" id="as-of-note"></div>
+    <div class="error-banner" id="amend-blocked-note" hidden></div>
+
+    <div class="panel" id="bill-form">
+      <h2>פרטי הצעת החוק</h2>
+      <div class="row">
+        <div class="field">
+          <label for="bill-title-input">שם ההצעה</label>
+          <input id="bill-title-input" type="text" />
+        </div>
+        <div class="field">
+          <label for="bill-initiator-input">שם היוזם</label>
+          <input id="bill-initiator-input" type="text" />
+        </div>
+        <div class="field">
+          <label for="bill-date-input">תאריך הנחה</label>
+          <input id="bill-date-input" type="text" placeholder="למשל 15.11.2023" />
+        </div>
+        <div class="field required" id="source-ref-field">
+          <label>מראה מקום (ס"ח)</label>
+          <input type="text" placeholder='למשל ס"ח התש"ן, עמ׳ 155.' />
+          <div class="hint">שדה חובה — בלי הערת שוליים למקור, ההצעה נכשלת בבדיקה 2 בוולידטור.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="add-change-controls">
+      <h2>הוספת שינוי</h2>
+      <div class="hint">
+        סמן/י טקסט בנוסח החוק (בצד ימין למטה) בעכבר כדי להחליף אותו או להוסיף מילים אחריו,
+        או לחצו על "+ הוסף אחרי" ליד כל סעיף/פסקה כדי להוסיף תוכן חדש (הגדרה/פסקה).
+        דפוס אחר שאינו נתמך יסורב בהודעה ברורה, לא ינחש.
+      </div>
+      <div class="selection-box" id="selection-box" hidden></div>
+      <h2 style="margin-top:10px">שינויים ממתינים</h2>
+      <ul class="pending-list" id="pending-list"></ul>
+      <div class="hint" id="pending-empty-hint">עדיין לא נוסף אף שינוי.</div>
+    </div>
+
+    <div class="split">
+      <div class="panel">
+        <h2>נוסח החוק (לפני)</h2>
+        <div id="before-tree"></div>
+      </div>
+      <div class="panel">
+        <h2>נוסח משולב (אחרי התיקון)</h2>
+        <div id="after-tree"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>הוראות התיקון</h2>
+      <div class="error-banner" id="error-banner" hidden></div>
+      <div id="lines-preview"></div>
+    </div>
+
+    <div class="panel">
+      <h2>ולידציה (15 בדיקות)</h2>
+      <table class="findings-table">
+        <thead>
+          <tr><th>#</th><th>סטטוס</th><th>בדיקה</th><th>פירוט</th></tr>
+        </thead>
+        <tbody id="findings-body"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <button id="download-btn" class="primary" disabled>הורדת docx</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
