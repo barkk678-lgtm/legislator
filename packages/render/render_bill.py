@@ -123,7 +123,10 @@ class Bill:
     bill_number: str = "פ/?????????"
     lines: list[Line] = field(default_factory=list)
     explanatory: list[str] = field(default_factory=list)
-    submitted_date: str = ""
+    # ברירת המחדל (24 סימני שאלה) תואמת בדיוק את golden-kaytanot.docx:
+    # תאריך ההגשה נקבע בפועל על ידי מזכירות הכנסת כשההצעה מוגשת -
+    # לא ידוע ולא נקבע על ידי המנסח, ולכן לא שדה קלט למשתמש (ראו 10ב).
+    submitted_date: str = "????????????????????????"
 
 
 # ── רינדור שורה ──────────────────────────────────────────────────────────

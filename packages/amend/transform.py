@@ -127,6 +127,20 @@ class ReplaceWords:
 
 
 @dataclass
+class ReplaceMarginTitleWords:
+    """מחליף ביטוי בכותרת השוליים של סעיף (לא בגוף הטקסט שלו) -
+    ha-hoveret-ha-sgula.pdf §7.8, עמ' 26 [PDF 55]: 'בסעיף מס' הסעיף
+    לחוק העיקרי, בכותרת השוליים, במקום "טקסט קיים" יבוא "טקסט חדש"'.
+    אותו עיקרון בדיוק כמו ReplaceWords (גבול הביטוי הוא בחירה מפורשת,
+    לא ניחוש מדיף) - פשוט פועל על section.margin_title, לא section.text
+    (לסעיף עצמו אין .text משל עצמו - התוכן שלו הוא הילדים)."""
+
+    section_number: str
+    old_phrase: str
+    new_phrase: str
+
+
+@dataclass
 class ReplacementAnnotation:
     """מצביעה על צומת (node_id) שעבר ReplaceWords, עם שני הביטויים
     כפי שנבחרו במפורש - ערוץ נפרד מ-.text, לא סמן מוטבע בתוכו (ראו
@@ -174,7 +188,12 @@ def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
 def apply(
     before: LegislativeNode,
     transformations: list[
-        InsertAfter | InsertSectionAfter | AddFirstSubsection | InsertWordsAfter | ReplaceWords
+        InsertAfter
+        | InsertSectionAfter
+        | AddFirstSubsection
+        | InsertWordsAfter
+        | ReplaceWords
+        | ReplaceMarginTitleWords
     ],
 ) -> tuple[LegislativeNode, list[Annotation]]:
     """מחזיר (עץ "אחרי" חדש, רשימת אנוטציות) - before לא משתנה. .text
@@ -332,6 +351,29 @@ def apply(
             annotations.append(
                 ReplacementAnnotation(
                     node_id=target.id, old_phrase=t.old_phrase, new_phrase=t.new_phrase
+                )
+            )
+        elif isinstance(t, ReplaceMarginTitleWords):
+            section = _find_section(after, t.section_number)
+            if section is None:
+                raise ValueError(f"סעיף {t.section_number} לא נמצא ב'לפני'")
+            title = section.margin_title or ""
+            count = title.count(t.old_phrase)
+            if count == 0:
+                raise ValueError(f"'{t.old_phrase}' לא נמצא בכותרת השוליים של סעיף {t.section_number}")
+            if count > 1:
+                raise ValueError(
+                    f"'{t.old_phrase}' מופיע {count} פעמים בכותרת השוליים של סעיף "
+                    f"{t.section_number} - דו-משמעי, לא ניתן לקבוע מיקום יחיד בלי לנחש."
+                )
+            pos = title.find(t.old_phrase)
+            section.margin_title = title[:pos] + t.new_phrase + title[pos + len(t.old_phrase) :]
+            # מצביעה על הסעיף עצמו (לא ילד) - engine.amend() מזהה שינוי
+            # בכותרת שוליים בהשוואת before_section.margin_title/after
+            # ומחפש ReplacementAnnotation לפי node_id של הסעיף עצמו.
+            annotations.append(
+                ReplacementAnnotation(
+                    node_id=section.id, old_phrase=t.old_phrase, new_phrase=t.new_phrase
                 )
             )
         else:

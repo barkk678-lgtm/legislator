@@ -134,6 +134,22 @@ class _Mutation:
 
 
 @dataclass
+class _MarginTitleMutation:
+    """שינוי בכותרת השוליים של סעיף (לא בגוף הטקסט שלו) - ha-hoveret-
+    ha-sgula.pdf §7.8. before_node הוא הסעיף עצמו (לא ילד) - הכותרת
+    שייכת לסעיף, לא לתוכן שבתוכו. מזוהה בנפרד מ-_diff_section (שמשווה
+    רק ילדים) - amend() בודק את זה ישירות ברמת הסעיף."""
+
+    before_node: LegislativeNode
+    before_title: str
+    after_title: str
+
+    @property
+    def node_id(self) -> str:
+        return self.before_node.id
+
+
+@dataclass
 class _RelabelAndInsert:
     """סעיף שאין בו עדיין סעיפים קטנים מקבל את הראשון שלו - ראו
     ha-hoveret-ha-sgula.pdf §7.10.6(ד) ב-_diff_section. before_node הוא
@@ -477,6 +493,37 @@ def _render_mutation(
     return Line(text=text, depth=0)
 
 
+def _render_margin_title_mutation(
+    section_number: str,
+    mutation: _MarginTitleMutation,
+    replacement: ReplacementAnnotation | None,
+    *,
+    full_title: str | None = None,
+    law_footnote_key: str | None = None,
+) -> Line:
+    """שינוי כותרת שוליים - ha-hoveret-ha-sgula.pdf §7.8, עמ' 26 [PDF 55]:
+    "בסעיף מס' הסעיף לחוק העיקרי, בכותרת השוליים, במקום 'טקסט קיים'
+    יבוא 'טקסט חדש'". דורש ReplacementAnnotation מפורש, בדיוק כמו
+    _render_mutation לגוף הטקסט - אין דיף אוטומטי לכותרות שוליים (אין
+    עדיין מקרה זהב שמצדיק לבנות דיף כזה, ואותה בעיית גבול-ביטוי
+    שכבר תועדה עבור טקסט רגיל חלה באותה מידה כאן)."""
+    if replacement is None:
+        raise NotImplementedError(
+            "שינוי כותרת שוליים בלי ReplacementAnnotation מפורש - אין "
+            "עדיין דיף אוטומטי לכותרות שוליים (ראו transform."
+            "ReplaceMarginTitleWords). לא ניחוש."
+        )
+    _validate_replacement(mutation.before_title, mutation.after_title, replacement)
+    body = f'בכותרת השוליים, במקום "{replacement.old_phrase}" יבוא "{replacement.new_phrase}".'
+
+    if full_title is not None:
+        text = f"ב{full_title} (להלן – החוק העיקרי), בסעיף {section_number}, {body}"
+        return Line(text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0)
+
+    text = f"בסעיף {section_number} לחוק העיקרי, {body}"
+    return Line(text=text, depth=0)
+
+
 def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
     if node.id == node_id:
         return node
@@ -571,9 +618,41 @@ def amend(
             continue
 
         instructions = _diff_section(before_sections[number], after_sections[number])
+        # שינוי בכותרת השוליים של הסעיף עצמו (§7.8) - לא נבדק בתוך
+        # _diff_section (שמשווה רק ילדים; הכותרת שייכת לסעיף עצמו).
+        # נבדק כאן ישירות ומתווסף בתחילת רשימת ההוראות - סדר קריאה
+        # טבעי (כותרת לפני תוכן), ואין מקרה זהב שקובע אחרת.
+        before_sec = before_sections[number]
+        after_sec = after_sections[number]
+        if before_sec.margin_title != after_sec.margin_title:
+            instructions = [
+                _MarginTitleMutation(
+                    before_node=before_sec,
+                    before_title=before_sec.margin_title or "",
+                    after_title=after_sec.margin_title or "",
+                )
+            ] + instructions
         if not instructions:
             continue
         touched_count += 1
+
+        if len(instructions) == 1 and isinstance(instructions[0], _MarginTitleMutation):
+            # מוסק מדפוס _Mutation: שינוי כותרת שוליים בודד מתלכד לשורה
+            # אחת, באותו אופן בדיוק שמוטציית טקסט בודדת מתלכדת.
+            replacement = replacements_by_id.get(instructions[0].node_id)
+            if touched_count == 1:
+                title_line = _render_margin_title_mutation(
+                    number, instructions[0], replacement,
+                    full_title=before.full_title or "", law_footnote_key=law_footnote_key,
+                )
+            else:
+                title_line = _render_margin_title_mutation(number, instructions[0], replacement)
+            title_line.side_heading = f"תיקון סעיף {number}"
+            if touched_count > 1:
+                title_line.number = f"{touched_count}."
+            _stamp_provenance(title_line, instructions[0].before_node, before)
+            lines.append(title_line)
+            continue
 
         if len(instructions) == 1 and isinstance(instructions[0], _Mutation):
             # מוסק מדוגמה אחת: מוטציה בודדת מתלכדת לשורה אחת (סעיף 2),
@@ -677,6 +756,11 @@ def amend(
                 for insertion_line in insertion_lines:
                     _stamp_provenance(insertion_line, before_anchor, before)
                 lines.extend(insertion_lines)
+            elif isinstance(instruction, _MarginTitleMutation):
+                replacement = replacements_by_id.get(instruction.node_id)
+                title_line = _render_margin_title_mutation(number, instruction, replacement)
+                _stamp_provenance(title_line, instruction.before_node, before)
+                lines.append(title_line)
             else:
                 replacement = replacements_by_id.get(instruction.node_id)
                 mutation_line = _render_mutation(number, instruction, replacement)
