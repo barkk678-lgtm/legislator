@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Legislator AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700&family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0B2A5B; --flag:#0038B8; --flag-deep:#012E9C;
+  --tint:#EAF0FC; --tint-2:#F6F9FE;
+  --ink:#14171C; --soft:#5A6472; --faint:#8C95A3;
+  --rule:#D9E1EF; --shell:#EEF2F8; --page:#FFFFFF;
+  --del:#A3242B; --ins:#0E6B45; --warn:#8A5A00;
+  --r:10px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{margin:0;background:var(--shell);color:var(--ink);
+ font-family:'Assistant',system-ui,sans-serif;font-size:15px;line-height:1.5;
+ display:flex;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+
+/* ═══ תפריט צד ═══ */
+.rail{width:236px;flex:0 0 236px;background:var(--navy);color:#fff;
+ display:flex;flex-direction:column;height:100vh}
+.brand{padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.13)}
+.brand b{display:block;font-size:19px;font-weight:700}
+.brand span{display:block;font-size:12.5px;color:#9FB4D8;margin-top:2px}
+.nav{padding:12px 10px;flex:1;overflow:auto}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;
+ padding:9px 11px;margin-bottom:1px;border:0;border-radius:7px;background:none;
+ color:#C6D4EC;font-size:14.5px;text-align:start}
+.nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav button.on{background:#fff;color:var(--navy);font-weight:600}
+.nav .ico{width:18px;flex:0 0 18px;text-align:center;opacity:.9;font-size:13px}
+.nav-sep{height:1px;background:rgba(255,255,255,.12);margin:11px}
+.me{padding:13px 18px;border-top:1px solid rgba(255,255,255,.13);
+ font-size:13px;color:#9FB4D8}
+.me b{display:block;color:#fff;font-weight:600;font-size:13.5px}
+
+/* ═══ מסגרת ═══ */
+.main{flex:1;display:flex;flex-direction:column;height:100vh;min-width:0}
+.topbar{background:var(--page);border-bottom:1px solid var(--rule);
+ padding:11px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.topbar h1{margin:0;font-size:17px;font-weight:700}
+.topbar .sub{font-size:13px;color:var(--soft)}
+.grow{flex:1}
+select,.inp{font:inherit;border:1px solid var(--rule);background:var(--page);
+ border-radius:8px;padding:7px 11px;color:var(--ink)}
+select{font-weight:600;max-width:420px}
+.inp:focus,select:focus{outline:2px solid var(--tint);border-color:var(--flag)}
+.btn{border:1px solid var(--rule);background:var(--page);border-radius:8px;
+ padding:8px 14px;font-size:14px}
+.btn:hover{border-color:#B6C4DC}
+.btn-primary{background:var(--flag);border-color:var(--flag);color:#fff;font-weight:600}
+.btn-primary:hover{background:var(--flag-deep);border-color:var(--flag-deep)}
+.asof{font-size:12.5px;color:var(--soft);background:var(--tint-2);
+ border:1px solid var(--rule);border-inline-start:3px solid var(--flag);
+ border-radius:6px;padding:5px 10px}
+
+.stage{flex:1;min-height:0;padding:16px;overflow:hidden}
+.tab{display:none;height:100%}
+.tab.on{display:flex;flex-direction:column;min-height:0}
+
+/* ═══ חלוניות ═══ */
+.cols{flex:1;display:grid;gap:16px;min-height:0}
+.card{background:var(--page);border:1px solid var(--rule);border-radius:var(--r);
+ display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.card > header{background:var(--tint);border-bottom:1px solid var(--rule);
+ padding:9px 16px;display:flex;align-items:baseline;gap:10px;flex:0 0 auto}
+.card > header h2{margin:0;font-size:13.5px;font-weight:700;color:var(--navy)}
+.card > header span{font-size:12.5px;color:var(--soft)}
+.card > header .grow{flex:1}
+.card .body{flex:1;overflow:auto;padding:20px 24px 48px}
+.card .foot{border-top:1px solid var(--rule);padding:10px 16px;
+ display:flex;gap:10px;align-items:center;background:var(--tint-2);flex:0 0 auto}
+
+/* טופס פרטי ההצעה */
+.meta{display:grid;gap:13px;flex:0 0 auto;margin-bottom:16px;
+ grid-template-columns:minmax(0,2.4fr) minmax(0,1.1fr) minmax(0,.9fr) minmax(0,1fr)}
+.fld label{display:block;font-size:12.5px;color:var(--soft);margin-bottom:4px}
+.fld .inp{width:100%;font-size:14.5px}
+.fld .hint{font-size:12px;margin-top:4px;color:var(--flag)}
+.fld .hint.miss{color:var(--warn)}
+
+/* ═══ נוסח חוק ═══ */
+.law{font-family:'Frank Ruhl Libre',serif;font-size:16.5px;line-height:1.85;max-width:64ch}
+.sec{display:grid;grid-template-columns:128px 1fr;gap:0 16px;margin-bottom:22px;position:relative}
+.sec-title{font-family:'Assistant',sans-serif;font-size:13.5px;font-weight:700;
+ color:var(--navy);line-height:1.45;padding-top:5px}
+.sec-title i{display:block;font-style:normal;font-weight:400;color:var(--faint);font-size:12.5px}
+.sec-body p{margin:0 0 6px}
+.sub,.def{display:block;margin-bottom:6px}
+.sub .lbl{color:var(--soft)}
+.addbtn{position:absolute;inset-inline-start:-28px;top:4px;opacity:0;transition:.12s;
+ width:23px;height:23px;border-radius:50%;border:1px solid var(--rule);
+ background:var(--page);color:var(--flag);font-size:15px;line-height:1;
+ display:flex;align-items:center;justify-content:center}
+.sec:hover .addbtn{opacity:1}
+del{text-decoration:line-through;text-decoration-thickness:1.5px;color:var(--del);background:#FBEDEE}
+ins{text-decoration:underline;text-decoration-thickness:1.5px;color:var(--ins);background:#E9F5EF}
+
+.pop{position:absolute;inset-inline-start:-258px;top:-4px;width:246px;z-index:20;
+ background:var(--page);border:1px solid var(--flag);border-radius:9px;
+ box-shadow:0 10px 28px rgba(11,42,91,.18);padding:6px;font-family:'Assistant',sans-serif}
+.pop h4{margin:5px 9px 6px;font-size:12px;font-weight:600;color:var(--soft)}
+.pop button{display:flex;width:100%;gap:7px;align-items:baseline;text-align:start;
+ background:none;border:0;border-radius:6px;padding:7px 9px;font-size:14px}
+.pop button:hover{background:var(--tint)}
+.pop button u{text-decoration:none;color:var(--flag);font-size:12.5px;margin-inline-start:auto}
+.pop button.dis{color:#A8B0BD;cursor:default}
+.pop button.dis:hover{background:none}
+.pop .note{margin:6px 9px 4px;font-size:11.5px;color:var(--faint);line-height:1.4}
+
+/* ═══ גיליון וורד ═══ */
+.sheetwrap{background:var(--shell);height:100%;overflow:auto;padding:22px}
+.sheet{background:var(--page);max-width:620px;margin:0 auto;
+ border:1px solid var(--rule);box-shadow:0 2px 14px rgba(11,42,91,.08);
+ padding:40px 44px 44px;font-family:'Frank Ruhl Libre',serif}
+.sheet .knesset{text-align:center;font-size:15px;font-weight:500;margin-bottom:24px}
+.sheet .init{font-size:14px;line-height:1.9;margin-bottom:20px}
+.sheet .init u{display:block;text-decoration:none;border-bottom:1px solid var(--ink);width:60%;margin-top:3px}
+.sheet h3.title{text-align:center;font-size:17px;font-weight:700;line-height:1.6;margin:0 0 24px}
+.tbl{width:100%;border-collapse:collapse;font-size:14.5px;line-height:1.75}
+.tbl td{vertical-align:top;padding:0 0 15px}
+.tbl .mg{width:114px;font-family:'Assistant',sans-serif;font-size:12.5px;
+ font-weight:700;color:var(--navy);padding-inline-end:12px}
+.tbl .no{width:26px;color:var(--soft)}
+.tbl sup{font-size:10px;color:var(--flag)}
+.fresh{background:#FFF9E6;box-shadow:-3px 0 0 #EFC15E inset}
+.sheet h4.hh{font-family:'Assistant',sans-serif;text-align:center;font-size:14px;
+ margin:28px 0 12px;font-weight:700}
+.hesber{font-size:14px;line-height:1.85;text-indent:1.6em;margin:0 0 9px}
+.sheet .foot2{margin-top:28px;font-size:13px;line-height:1.8;color:var(--soft)}
+.sheet .fn{margin-top:24px;padding-top:9px;border-top:1px solid var(--rule);
+ font-size:12px;color:var(--soft)}
+
+/* ═══ צ'אט ═══ */
+.chat{flex:1;overflow:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:78%;padding:11px 15px;border-radius:12px;font-size:14.5px;line-height:1.65}
+.msg.u{align-self:flex-start;background:var(--flag);color:#fff;border-end-start-radius:3px}
+.msg.a{align-self:flex-end;background:var(--tint-2);border:1px solid var(--rule);border-end-end-radius:3px}
+.msg.a b{color:var(--navy)}
+.composer{border-top:1px solid var(--rule);padding:12px 16px;display:flex;gap:10px;
+ background:var(--tint-2);flex:0 0 auto}
+.composer .inp{flex:1;font-size:14.5px}
+.draft{font-family:'Frank Ruhl Libre',serif;font-size:15px;line-height:1.85;
+ background:var(--page);border:1px solid var(--rule);border-radius:8px;padding:16px 18px;margin-top:10px}
+.draft .to{font-weight:700;margin-bottom:8px}
+
+/* רשימות צד */
+.list{padding:8px}
+.item{padding:10px 12px;border-radius:8px;border:1px solid transparent;cursor:pointer}
+.item:hover{background:var(--tint-2);border-color:var(--rule)}
+.item.on{background:var(--tint);border-color:var(--flag)}
+.item b{display:block;font-size:14px;font-weight:600}
+.item span{display:block;font-size:12.5px;color:var(--soft);margin-top:2px}
+.src{font-size:12.5px;color:var(--soft);background:var(--tint-2);
+ border:1px solid var(--rule);border-inline-start:3px solid var(--flag);
+ border-radius:6px;padding:8px 11px;margin-top:8px;line-height:1.6}
+.src b{color:var(--navy);font-weight:600}
+
+.drop{border:2px dashed var(--rule);border-radius:var(--r);padding:30px;
+ text-align:center;color:var(--soft);background:var(--tint-2);margin-bottom:16px}
+.drop b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+
+h5.kh{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--navy)}
+.tsum{font-size:14.5px;line-height:1.75}
+.tsum ul{margin:6px 0 14px;padding-inline-start:20px}
+.tsum li{margin-bottom:5px}
+.quote{font-family:'Frank Ruhl Libre',serif;border-inline-start:3px solid var(--flag);
+ padding-inline-start:12px;margin:10px 0;color:var(--soft);font-size:14.5px}
+.stat{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.stat div{background:var(--tint-2);border:1px solid var(--rule);border-radius:8px;
+ padding:11px 16px;min-width:118px}
+.stat b{display:block;font-size:23px;font-weight:700;color:var(--navy);line-height:1.2}
+.stat span{font-size:12.5px;color:var(--soft)}
+
+@media(max-width:1150px){.cols{grid-template-columns:1fr !important}}
+</style>
+</head>
+<body>
+
+<nav class="rail">
+  <div class="brand"><b>Legislator AI</b><span>ארגז הכלים הפרלמנטרי</span></div>
+  <div class="nav">
+    <button class="on" data-t="bills"><span class="ico">§</span>הצעות חוק</button>
+    <button data-t="merge"><span class="ico">⇄</span>נוסח משולב</button>
+    <div class="nav-sep"></div>
+    <button data-t="query"><span class="ico">?</span>שאילתות</button>
+    <button data-t="agenda"><span class="ico">!</span>הצעות לסדר</button>
+    <button data-t="rules"><span class="ico">✦</span>מומחה התקנון</button>
+    <button data-t="proto"><span class="ico">≡</span>סיכומי פרוטוקולים</button>
+    <button data-t="research"><span class="ico">◎</span>מחקר</button>
+  </div>
+  <div class="me"><b>ברק</b>הכנסת העשרים ושש</div>
+</nav>
+
+<div class="main">
+
+<!-- ══════ הצעות חוק ══════ -->
+<div class="topbar" data-bar="bills">
+  <select>
+    <option>חוק הקייטנות (רישוי ופיקוח), התש"ן–1990</option>
+    <option>חוק המאבק בארגוני פשיעה, התשס"ג–2003</option>
+  </select>
+  <div class="asof">נוסח כפי שהופיע בוויקיטקסט ביום 30.09.2024</div>
+  <div class="grow"></div>
+  <button class="btn">טעינת הצעת חוק</button>
+  <button class="btn btn-primary">ייצוא לוורד</button>
+</div>
+
+<!-- ══════ ברי כותרת לשאר ══════ -->
+<div class="topbar" data-bar="merge" hidden>
+  <h1>נוסח משולב</h1><span class="sub">העלאת הצעת חוק וצפייה בחוק כפי שייראה אם תתקבל</span>
+  <div class="grow"></div><button class="btn btn-primary">ייצוא לוורד</button>
+</div>
+<div class="topbar" data-bar="query" hidden>
+  <h1>שאילתות</h1><span class="sub">ניסוח שאילתה לשר לפי הפורמט המקובל</span>
+  <div class="grow"></div><button class="btn">שאילתות קודמות</button>
+  <button class="btn btn-primary">ייצוא לוורד</button>
+</div>
+<div class="topbar" data-bar="agenda" hidden>
+  <h1>הצעות לסדר</h1><span class="sub">ניסוח הצעה לסדר היום ליושב ראש הכנסת</span>
+  <div class="grow"></div><button class="btn btn-primary">העתקה</button>
+</div>
+<div class="topbar" data-bar="rules" hidden>
+  <h1>מומחה התקנון</h1>
+  <span class="sub">תשובות מתוך תקנון הכנסת, חוק הכנסת והחלטות ועדת האתיקה בלבד</span>
+</div>
+<div class="topbar" data-bar="proto" hidden>
+  <h1>סיכומי פרוטוקולים</h1><span class="sub">סיכום דיון בודד או סדרת דיונים סביב הצעת חוק</span>
+  <div class="grow"></div><button class="btn btn-primary">ייצוא לוורד</button>
+</div>
+<div class="topbar" data-bar="research" hidden>
+  <h1>מחקר</h1><span class="sub">שאלות על נתוני הכנסת — שאילתות, הצעות חוק, הצבעות</span>
+</div>
+
+<div class="stage">
+
+<!-- ═══════════ הצעות חוק ═══════════ -->
+<div class="tab on" id="bills">
+  <div class="meta">
+    <div class="fld"><label>שם ההצעה</label>
+      <input class="inp" value='הצעת חוק הקייטנות (רישוי ופיקוח) (תיקון – החמרת הענישה), התשפ"ו–2026'>
+      <div class="hint">הוצע לפי השינויים שערכת. אפשר לערוך.</div></div>
+    <div class="fld"><label>שם היוזם</label><input class="inp" value="חבר הכנסת יעקב אשר"></div>
+    <div class="fld"><label>תאריך הנחה</label><input class="inp" placeholder="בחירת תאריך">
+      <div class="hint miss">חסר — יופיע בשם ההצעה</div></div>
+    <div class="fld"><label>מראה מקום</label><input class="inp" value='ס"ח התש"ן, עמ׳ 155'></div>
+  </div>
+
+  <div class="cols" style="grid-template-columns:1fr 1fr">
+    <section class="card">
+      <header><h2>נוסח החוק</h2><span>ערוך את הטקסט ישירות</span></header>
+      <div class="body"><div class="law">
+
+        <div class="sec"><button class="addbtn">+</button>
+          <div class="sec-title">הגדרות<i>סעיף 1</i></div>
+          <div class="sec-body">
+            <p>בחוק זה –</p>
+            <span class="def">"חוק רישוי עסקים" – חוק רישוי עסקים, התשכ"ח–1968;</span>
+            <span class="def">"ילד" – מי שטרם מלאו לו שמונה עשרה שנים;</span>
+            <span class="def"><ins>"קייטנה מפוקחת" – קייטנה שמנהל ארגון נוער או תנועת נוער;</ins></span>
+            <span class="def">"קייטנה" – מקום שבו מתנהלת פעילות יום יומית מאורגנת של נופש וחברה לקבוצת ילדים, לתקופה קצובה ורצופה של מספר ימים לפחות, בתקופת חופשת הלימודים מבית‑הספר;</span>
+            <span class="def">"השר" – שר החינוך והתרבות.</span>
+          </div></div>
+
+        <div class="sec"><button class="addbtn">+</button>
+          <div class="sec-title">רישוי קייטנות<i>סעיף 2</i></div>
+          <div class="sec-body"><p>לא ינהל אדם קייטנה אלא אם כן יש בידו רשיון לפי חוק רישוי עסקים.</p></div></div>
+
+        <div class="sec"><button class="addbtn">+</button>
+          <div class="sec-title">סייג לרישוי<i>סעיף 3</i></div>
+          <div class="sec-body"><p>לא יינתן רשיון לקייטנה אם תכנית הקייטנה נוגדת את מטרות החינוך הממלכתי כמפורט בסעיף 2 לחוק חינוך ממלכתי, התשי"ג–1953, או שהתכנית מנוגדת לכל דין.</p></div></div>
+
+        <div class="sec"><button class="addbtn">+</button>
+          <div class="sec-title">פעילות אסורה<i>סעיף 4</i></div>
+          <div class="sec-body"><p>לא ינהל אדם קייטנה אם תכנית הקייטנה או הפעילות בה נוגדות את העקרונות המפורטים בסעיף 3.</p></div></div>
+
+        <div class="sec"><button class="addbtn">+</button>
+          <div class="sec-title">עונשין<i>סעיף 5</i></div>
+          <div class="sec-body"><p>המנהל קייטנה בניגוד להוראות סעיפים 2 או 4, דינו – מאסר <del>ששה חדשים</del><ins>שנה</ins>.</p></div></div>
+
+        <div class="sec"><button class="addbtn">+</button>
+          <div class="sec-title">ביצוע ותקנות<i>סעיף 6</i></div>
+          <div class="sec-body">
+            <div class="pop">
+              <h4>הוספה אחרי סעיף קטן (א)</h4>
+              <button>סעיף ראשי <u>יהיה 6א</u></button>
+              <button>סעיף קטן <u>יהיה (א1)</u></button>
+              <button>פסקה <u>תהיה (1)</u></button>
+              <button class="dis">פסקת משנה</button>
+              <div class="note">פסקת משנה תיפתח אחרי שתתווסף פסקה.</div>
+            </div>
+            <span class="sub"><span class="lbl">(א)</span> השר ממונה על ביצוע חוק זה והוא רשאי להתקין תקנות לענין קייטנות, לרבות בענייני בטיחות ובטחון, פעילות חינוכית והדרכה ופיקוח פדגוגי.</span>
+            <span class="sub"><span class="lbl">(ב)</span> אדם שלא קיים תנאי מתנאי הרשיון או לא קיים הוראות תקנה לפי סעיף קטן (א), רואים אותו כמי שלא קיים תנאי מתנאי רשיון שניתן לפי חוק רישוי עסקים והוראות חוק רישוי עסקים יחולו לגביו.</span>
+          </div></div>
+
+        <div class="sec"><button class="addbtn">+</button>
+          <div class="sec-title">סייג לתחולה<i>סעיף 8</i></div>
+          <div class="sec-body"><p>חוק זה לא יחול על מי שהיה בידו רשיון לקייטנה לפי חוק רישוי עסקים שהיה בר תוקף ערב תחילתו של חוק זה.</p></div></div>
+
+      </div></div>
+    </section>
+
+    <section class="card">
+      <header><h2>הצעת החוק</h2><span>תצוגה מקדימה של קובץ הוורד</span></header>
+      <div class="sheetwrap">
+        <div class="sheet">
+          <div class="knesset">הכנסת העשרים ושש</div>
+          <div class="init">יוזם:&nbsp;&nbsp;&nbsp;&nbsp;חבר הכנסת יעקב אשר<u></u>פ/____/26</div>
+          <h3 class="title">הצעת חוק הקייטנות (רישוי ופיקוח)<br>(תיקון – החמרת הענישה), התשפ"ו–2026</h3>
+          <table class="tbl">
+            <tr class="fresh"><td class="mg">תיקון סעיף 1</td><td class="no">1.</td>
+              <td>בחוק הקייטנות (רישוי ופיקוח), התש"ן–1990<sup>1</sup> (להלן – החוק העיקרי), בסעיף 1, אחרי ההגדרה "ילד" יבוא:</td></tr>
+            <tr class="fresh"><td class="mg"></td><td class="no"></td>
+              <td>"'קייטנה מפוקחת' – קייטנה שמנהל ארגון נוער או תנועת נוער;".</td></tr>
+            <tr class="fresh"><td class="mg">תיקון סעיף 5</td><td class="no">2.</td>
+              <td>בסעיף 5 לחוק העיקרי, במקום "מאסר ששה חדשים" יבוא "מאסר שנה".</td></tr>
+          </table>
+          <h4 class="hh">דברי הסבר</h4>
+          <p class="hesber">חוק הקייטנות (רישוי ופיקוח), התש"ן–1990, נועד לפקח על פעילות יום יומית של נופש וחברה לקבוצות ילדים בתקופת חופשת הלימודים.</p>
+          <p class="hesber">מוצע להוסיף הגדרה של קייטנה מפוקחת, ולהחמיר את הענישה הקבועה בסעיף 5 לחוק, כך שדינו של המנהל קייטנה בניגוד להוראות החוק יהיה מאסר שנה.</p>
+          <div class="foot2">‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑<br>הוגשה ליו"ר הכנסת והסגנים<br>והונחה על שולחן הכנסת ביום</div>
+          <div class="fn">1 ס"ח התש"ן, עמ׳ 155.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ═══════════ נוסח משולב ═══════════ -->
+<div class="tab" id="merge">
+  <div class="cols" style="grid-template-columns:1.35fr 1fr">
+    <section class="card">
+      <header><h2>החוק לאחר קבלת ההצעה</h2><span>חוק הקייטנות (רישוי ופיקוח), התש"ן–1990</span></header>
+      <div class="body"><div class="law">
+        <div class="sec"><div class="sec-title">הגדרות<i>סעיף 1</i></div>
+          <div class="sec-body">
+            <p>בחוק זה –</p>
+            <span class="def">"חוק רישוי עסקים" – חוק רישוי עסקים, התשכ"ח–1968;</span>
+            <span class="def">"ילד" – מי שטרם מלאו לו שמונה עשרה שנים;</span>
+            <span class="def"><ins>"קייטנה מפוקחת" – קייטנה שמנהל ארגון נוער או תנועת נוער;</ins></span>
+            <span class="def">"קייטנה" – מקום שבו מתנהלת פעילות יום יומית מאורגנת של נופש וחברה לקבוצת ילדים…</span>
+          </div></div>
+        <div class="sec"><div class="sec-title">רישוי קייטנות<i>סעיף 2</i></div>
+          <div class="sec-body"><p>לא ינהל אדם קייטנה <ins>שאינה קייטנה מפוקחת</ins> אלא אם כן יש בידו רשיון לפי חוק רישוי עסקים.</p></div></div>
+        <div class="sec"><div class="sec-title">עונשין<i>סעיף 5</i></div>
+          <div class="sec-body"><p>המנהל קייטנה בניגוד להוראות סעיפים 2 או 4, דינו – מאסר <del>ששה חדשים</del><ins>שנה</ins>.</p></div></div>
+      </div></div>
+    </section>
+
+    <section class="card">
+      <header><h2>מה ההצעה משנה</h2><span>תקציר אוטומטי</span></header>
+      <div class="body">
+        <div class="drop"><b>הצעת החוק נטענה</b>p_6158_25.docx · 2 עמודים</div>
+        <div class="tsum">
+          <h5 class="kh">שלושה שינויים</h5>
+          <ul>
+            <li>נוספה הגדרה של <b>קייטנה מפוקחת</b> — קייטנה שמנהל ארגון נוער או תנועת נוער.</li>
+            <li>חובת הרישוי בסעיף 2 <b>לא תחול</b> על קייטנה מפוקחת.</li>
+            <li>העונש בסעיף 5 מוחמר מששה חודשי מאסר <b>לשנה</b>.</li>
+          </ul>
+          <h5 class="kh">המשמעות</h5>
+          <p>ההצעה מוציאה קייטנות של תנועות נוער מחובת רישוי עסקים, ובמקביל מחמירה את הענישה על מי שמנהל קייטנה החייבת ברישוי בלא רשיון.</p>
+          <h5 class="kh">חוקים נוספים שנוגעים בדבר</h5>
+          <div class="src"><b>חוק רישוי עסקים, התשכ"ח–1968</b><br>מנגנון הרישוי שההצעה מפנה אליו. לא מתוקן בהצעה.</div>
+          <div class="src"><b>חוק יסודות התקציב, התשמ"ה–1985</b><br>מקור המבחנים לתמיכה שההגדרה החדשה נסמכת עליהם.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ═══════════ שאילתות ═══════════ -->
+<div class="tab" id="query">
+  <div class="cols" style="grid-template-columns:1.4fr 1fr">
+    <section class="card">
+      <header><h2>ניסוח השאילתה</h2></header>
+      <div class="chat">
+        <div class="msg u">אני רוצה להגיש שאילתה לשר החינוך על מספר הקייטנות שפעלו בלי רישיון בקיץ האחרון, וכמה קנסות הוטלו.</div>
+        <div class="msg a">ניסחתי טיוטה לפי הפורמט המקובל. שאילתה רגילה או דחופה?
+          <div class="draft">
+            <div class="to">שאילתה רגילה לשר החינוך</div>
+            בשנים האחרונות עולות טענות בדבר פעילותן של קייטנות ללא רישיון כדין, ובכלל זה קייטנות שפעלו ללא פיקוח על תנאי הבטיחות והתברואה.<br><br>
+            לפיכך אבקש לשאול:<br>
+            1. כמה קייטנות פעלו ללא רישיון בקיץ התשפ"ה, לפי מחוז?<br>
+            2. כמה דוחות הוצאו וכמה קנסות הוטלו בגין הפעלה ללא רישיון?<br>
+            3. מהם הצעדים שנוקט המשרד למניעת הישנות התופעה?
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <input class="inp" placeholder="הוסף שאלה, שנה ניסוח, או בקש לקצר">
+        <button class="btn btn-primary">שליחה</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>שאילתות קודמות בנושא</h2><span>ממאגר הכנסת</span></header>
+      <div class="body">
+        <div class="src"><b>שאילתה 2114/25 · ח"כ מיכל וולדיגר</b><br>
+          רישוי קייטנות בחופשת הקיץ — הוגשה 14.07.2025, נענתה 03.09.2025.</div>
+        <div class="src"><b>שאילתה 1877/25 · ח"כ יוראי להב הרצנו</b><br>
+          פיקוח על תנאי בטיחות בקייטנות — הוגשה 22.05.2025, טרם נענתה.</div>
+        <div class="src"><b>שאילתה 908/24 · ח"כ שרן השכל</b><br>
+          אכיפה נגד מפעילי קייטנות ללא רישיון — נענתה 11.12.2024.</div>
+        <p style="font-size:13px;color:var(--soft);margin-top:14px">
+          שתיים מהשאילתות עוסקות באכיפה. כדאי לחדד את השאלה כדי שלא תיחשב חוזרת.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ═══════════ הצעות לסדר ═══════════ -->
+<div class="tab" id="agenda">
+  <div class="cols" style="grid-template-columns:1fr">
+    <section class="card" style="max-width:880px;margin:0 auto;width:100%">
+      <header><h2>ניסוח הצעה לסדר</h2><span>נושא, נימוק, ובקשה לדיון</span></header>
+      <div class="chat">
+        <div class="msg u">רוצה להציע לסדר על המחסור במקומות בקייטנות לילדים עם צרכים מיוחדים.</div>
+        <div class="msg a">הנה נוסח מוצע. אפשר לקצר או להוסיף נתונים.
+          <div class="draft">
+            <div class="to">הצעה לסדר היום</div>
+            <b>הנושא:</b> המחסור במסגרות קיץ לילדים עם צרכים מיוחדים<br><br>
+            בקיץ האחרון נותרו אלפי ילדים עם צרכים מיוחדים ללא מסגרת קיץ מותאמת, בשל מחסור בכוח אדם מקצועי ובתקציב ייעודי. הורים נאלצו להיעדר מעבודתם לתקופות ממושכות.<br><br>
+            אבקש לקיים דיון בהיערכות משרד החינוך לקיץ הקרוב, ובהקצאת התקציב הדרוש להפעלת מסגרות מותאמות.
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <input class="inp" placeholder="בקש שינוי בניסוח">
+        <button class="btn btn-primary">שליחה</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ═══════════ מומחה התקנון ═══════════ -->
+<div class="tab" id="rules">
+  <div class="cols" style="grid-template-columns:1.4fr 1fr">
+    <section class="card">
+      <header><h2>שאלה על התקנון</h2></header>
+      <div class="chat">
+        <div class="msg u">הצעת חוק שלי נפלה בקריאה טרומית. מתי אפשר להגיש אותה שוב?</div>
+        <div class="msg a">הצעת חוק שהמליאה דחתה בקריאה טרומית לא ניתן להגיש מחדש באותו נוסח לפני שחלפו <b>שישה חודשים</b> מיום הדחייה.<br><br>
+          אם תכניס שינוי מהותי בנוסח, ההצעה נחשבת חדשה ואפשר להגישה מיד — אבל ההכרעה אם השינוי מהותי נתונה ליושב ראש הכנסת.</div>
+        <div class="msg u">ומה אם ח"כ אחר יגיש אותה?</div>
+        <div class="msg a">אותה מגבלה חלה על ההצעה ולא על המגיש, ולכן גם ח"כ אחר לא יוכל להניח נוסח זהה לפני תום שישה חודשים.</div>
+      </div>
+      <div class="composer">
+        <input class="inp" placeholder="שאל על נוהל, מועד, או סמכות">
+        <button class="btn btn-primary">שליחה</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>המקורות לתשובה</h2><span>תקנון הכנסת בלבד</span></header>
+      <div class="body">
+        <div class="src"><b>תקנון הכנסת, סעיף 75(ה)</b><br>
+          הצעת חוק שנדחתה בקריאה טרומית — סייג להנחה חוזרת ותקופת ההמתנה.</div>
+        <div class="src"><b>תקנון הכנסת, סעיף 75(ו)</b><br>
+          סמכות יושב ראש הכנסת לקבוע אם נוסח מהווה הצעה חדשה.</div>
+        <div class="src"><b>חוק הכנסת, סעיף 3</b><br>
+          סדרי עבודת הכנסת והסמכות לקבוע אותם בתקנון.</div>
+        <p style="font-size:13px;color:var(--soft);margin-top:14px">
+          התשובות נשענות על התקנון, חוק הכנסת והחלטות ועדת האתיקה. אין כאן ייעוץ משפטי.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ═══════════ פרוטוקולים ═══════════ -->
+<div class="tab" id="proto">
+  <div class="cols" style="grid-template-columns:280px 1fr">
+    <section class="card">
+      <header><h2>בחירת דיונים</h2></header>
+      <div class="list">
+        <div class="item on"><b>ועדת החינוך</b><span>4 דיונים · הצעת חוק הקייטנות</span></div>
+        <div class="item"><b>ועדת החינוך</b><span>21.05.2025 · רישוי קייטנות</span></div>
+        <div class="item"><b>ועדת הפנים</b><span>09.03.2025 · רישוי עסקים</span></div>
+        <div class="item"><b>מליאה</b><span>12.02.2025 · קריאה טרומית</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>ארבעה דיונים בהצעת חוק הקייטנות</h2><span>פברואר–יולי 2025</span></header>
+      <div class="body">
+        <div class="stat">
+          <div><b>4</b><span>דיונים</span></div>
+          <div><b>11</b><span>חברי כנסת</span></div>
+          <div><b>6</b><span>גורמי חוץ</span></div>
+          <div><b>9ש׳</b><span>סך הדיונים</span></div>
+        </div>
+        <div class="tsum">
+          <h5 class="kh">מה עלה בדיונים</h5>
+          <ul>
+            <li>משרד החינוך תמך בעקרון הפטור לתנועות נוער, והתנגד להרחבתו לגופים מסחריים.</li>
+            <li>משרד הפנים ביקש שהפטור לא יחול על קייטנות עם לינה.</li>
+            <li>מרכז השלטון המקומי העלה חשש לפיקוח תברואתי בקייטנות פטורות.</li>
+            <li>הוועדה ביקשה נתונים על מספר הקייטנות שייכללו בפטור — טרם התקבלו.</li>
+          </ul>
+          <h5 class="kh">מה נותר פתוח</h5>
+          <ul>
+            <li>הגדרת "ארגון נוער" — האם נסמכת על מבחני התמיכה בלבד.</li>
+            <li>תחולה על קייטנות עם לינה.</li>
+            <li>מנגנון פיקוח חלופי לקייטנות פטורות.</li>
+          </ul>
+          <div class="quote">"הפטור הזה נועד לתנועות הנוער, ואם ניתן לו לזלוג לגופים מסחריים נמצא את עצמנו בלי פיקוח על אלפי ילדים."<br>
+            <span style="font-family:'Assistant';font-size:12.5px">— יו"ר הוועדה, דיון 21.05.2025</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ═══════════ מחקר ═══════════ -->
+<div class="tab" id="research">
+  <div class="cols" style="grid-template-columns:1fr">
+    <section class="card" style="max-width:940px;margin:0 auto;width:100%">
+      <header><h2>שאלה על נתוני הכנסת</h2></header>
+      <div class="chat">
+        <div class="msg u">כמה הצעות חוק בנושא רישוי קייטנות הוגשו בחמש השנים האחרונות, ומה עלה בגורלן?</div>
+        <div class="msg a">
+          <b>שבע הצעות, בארבע כנסות.</b> אחת התקבלה, שתיים נדחו בטרומית, ארבע הוסרו מסדר היום או נפלו עם פיזור הכנסת.
+          <div class="stat" style="margin:12px 0 4px">
+            <div><b>7</b><span>הצעות</span></div>
+            <div><b>1</b><span>התקבלה</span></div>
+            <div><b>2</b><span>נדחו</span></div>
+            <div><b>4</b><span>לא הושלמו</span></div>
+          </div>
+          שתיים מהן זהות בעיקרן להצעה שאתה מנסח — פ/4102/24 ופ/1877/25. אם תניח נוסח דומה, חובה לציין אותן בדברי ההסבר.
+        </div>
+      </div>
+      <div class="composer">
+        <input class="inp" placeholder="שאל על הצעות חוק, שאילתות, הצבעות או דיונים">
+        <button class="btn btn-primary">שליחה</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+</div></div>
+
+<script>
+document.querySelectorAll('.nav button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    const t=b.dataset.t;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id===t));
+    document.querySelectorAll('[data-bar]').forEach(x=>x.hidden=(x.dataset.bar!==t));
+  };
+});
+</script>
+</body>
+</html>
