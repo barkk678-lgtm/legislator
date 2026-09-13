@@ -1,0 +1,7 @@
+# requirements.txt בשורש הריפו - לצורך פריסת Vercel בלבד (הבילדר מחפש
+# אותו לצד ה-entrypoint או בשורש; ראו pyproject.toml). להרצה מקומית
+# ממשיכים להשתמש ב-apps/api/requirements.txt (כולל uvicorn/httpx,
+# שלא נדרשים כאן - Vercel מריץ את אובייקט ה-ASGI ישירות, לא uvicorn).
+fastapi
+jinja2
+pyluach

@@ -1,0 +1,7 @@
+[tool.vercel]
+# apps/api/main.py הוא הכניסה האמיתית לאפליקציה (FastAPI, ראו TASKS.md
+# משימה 10) - לא בשורש הריפו, לכן צריך להצביע עליה במפורש. entrypoint
+# לא מגביל את שאר הריפו מלהיכלל בפריסה - packages/amend/render/validate/
+# corpus (אחים ל-apps/, לא ילדים שלה) עדיין נגישים דרך sys.path.insert
+# היחסי שכבר קיים ב-main.py, בדיוק כמו בהרצה מקומית.
+entrypoint = "apps.api.main:app"
