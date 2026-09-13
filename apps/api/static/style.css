@@ -1,309 +1,243 @@
+/* עיצוב לפי docs/design/legislator-mockup.html + docs/design/README.md
+   ("מה לוקחים ממנו"): פלטה, טיפוגרפיה, מבנה תפריט צד/כרטיסים, גיליון
+   הוורד, תפריט ההוספה. מנגנוני האינטראקציה (app.js) לא נגעו - זה עיצוב
+   בלבד על אותם אלמנטים/מזהים. ראו docs/design/ui-overhaul-plan.md. */
+
 :root {
-  --bg: #faf9f7;
-  --panel-bg: #ffffff;
-  --border: #d8d3cb;
-  --text: #22201c;
-  --muted: #6b665e;
-  --accent: #1c5d3b;
-  --accent-bg: #e7f3ec;
-  --danger: #8a1f1f;
-  --danger-bg: #fbeaea;
-  --warn: #8a5a10;
-  --warn-bg: #fbf1de;
-  --skip-bg: #edeae4;
-  --touched-bg: #fff4d6;
+  --navy: #0B2A5B;
+  --flag: #0038B8;
+  --flag-deep: #012E9C;
+  --tint: #EAF0FC;
+  --tint-2: #F6F9FE;
+  --ink: #14171C;
+  --soft: #5A6472;
+  --faint: #8C95A3;
+  --rule: #D9E1EF;
+  --shell: #EEF2F8;
+  --page: #FFFFFF;
+  --del: #A3242B;
+  --del-bg: #FBEDEE;
+  --ins: #0E6B45;
+  --ins-bg: #E9F5EF;
+  --warn: #8A5A00;
+  --warn-bg: #FBF1DE;
+  --skip-bg: #EDEAE4;
+  --touched-bg: #FFF9E6;
+  --touched-accent: #EFC15E;
+  --r: 10px;
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
-html, body {
+html, body { height: 100%; }
+body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: "Segoe UI", Arial, "Noto Sans Hebrew", sans-serif;
+  background: var(--shell);
+  color: var(--ink);
+  font-family: "Assistant", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
   direction: rtl;
-}
-
-body { padding: 16px; }
-
-h1 { font-size: 1.3rem; margin: 0 0 4px; }
-h2 { font-size: 1.05rem; margin: 0 0 8px; }
-.subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
-
-.panel {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
-  margin-bottom: 14px;
-}
-
-.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
-.field { display: flex; flex-direction: column; gap: 4px; min-width: 180px; flex: 1; }
-.field label { font-size: 0.8rem; color: var(--muted); }
-.field input, .field select, .field textarea {
-  font-family: inherit;
-  font-size: 0.95rem;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  direction: rtl;
-}
-.field.required label::after { content: " *"; color: var(--danger); }
-
-button {
-  font-family: inherit;
-  font-size: 0.9rem;
-  padding: 6px 12px;
-  border-radius: 5px;
-  border: 1px solid var(--accent);
-  background: var(--accent-bg);
-  color: var(--accent);
-  cursor: pointer;
-}
-button:hover { filter: brightness(0.97); }
-button.primary { background: var(--accent); color: #fff; }
-button.subtle { border-color: var(--border); background: transparent; color: var(--muted); }
-button.danger { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.split { display: flex; gap: 14px; }
-.split > .panel { flex: 1; min-width: 0; }
-
-.as-of-note {
-  font-size: 0.8rem;
-  color: var(--muted);
-  border-inline-start: 3px solid var(--accent);
-  padding-inline-start: 8px;
-  margin-bottom: 10px;
-}
-.source-ref-note {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-
-.node { margin-inline-start: 14px; margin-bottom: 6px; }
-.node > .node-header {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-weight: 600;
+}
+button {
+  font: inherit; cursor: pointer;
+  border: 1px solid var(--rule); background: var(--page); color: var(--ink);
+  border-radius: 8px; padding: 8px 14px; font-size: 14px;
+}
+button:hover { border-color: #B6C4DC; }
+button.primary { background: var(--flag); border-color: var(--flag); color: #fff; font-weight: 600; }
+button.primary:hover { background: var(--flag-deep); border-color: var(--flag-deep); }
+button.subtle { border-color: transparent; background: transparent; color: var(--soft); }
+button.subtle:hover { border-color: var(--rule); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ═══ תפריט צד ═══ */
+.rail {
+  width: 236px; flex: 0 0 236px; background: var(--navy); color: #fff;
+  display: flex; flex-direction: column; height: 100vh;
+}
+.brand { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,.13); }
+.brand b { display: block; font-size: 19px; font-weight: 700; }
+.brand span { display: block; font-size: 12.5px; color: #9FB4D8; margin-top: 2px; }
+.nav { padding: 12px 10px; flex: 1; overflow: auto; }
+.nav button {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 11px; margin-bottom: 1px; border: 0; border-radius: 7px;
+  background: none; color: #C6D4EC; font-size: 14.5px; text-align: start;
+}
+.nav button:hover { background: rgba(255,255,255,.08); color: #fff; }
+.nav button.on { background: #fff; color: var(--navy); font-weight: 600; }
+.nav .ico { width: 18px; flex: 0 0 18px; text-align: center; opacity: .9; font-size: 13px; }
+
+/* ═══ מסגרת ═══ */
+.main { flex: 1; display: flex; flex-direction: column; height: 100vh; min-width: 0; }
+.topbar {
+  background: var(--page); border-bottom: 1px solid var(--rule);
+  padding: 11px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.topbar h1 { margin: 0; font-size: 17px; font-weight: 700; }
+.grow { flex: 1; }
+select, .inp {
+  font: inherit; border: 1px solid var(--rule); background: var(--page);
+  border-radius: 8px; padding: 7px 11px; color: var(--ink);
+}
+select { font-weight: 600; max-width: 420px; }
+.inp:focus, select:focus { outline: 2px solid var(--tint); border-color: var(--flag); }
+.asof {
+  font-size: 12.5px; color: var(--soft); background: var(--tint-2);
+  border: 1px solid var(--rule); border-inline-start: 3px solid var(--flag);
+  border-radius: 6px; padding: 5px 10px;
+}
+
+.stage { flex: 1; min-height: 0; padding: 16px; overflow: hidden; }
+.tab { display: none; height: 100%; }
+.tab.on { display: flex; flex-direction: column; min-height: 0; }
+
+/* ═══ חלוניות ═══ */
+.cols { flex: 1; display: grid; gap: 16px; min-height: 0; grid-template-columns: 1fr 1fr; }
+.card {
+  background: var(--page); border: 1px solid var(--rule); border-radius: var(--r);
+  display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden;
+}
+.card > header {
+  background: var(--tint); border-bottom: 1px solid var(--rule);
+  padding: 9px 16px; display: flex; align-items: baseline; gap: 10px; flex: 0 0 auto;
+}
+.card > header h2 { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--navy); }
+.card > header span { font-size: 12.5px; color: var(--soft); }
+.card .body { flex: 1; overflow: auto; padding: 20px 24px 48px; }
+
+@media (max-width: 1150px) { .cols { grid-template-columns: 1fr !important; } }
+
+/* טופס פרטי ההצעה */
+.meta {
+  display: grid; gap: 13px; flex: 0 0 auto; margin-bottom: 16px;
+  grid-template-columns: minmax(0,2.4fr) minmax(0,1.4fr);
+}
+.fld label { display: block; font-size: 12.5px; color: var(--soft); margin-bottom: 4px; }
+.fld.required label::after, .insert-margin-title-field label::after { content: " *"; color: var(--del); }
+.fld .inp, .fld textarea { width: 100%; font-size: 14.5px; font-family: inherit; }
+.fld textarea { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--rule); }
+.hint { font-size: 12px; margin-top: 4px; color: var(--soft); }
+.as-of-note, .source-ref-note {
+  font-size: 12.5px; color: var(--soft); background: var(--tint-2);
+  border: 1px solid var(--rule); border-inline-start: 3px solid var(--flag);
+  border-radius: 6px; padding: 6px 10px; margin-bottom: 10px;
+}
+
+/* ═══ נוסח החוק ═══ */
+.law-heading {
+  font-family: "Frank Ruhl Libre", serif; font-size: 17px; font-weight: 700;
+  margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--rule);
+}
+#law-tree { font-family: "Frank Ruhl Libre", serif; font-size: 16.5px; line-height: 1.85; max-width: 64ch; }
+
+.node { margin-inline-start: 14px; margin-bottom: 20px; }
+.node-header {
+  font-family: "Assistant", sans-serif; font-size: 13.5px; font-weight: 700;
+  color: var(--navy); display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
 }
 .node.status-repealed > .node-header,
-.node.status-merged > .node-header { color: var(--muted); font-style: italic; }
+.node.status-merged > .node-header { color: var(--faint); font-style: italic; }
+.node-number { color: var(--faint); font-weight: 400; font-size: 12.5px; }
 
-.node-body-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-}
+.node-body-row { display: flex; align-items: flex-end; gap: 6px; }
 .node-body-row > .node-text,
 .node-body-row > .node-text-empty { flex: 1; min-width: 0; }
 
-.node-add-btn {
-  font-size: 0.72rem;
-  padding: 1px 7px;
-  visibility: hidden;
-  flex-shrink: 0;
+.node-text {
+  white-space: pre-wrap; line-height: 1.85; cursor: text; user-select: text;
+  padding: 2px 0; outline: none; border-radius: 4px;
 }
-.node-body-row:hover .node-add-btn { visibility: visible; }
+.node-text:focus { background: var(--tint); box-shadow: 0 0 0 2px var(--flag); }
+.node-text del, .node-margin-title del { color: var(--del); background: var(--del-bg); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.node-text ins, .node-margin-title ins { color: var(--ins); background: var(--ins-bg); text-decoration: underline; text-decoration-thickness: 1.5px; }
+.node-text.edit-unsupported, .node-margin-title.edit-unsupported {
+  background: var(--del-bg); outline: 1px dashed var(--del);
+}
 
-/* תוכן שהוסף כרגע (סעיף/סעיף קטן/פסקה בכל היררכיה) - נראה בדיוק כמו
-   כל צומת אחר, פרט לרקע הצהוב, וניתן לעריכה חופשית כמו כל תוכן אחר
-   (ראו משוב המשתמש אחרי בדיקה ידנית, TASKS.md 10ב). */
+.node-margin-title { outline: none; border-radius: 3px; padding: 0 2px; }
+.node-margin-title[contenteditable="true"]:focus { background: var(--tint); box-shadow: 0 0 0 2px var(--flag); }
+.node-margin-title.readonly { color: var(--faint); font-weight: 400; font-style: italic; }
+
+/* תוכן שהוכנס - נראה כמו כל צומת אחר, פרט לרקע הצהוב (בדיוק כמו
+   ".fresh" בטבלת ההצעה - אותו רעיון, שני מקומות) - עדיין ניתן לעריכה
+   חופשית, לא נעול (ראו משוב המשתמש, TASKS.md 10ב). */
 .node.inserted > .node-header,
 .node.inserted > .node-body-row > .node-text {
-  background: var(--touched-bg);
-  border-radius: 4px;
-  padding-inline: 4px;
+  background: var(--touched-bg); border-radius: 4px; padding-inline: 4px;
+  box-shadow: -3px 0 0 var(--touched-accent) inset;
 }
+
+/* כפתור "+": נשאר בסוף שורת התוכן של הצומת (לא ליד הכותרת, כמו
+   שהמוקאפ ממקם אותו) - החלטת פונקציונליות גוברת, ראו
+   docs/design/ui-overhaul-plan.md. רק העיצוב (עיגול, --flag) מהמוקאפ. */
+.node-add-btn, .remove-insertion-btn {
+  flex-shrink: 0; opacity: 0; transition: .12s;
+  width: 23px; height: 23px; border-radius: 50%; border: 1px solid var(--rule);
+  background: var(--page); color: var(--flag); font-size: 15px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.node-body-row:hover .node-add-btn { opacity: 1; }
 .remove-insertion-btn {
-  font-size: 0.72rem;
-  padding: 1px 7px;
-  margin-inline-start: auto;
+  opacity: 1; width: auto; height: auto; border-radius: 20px; font-size: 11px;
+  padding: 1px 9px; margin-inline-start: auto; color: var(--del); border-color: var(--del-bg);
 }
 
-.editor-note-flag {
-  font-size: 0.72rem;
-  font-weight: 400;
-  font-style: italic;
-  color: var(--muted);
-}
-
-.node-text {
-  white-space: pre-wrap;
-  line-height: 1.5;
-  cursor: text;
-  user-select: text;
-  padding: 2px 0;
-}
-.node.touched > .node-text, .node.touched > .node-header {
-  background: var(--touched-bg);
-  border-radius: 4px;
-  padding-inline: 4px;
-}
-
-.selection-box {
-  border: 1px dashed var(--accent);
-  border-radius: 6px;
-  padding: 8px;
-  background: var(--accent-bg);
-  margin-top: 8px;
-}
-.selection-preview {
-  font-family: "Consolas", monospace;
-  direction: ltr;
-  unicode-bidi: plaintext;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 6px 8px;
-  margin: 6px 0;
-  word-break: break-word;
-}
-.ws-mark {
-  background: #ffd166;
-  border-radius: 2px;
-  padding: 0 1px;
-}
-
-.pending-list { list-style: none; padding: 0; margin: 0; }
-.pending-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.88rem;
-}
-
-.line-row { border-bottom: 1px solid var(--border); padding: 6px 0; font-size: 0.92rem; }
-.line-side-heading { font-weight: 700; color: var(--accent); font-size: 0.8rem; }
-.line-quoted { background: #f4f1ea; padding: 4px 6px; border-radius: 4px; margin-top: 3px; }
-
-.findings-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.findings-table th, .findings-table td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--border); }
-.status-badge {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-.status-badge.pass { background: var(--accent-bg); color: var(--accent); }
-.status-badge.fail { background: var(--danger-bg); color: var(--danger); }
-.status-badge.warn { background: var(--warn-bg); color: var(--warn); }
-.status-badge.skip { background: var(--skip-bg); color: var(--muted); }
-
-.error-banner {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin-bottom: 10px;
-  font-size: 0.9rem;
-}
-
-.hint { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
-[hidden] { display: none !important; }
-
-/* ---------- משימה 10ב: עריכה חופשית ---------- */
-
-.law-heading {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
-}
-
-.editor-panel .node-text {
-  outline: none;
-  border-radius: 4px;
-}
-.editor-panel .node-text:focus {
-  background: var(--accent-bg);
-  box-shadow: 0 0 0 2px var(--accent);
-}
-.node-text del { color: var(--danger); text-decoration: line-through; }
-.node-text ins { color: var(--accent); text-decoration: underline; }
-.node-text.edit-unsupported {
-  background: var(--danger-bg);
-  outline: 1px dashed var(--danger);
-}
-
-.node-number { color: var(--muted); font-weight: 700; }
-.node-margin-title {
-  outline: none;
-  border-radius: 3px;
-  padding: 0 2px;
-}
-.node-margin-title[contenteditable="true"]:focus {
-  background: var(--accent-bg);
-  box-shadow: 0 0 0 2px var(--accent);
-}
-.node-margin-title del { color: var(--danger); text-decoration: line-through; }
-.node-margin-title ins { color: var(--accent); text-decoration: underline; }
-.node-margin-title.edit-unsupported {
-  background: var(--danger-bg);
-  outline: 1px dashed var(--danger);
-}
-.node-margin-title.readonly { color: var(--muted); font-weight: 400; font-style: italic; }
-
+/* ═══ תפריט הוספה (".pop" במוקאפ) ═══ */
 .insert-host { position: relative; }
 .insert-menu {
-  position: relative;
-  z-index: 5;
-  margin: 6px 0;
-  padding: 8px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--panel-bg);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  max-width: 360px;
+  position: relative; z-index: 20; margin: 6px 0; width: 246px;
+  background: var(--page); border: 1px solid var(--flag); border-radius: 9px;
+  box-shadow: 0 10px 28px rgba(11,42,91,.18); padding: 6px; font-family: "Assistant", sans-serif;
 }
-.insert-menu-levels { display: flex; flex-direction: column; gap: 4px; }
-.insert-level-btn { text-align: start; }
-.insert-menu-form { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.insert-menu-levels { display: flex; flex-direction: column; gap: 2px; }
+.insert-level-btn {
+  display: flex; width: 100%; gap: 7px; align-items: baseline; text-align: start;
+  background: none; border: 0; border-radius: 6px; padding: 7px 9px; font-size: 14px;
+}
+.insert-level-btn:hover:not(:disabled) { background: var(--tint); }
+.insert-menu-form { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 6px; }
 .insert-menu-form button { margin-inline-end: 6px; }
 
 .insertion-error-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0;
-  padding: 5px 8px;
-  background: var(--danger-bg);
-  color: var(--danger);
-  border-radius: 5px;
-  font-size: 0.85rem;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  margin: 4px 0; padding: 5px 8px; background: var(--del-bg); color: var(--del);
+  border-radius: 5px; font-size: 12.5px;
 }
 
-.docx-panel { background: #fdfcf9; }
-.docx-approx {
-  margin-top: 10px;
-  padding: 12px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  min-height: 120px;
+/* ═══ גיליון הוורד (".sheet"/".tbl" במוקאפ) ═══ */
+#docx-approx {
+  background: var(--shell); height: 100%; overflow: auto; padding: 22px; margin: 0;
+  border: 0; border-radius: 0; min-height: 0;
 }
-.docx-title { font-weight: 700; text-align: center; margin-bottom: 4px; }
-.docx-initiator { font-size: 0.85rem; color: var(--muted); text-align: center; margin-bottom: 10px; }
+/* .sheet עוטף את שלושת הילדים (כותרת/יוזם/טבלה) בכרטיס "דף" אחד -
+   נוסף ב-index.html מסביב לשלושת ה-id-ים הקיימים, לא משנה אותם. */
+.sheet {
+  background: var(--page); max-width: 620px; margin: 0 auto;
+  border: 1px solid var(--rule); box-shadow: 0 2px 14px rgba(11,42,91,.08);
+  padding: 40px 44px 44px; font-family: "Frank Ruhl Libre", serif;
+}
+.docx-title {
+  text-align: center; font-size: 17px; font-weight: 700; line-height: 1.6; margin-bottom: 4px;
+}
+.docx-initiator { font-size: 14px; color: var(--soft); text-align: center; margin-bottom: 20px; }
+#docx-lines { font-size: 14.5px; line-height: 1.75; }
+#docx-lines .hint { font-family: "Assistant", sans-serif; padding: 10px 0; }
 
-.validator-drawer { padding: 8px 14px; }
-#validator-toggle {
-  width: 100%;
-  text-align: start;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  font-weight: 600;
+.docx-extra {
+  max-width: 620px; margin: 14px auto 0; font-family: "Assistant", sans-serif;
 }
-#validator-summary { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
-#findings-table { margin-top: 10px; }
+
+.line-row { border-bottom: 1px solid var(--rule); padding: 8px 0; }
+.line-side-heading {
+  font-family: "Assistant", sans-serif; font-size: 12.5px; font-weight: 700; color: var(--navy);
+}
+.line-quoted { background: var(--tint-2); padding: 4px 6px; border-radius: 4px; margin-top: 3px; }
+
+/* ולידציה: אינה מוצגת למשתמש (docs/design/README.md #4) - 15 הבדיקות
+   ממשיכות לרוץ בשרת כרגיל, פנימית בלבד. חיווי על שדה חסר מוצג בטופס
+   עצמו (source-ref-note למעלה), לא כפאנל נפרד. */

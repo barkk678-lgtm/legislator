@@ -384,7 +384,6 @@ async function refreshPreview() {
 
   renderInsertionErrors(data.insertion_errors);
   renderDocxApprox(data.lines);
-  renderFindings(data.findings);
   document.getElementById("download-hint").textContent = data.insertion_errors.length
     ? `שים לב: ${data.insertion_errors.length} הוספות לא בוצעו (ראו כרטיסי השגיאה בעץ)`
     : "";
@@ -423,28 +422,6 @@ function renderDocxApprox(lines) {
     row.appendChild(body);
     container.appendChild(row);
   }
-}
-
-function renderFindings(findings) {
-  const tbody = document.getElementById("findings-body");
-  tbody.innerHTML = "";
-  const statusClass = { "עבר": "pass", "נכשל": "fail", "אזהרה": "warn", "לא נבדק": "skip" };
-  let passCount = 0;
-  let failCount = 0;
-  for (const f of findings) {
-    const tr = document.createElement("tr");
-    const cls = statusClass[f.status] || "skip";
-    if (f.status === "עבר") passCount++;
-    if (f.status === "נכשל") failCount++;
-    tr.innerHTML = `
-      <td>${f.check_number}</td>
-      <td><span class="status-badge ${cls}">${f.status}</span></td>
-      <td>${escapeHtml(f.description)}</td>
-      <td>${escapeHtml(f.message || "")}</td>`;
-    tbody.appendChild(tr);
-  }
-  document.getElementById("validator-summary").textContent =
-    `(${passCount} עברו, ${failCount} נכשלו, מתוך ${findings.length})`;
 }
 
 /* ---------- תפריט הוספה ---------- */
@@ -556,11 +533,6 @@ document.getElementById("download-btn").addEventListener("click", async () => {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-});
-
-document.getElementById("validator-toggle").addEventListener("click", () => {
-  const table = document.getElementById("findings-table");
-  table.hidden = !table.hidden;
 });
 
 for (const inputId of ["bill-title-input", "bill-initiator-input"]) {

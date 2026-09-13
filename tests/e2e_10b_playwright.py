@@ -180,13 +180,10 @@ def main():
             f"-> {docx_after_editing_inserted!r}",
         )
 
-        # --- בונוס: מגירת הולידטור ---
-        findings_table = page.locator("#findings-table")
-        check("טבלת הולידציה מוסתרת כברירת מחדל", not findings_table.is_visible())
-        page.click("#validator-toggle")
-        check("טבלת הולידציה נפתחת בלחיצה", findings_table.is_visible())
-        rows = page.locator("#findings-body tr").count()
-        check("מוצגות כל 15 הבדיקות (כולל עבר/לא נבדק)", rows == 15, f"-> {rows}")
+        # --- פאנל הולידציה אינו מוצג למשתמש (docs/design/README.md #4) -
+        # 15 הבדיקות ממשיכות לרוץ בשרת (נבדק ב-tests/unit/test_api.py),
+        # אין להן שום ייצוג ב-DOM כאן בכוונה.
+        check("אין פאנל ולידציה גלוי ב-DOM", page.locator("#findings-table").count() == 0)
 
         # --- קריטריון 4: ייצוא docx תקין ---
         page.fill("#bill-title-input", "הצעת חוק בדיקה")

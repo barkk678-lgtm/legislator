@@ -3,78 +3,73 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>מנסח החקיקה — עריכה חופשית</title>
+  <title>Legislator AI — מנסח החקיקה</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700&family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <h1>מנסח החקיקה</h1>
-  <div class="subtitle">
-    עריכה חופשית של נוסח החוק (משימה 10ב) — מקומי בלבד, שני חוקי fixture.
-  </div>
 
-  <div class="panel">
-    <div class="field">
-      <label for="law-select">חוק</label>
+  <nav class="rail">
+    <div class="brand"><b>Legislator AI</b><span>ארגז הכלים הפרלמנטרי</span></div>
+    <div class="nav">
+      <button class="on"><span class="ico">§</span>הצעות חוק</button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
       <select id="law-select"></select>
-    </div>
-  </div>
-
-  <div id="law-panels" hidden>
-    <div class="as-of-note" id="as-of-note"></div>
-    <div class="source-ref-note" id="source-ref-note"></div>
-    <div class="error-banner" id="amend-blocked-note" hidden></div>
-
-    <div class="split">
-      <div class="panel editor-panel">
-        <h2>נוסח החוק — לחצו לעריכה</h2>
-        <div class="hint">
-          לחצו על טקסט ועיטרו אותו ישירות. השינוי מתועד כשיוצאים מהשדה (blur).
-          לחצו על "+" בסוף שורת הסעיף/סעיף קטן/פסקה כדי להוסיף תוכן חדש אחריו.
-          תוכן שהוסף כרגע מסומן ברקע צהוב, ועדיין ניתן לעריכה חופשית כמו כל תוכן אחר.
-        </div>
-        <div id="law-tree"></div>
-      </div>
-
-      <div class="panel docx-panel">
-        <h2>תצוגת הצעת החוק</h2>
-        <div class="row">
-          <div class="field">
-            <label for="bill-title-input">שם ההצעה</label>
-            <input id="bill-title-input" type="text" />
-          </div>
-          <div class="field">
-            <label for="bill-initiator-input">שם היוזם</label>
-            <input id="bill-initiator-input" type="text" />
-          </div>
-        </div>
-
-        <div class="docx-approx" id="docx-approx">
-          <div class="docx-title" id="docx-title-line"></div>
-          <div class="docx-initiator" id="docx-initiator-line"></div>
-          <div class="docx-table" id="docx-lines"></div>
-        </div>
-
-        <div class="field">
-          <label>דברי הסבר</label>
-          <textarea id="explanatory-input" rows="4"
-            placeholder="פסקה אחת בכל שורה - כל שורה תוצג כפסקה נפרדת בדברי ההסבר."></textarea>
-        </div>
-
-        <button id="download-btn" class="primary">הורדת docx</button>
-        <div class="hint" id="download-hint"></div>
-      </div>
+      <div class="asof" id="as-of-note"></div>
+      <div class="grow"></div>
+      <button id="download-btn" class="primary">הורדת docx</button>
     </div>
 
-    <div class="panel validator-drawer">
-      <button id="validator-toggle" class="subtle">
-        ולידציה (15 בדיקות) <span id="validator-summary"></span> ▾
-      </button>
-      <table class="findings-table" id="findings-table" hidden>
-        <thead>
-          <tr><th>#</th><th>סטטוס</th><th>בדיקה</th><th>פירוט</th></tr>
-        </thead>
-        <tbody id="findings-body"></tbody>
-      </table>
+    <div class="stage">
+      <div class="tab on" id="bills">
+        <div id="law-panels" hidden>
+          <div class="source-ref-note" id="source-ref-note"></div>
+
+          <div class="meta">
+            <div class="fld">
+              <label for="bill-title-input">שם ההצעה</label>
+              <input id="bill-title-input" class="inp" type="text" />
+              <div class="hint">אם נשאר ריק - תיבנה כותרת ברירת מחדל אוטומטית.</div>
+            </div>
+            <div class="fld">
+              <label for="bill-initiator-input">שם היוזם</label>
+              <input id="bill-initiator-input" class="inp" type="text" />
+            </div>
+          </div>
+
+          <div class="cols">
+            <section class="card">
+              <header><h2>נוסח החוק</h2><span>לחצו לעריכה</span></header>
+              <div class="body"><div id="law-tree"></div></div>
+            </section>
+
+            <section class="card">
+              <header><h2>הצעת החוק</h2><span>תצוגה מקדימה של קובץ הוורד</span></header>
+              <div id="docx-approx">
+                <div class="sheet">
+                  <div class="docx-title" id="docx-title-line"></div>
+                  <div class="docx-initiator" id="docx-initiator-line"></div>
+                  <div id="docx-lines"></div>
+                </div>
+                <div class="docx-extra">
+                  <div class="fld">
+                    <label for="explanatory-input">דברי הסבר</label>
+                    <textarea id="explanatory-input" rows="4"
+                      placeholder="אם נשאר ריק - תיבנה טיוטה אוטומטית לפי סעיפים שנגעתם בהם."></textarea>
+                  </div>
+                  <div class="hint" id="download-hint"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -83,11 +78,11 @@
     <div class="insert-menu" hidden>
       <div class="insert-menu-levels"></div>
       <div class="insert-menu-form" hidden>
-        <div class="field required insert-margin-title-field" hidden>
+        <div class="fld insert-margin-title-field" hidden>
           <label>כותרת שוליים לסעיף החדש</label>
-          <input type="text" class="insert-margin-title-input" />
+          <input type="text" class="inp insert-margin-title-input" />
         </div>
-        <div class="field">
+        <div class="fld">
           <label>תוכן</label>
           <textarea class="insert-text-input" rows="2"></textarea>
         </div>
