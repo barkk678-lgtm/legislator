@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpu
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 
 from render_bill import Bill, Line, write_docx  # noqa: E402
+from ingest_checks import check_unique_ids  # noqa: E402
 from node import LegislativeNode  # noqa: E402
 from wikitext_parser import parse_wikitext  # noqa: E402
 from transform import InsertAfter, InsertWordsAfter, apply  # noqa: E402
@@ -198,6 +199,11 @@ def _known_missing_first_number_correction(rows):
 
 
 def main():
+    id_problems = check_unique_ids(_BEFORE)
+    for p in id_problems:
+        print("FAIL", p)
+    ok = not id_problems
+
     out = Path("/tmp/kaytanot_rebuilt.docx")
     write_docx(BILL, REFS, SKELETON, out)
 
@@ -209,7 +215,6 @@ def main():
     print(f"שורות: נוצרו {len(got)}, במקור {len(want)}\n")
     print("(השוואה מול ORIGINAL עם שני תיקונים מתועדים - ראו _known_source_typo_correction "
           "ו-_known_missing_first_number_correction)\n")
-    ok = True
     for i in range(max(len(got), len(want))):
         g = got[i] if i < len(got) else None
         w = want[i] if i < len(want) else None

@@ -195,7 +195,7 @@ def parse_wikitext(
                 stack.pop()
             parent_node = stack[-1][1]
             node = LegislativeNode(
-                id=f"{law_id}/{_slug(anchor, len(parent_node.children))}",
+                id=f"{parent_node.id}/{_slug(anchor, len(parent_node.children))}",
                 node_type="chapter",
                 number=anchor,
                 margin_title=normalize_text(title),
@@ -218,7 +218,7 @@ def parse_wikitext(
             parent_node = stack[-1][1]
             numbering_space = stack[-1][2]
             node = LegislativeNode(
-                id=f"{law_id}/s{number}",
+                id=f"{parent_node.id}/s{number}",
                 node_type="section",
                 number=number,
                 margin_title=normalize_text(title),

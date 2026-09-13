@@ -44,24 +44,14 @@ def main():
     )
     checks.append(("קייטנות: run_sanity_checks נקי", run_sanity_checks(kaytanot_text, kaytanot_tree) == []))
 
-    # מאבק בארגוני פשיעה: פער אמיתי, לא סינתטי - התגלה תוך כדי ingest
-    # אמיתי (2026-09-13, לפני שהורץ ל-DB בפועל). {{ח:סעיף}} ב-
-    # wikitext_parser.py בונה id מ-law_id בלבד, לא מ-parent_node.id -
+    # מאבק בארגוני פשיעה: תוקן (2026-09-13). {{ח:סעיף}} ב-
+    # wikitext_parser.py היה בונה id מ-law_id בלבד, לא מ-parent_node.id -
     # סעיף 1 בחוק עצמו וסעיף 1 בכל אחת משתי התוספות (numbering_space
-    # ="schedule", שמתחילה למספר מחדש) מקבלים בדיוק אותו id. עדיין
-    # לא תוקן - ממתין להחלטה (ראו TASKS.md/decisions.md). הבדיקה כאן
-    # מתעדת את המצב הנוכחי (עם הבאג), לא מנחשת תיקון.
+    # ="schedule", שמתחילה למספר מחדש) קיבלו בדיוק אותו id. תוקן
+    # (id יחסי ל-parent_node, כמו subsection/paragraph כבר עשו) -
+    # run_sanity_checks על מאבק חייב להיות נקי עכשיו.
     maavak_text, maavak_tree = _load("maavak-birgunei-plisha", "maavak-2003")
-    maavak_problems = run_sanity_checks(maavak_text, maavak_tree)
-    checks.append(("מאבק: run_sanity_checks תופס את התנגשות ה-id (עדיין לא תוקן)", len(maavak_problems) == 1))
-    checks.append(
-        (
-            'מאבק: הבעיה מזהה בדיוק את "maavak-2003/s1" ו-"maavak-2003/s2" ככפולים',
-            maavak_problems
-            and "maavak-2003/s1" in maavak_problems[0]
-            and "maavak-2003/s2" in maavak_problems[0],
-        )
-    )
+    checks.append(("מאבק: run_sanity_checks נקי (אחרי תיקון ה-id)", run_sanity_checks(maavak_text, maavak_tree) == []))
 
     # המקרה המרכזי - פער אמיתי, לא סינתטי (ראו TASKS.md משימה 7).
     penal_text, penal_tree = _load("penal", "penal-1977")

@@ -10,6 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 
+from ingest_checks import check_unique_ids  # noqa: E402
 from node import effective_source_ref  # noqa: E402
 from wikitext_parser import parse_wikitext  # noqa: E402
 
@@ -40,6 +41,7 @@ def main():
 
     # --- חוק הקייטנות ---
     kaytanot, kaytanot_meta = load("kaytanot", "kaytanot-1990")
+    checks.append(("קייטנות: כל ה-id-ים בעץ ייחודיים", check_unique_ids(kaytanot) == []))
     checks.append(("שורש הקייטנות הוא law, לא נורמטיבי", kaytanot.node_type == "law" and not kaytanot.is_normative))
     checks.append(("8 סעיפים ישירות תחת השורש (אין פרקים)", len(kaytanot.children) == 8))
     checks.append(
@@ -85,6 +87,7 @@ def main():
 
     # --- חוק מאבק בארגוני פשיעה ---
     crime, crime_meta = load("maavak-birgunei-plisha", "maavak-2003")
+    checks.append(("מאבק: כל ה-id-ים בעץ ייחודיים (כולל שתי התוספות)", check_unique_ids(crime) == []))
     chapters = [c for c in crime.children if c.node_type == "chapter"]
     checks.append(("8 פרקים + 2 תוספות = 10 קטע2", len(chapters) == 10))
 

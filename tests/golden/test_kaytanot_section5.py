@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpu
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 
 from render_bill import Line  # noqa: E402
+from ingest_checks import check_unique_ids  # noqa: E402
 from node import LegislativeNode  # noqa: E402
 from wikitext_parser import parse_wikitext  # noqa: E402
 from transform import ReplaceWords, apply  # noqa: E402
@@ -82,7 +83,10 @@ def main():
     got = amend(before, after, annotations, law_footnote_key="kaytanot")
     want = EXPECTED_LINES
 
-    ok = True
+    id_problems = check_unique_ids(before)
+    for p in id_problems:
+        print("FAIL", p)
+    ok = not id_problems
     print(f"שורות: נוצרו {len(got)}, במקור {len(want)}\n")
     for i in range(max(len(got), len(want))):
         g = got[i] if i < len(got) else None
