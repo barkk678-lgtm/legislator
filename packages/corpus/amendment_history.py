@@ -8,6 +8,15 @@
 parse_citation_registry עובד על אותה מחרוזת ויקיטקסט (הפתיח של דף החוק),
 לא על רשת - היא כבר נשלפת ונשמרת ע"י wikitext_client.fetch_wikitext.
 
+**שכבות (ראו CLAUDE.md "ה-ingest שומר עובדות, לא פרשנויות"):**
+raw_amendment_note הוא העובדה שנשמרת בקורפוס - כמו שהיא. כל הפונקציות
+במודול הזה (כולל parse_citation_registry, שגם היא פרסור דטרמיניסטי של
+טקסט גולמי כבר-שמור) רצות מעל טקסט שכבר שמור, ולא כותבות עמודות מחושבות
+חזרה לקורפוס ב-ingest. resolve_amendment_tokens היא הפונקציה היחידה
+שמכילה שיפוט (צימוד בין שני מקורות שאינו תמיד ודאי) - היא מיועדת
+לריצה בזמן שאילתה, לא לאחסון כתוצאה קבועה: אם היא תשתפר בעתיד, אסור
+שזה יחייב ingest חוזר לקורפוס.
+
 מה פוענח, ואיך אומת (מקור עצמאי - ראו "הסתיים כאשר" במשימה 7א):
 דף חוק העונשין בוויקיטקסט מכיל בעצמו רשימת ציטוטים כרונולוגית של כל
 תיקוני החוק, בשורה שמתחילה ב-'''נוסח מאוחד:''' (אחרי הקונסולידציה של
@@ -24,20 +33,26 @@ parse_citation_registry עובד על אותה מחרוזת ויקיטקסט (ה
 הידועה בחלק המקדמי של חוק העונשין, שתואמת בדיוק את הטווח הרחב של סעיפים
 שנושאים את אותו תיקון (1 ועד למעלה מ-20 ברצף - ראו טסטים).
 
-**מה עדיין לא פוענח/לא ודאי - לא ינוחש:**
-1. טוקן בלי סיומת "־N" ובלי סוגריים (למשל "תשס״ז" לבדו) - ההשערה שהוא
-   שווה-ערך ל-"־1" (הציטוט הראשון של אותה שנה) נתמכת רק במקרה בדיקה אחד
-   (סעיף 15, "תשס״ז" → ציטוט ראשון של תשס״ז, "חוק איסור סחר בבני אדם" -
-   סביר תוכנית לסעיף על סמכות שיפוט חוץ-טריטוריאלית, אבל לא אומת מול
-   מקור נוסף). מסומן ordinal_explicit=False - לא להתייחס אליו כוודאי.
+**מה בכוונה לא פוענח/נפתר - הוכרע (2026-09-13, ברק) לשמור טוקן גולמי
+בלי להכריע, במקום לנחש (ראו TASKS.md 7א):**
+
+1. טוקן בלי סוגריים ובלי סיומת "־N" (למשל "תשס״ז" לבדו) - **אין ברירת
+   מחדל**. ordinal_in_year=None. נבדק בפועל בקורפוס (penal.wikitext):
+   131 מופעים כאלה, ומתוכם 117 (89%) לשנה שלהם יש יותר מציטוט אחד
+   ברשימה - כלומר "להניח שזה הציטוט הראשון" היה טעות שקטה ברוב
+   המקרים, לא ברירת מחדל סבירה. resolve_amendment_tokens מחזירה את
+   כל מועמדי אותה שנה (בדיוק כמו legacy, סעיף 2 למטה) - לא בוחרת.
 2. טוקנים בסוגריים מרובעים ([1939], [תשי״ז] וכו') - תיקונים מלפני
-   הקונסולידציה של תשל"ז. לרשימת "נוסחים קודמים" אין מנגנון "־N"
-   מקביל בוויקיטקסט המקורי עצמו (נבדק: ל-תשי״ז יש שני ציטוטים ברשימה
-   הזו, אבל 34כד לא מבחין ביניהם בסוגריים) - זו מגבלה אמיתית של
-   המקור, לא של הפרסר. resolve_amendment_tokens מחזירה את כל
-   המועמדים התואמים (candidates) ולא מנחשת איזה מהם.
-3. הארגומנט "אחר=..." (למשל "[א/5]") - לא מפוענח כלל, נשמר גולמי
-   ב-ParsedAmendmentNote.other_raw. אין עדיין השערה נבדקת למשמעותו.
+   הקונסולידציה של תשל"ז. ordinal_in_year=None גם כאן (לרשימת "נוסחים
+   קודמים" אין מנגנון "־N" מקביל בוויקיטקסט המקורי עצמו - זו מגבלה
+   אמיתית של המקור, לא של הפרסר: ל-34כד ולתשי״ז יש 5 מועמדים תואמים,
+   ואין דרך לדעת מהמקור איזה מהם). resolve_amendment_tokens מחזירה
+   את כל המועמדים התואמים לפי שנה בלבד - 84 מתוך 162 מופעי legacy
+   בקורפוס דו-משמעיים כך גם, 4 לא נמצא להם מועמד כלל.
+3. הארגומנט "אחר=..." (למשל "[א/5]", "[יא/32א]") - לא מפוענח כלל,
+   נשמר גולמי ב-ParsedAmendmentNote.other_raw. 255 מופעים בקורפוס,
+   בפורמט עקבי [אות/מספר] - לא נבדקה משמעותו (ראו TASKS.md, משימת
+   חקירה נפרדת, לא נפתחה עדיין לעבודה).
 """
 
 import re
@@ -51,15 +66,14 @@ class AmendmentToken:
     """טוקן בודד בתוך רשימת 'תיקון: ...'."""
 
     hebrew_year: str  # "תשנ״ד", או שנה גולמית טרום-1977 (עברית או לועזית) לטוקן legacy
-    ordinal_in_year: int  # מיקום 1-based בין ציטוטי אותה שנה (ברירת מחדל 1 אם לא צוין סיומת)
-    ordinal_explicit: bool  # True אם ה-"־N" הופיע במפורש; False = ברירת מחדל לא-מאומתת (ראו סעיף 1 למעלה)
+    ordinal_in_year: int | None  # מיקום 1-based, רק אם צוין במקור כ-"־N"; None = לא ידוע, לא מנוחש
     is_legacy: bool  # True = טוקן בסוגריים מרובעים (טרום-קונסולידציה)
 
 
 @dataclass(frozen=True)
 class ParsedAmendmentNote:
     tokens: tuple[AmendmentToken, ...]
-    other_raw: str | None  # ערך "אחר=..." הגולמי, לא מפוענח (ראו סעיף 3 למעלה)
+    other_raw: str | None  # ערך "אחר=..." הגולמי, לא מפוענח (ראו סעיף 3 בדוקסטרינג המודול)
     unrecognized_parts: tuple[str, ...]  # ארגומנטים נוספים שלא זוהו - לא נזרקים
 
 
@@ -99,26 +113,15 @@ def parse_amendment_note(raw: str | None) -> ParsedAmendmentNote:
 
 def _parse_token(chunk: str) -> AmendmentToken:
     if chunk.startswith("[") and chunk.endswith("]"):
-        return AmendmentToken(
-            hebrew_year=chunk[1:-1].strip(),
-            ordinal_in_year=1,
-            ordinal_explicit=False,
-            is_legacy=True,
-        )
+        return AmendmentToken(hebrew_year=chunk[1:-1].strip(), ordinal_in_year=None, is_legacy=True)
     if _HEBREW_MAQAF in chunk:
         year, _, ordinal_str = chunk.rpartition(_HEBREW_MAQAF)
         return AmendmentToken(
             hebrew_year=year.strip(),
             ordinal_in_year=int(ordinal_str.strip()),
-            ordinal_explicit=True,
             is_legacy=False,
         )
-    return AmendmentToken(
-        hebrew_year=chunk.strip(),
-        ordinal_in_year=1,
-        ordinal_explicit=False,
-        is_legacy=False,
-    )
+    return AmendmentToken(hebrew_year=chunk.strip(), ordinal_in_year=None, is_legacy=False)
 
 
 @dataclass(frozen=True)
@@ -188,14 +191,16 @@ def parse_citation_registry(wikitext: str) -> list[CitationEntry]:
 def resolve_amendment_tokens(
     tokens: tuple[AmendmentToken, ...], registry: list[CitationEntry]
 ) -> list[tuple[AmendmentToken, tuple[CitationEntry, ...]]]:
-    """מצמידה לכל טוקן את כל ה-CitationEntry התואמים לו ברשימה.
+    """מצמידה לכל טוקן את כל ה-CitationEntry התואמים לו ברשימה - פונקציית
+    שאילתה, לא שלב ב-ingest (ראו docstring המודול).
 
-    0 תוצאות = לא נמצא; תוצאה 1 = פתירה חד-משמעית; יותר מ-1 = דו-משמעי
-    (קורה בפועל עם טוקני legacy - ראו סעיף 2 בדוקסטרינג המודול, לא
-    מנחשת איזה מהם נכון)."""
+    כשה-ordinal לא ידוע במקור (ordinal_in_year=None - גם legacy וגם טוקן
+    בלי סיומת, ראו סעיפים 1-2 בדוקסטרינג) מתאימה לפי שנה בלבד ומחזירה
+    את *כל* המועמדים, בלי לבחור. 0 תוצאות = לא נמצא; 1 = פתירה חד-משמעית;
+    יותר מ-1 = דו-משמעי במקור עצמו - לא מנוחש."""
     resolved = []
     for token in tokens:
-        if token.is_legacy:
+        if token.ordinal_in_year is None:
             candidates = tuple(e for e in registry if e.hebrew_year == token.hebrew_year)
         else:
             candidates = tuple(

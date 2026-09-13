@@ -43,8 +43,7 @@ def main():
         (
             "34כד: תשנ״ד סיומת ־3 מזוהה במפורש",
             parsed_34kd.tokens[4].hebrew_year == "תשנ״ד"
-            and parsed_34kd.tokens[4].ordinal_in_year == 3
-            and parsed_34kd.tokens[4].ordinal_explicit,
+            and parsed_34kd.tokens[4].ordinal_in_year == 3,
         )
     )
 
@@ -53,10 +52,9 @@ def main():
     checks.append(("סעיף 15: 5 טוקנים", len(parsed_bare.tokens) == 5))
     checks.append(
         (
-            "סעיף 15: טוקן בלי סיומת (תשס״ז) מסומן ordinal_explicit=False",
+            "סעיף 15: טוקן בלי סיומת (תשס״ז) -> ordinal_in_year=None, לא מנוחש",
             parsed_bare.tokens[3].hebrew_year == "תשס״ז"
-            and parsed_bare.tokens[3].ordinal_in_year == 1
-            and not parsed_bare.tokens[3].ordinal_explicit,
+            and parsed_bare.tokens[3].ordinal_in_year is None,
         )
     )
 
@@ -99,6 +97,17 @@ def main():
         (
             "legacy [תשי״ז] דו-משמעי במקור עצמו - לא מנוחש",
             len(legacy_by_year["תשי״ז"]) > 1,
+        )
+    )
+
+    # סעיף 15: טוקן בלי סיומת (תשס״ז) לא מנוחש כציטוט ראשון - מוחזרים
+    # כל מועמדי תשס״ז (יש בפועל יותר מאחד בפיקסצ'ר).
+    resolved_bare = resolve_amendment_tokens(parsed_bare.tokens, _REGISTRY)
+    bare_tsz_candidates = next(cands for tok, cands in resolved_bare if tok.hebrew_year == "תשס״ז")
+    checks.append(
+        (
+            "סעיף 15 (תשס״ז בלי סיומת) לא נבחר מועמד יחיד בשקט",
+            len(bare_tsz_candidates) > 1,
         )
     )
 
