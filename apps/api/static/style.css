@@ -95,6 +95,12 @@ select { font-weight: 600; max-width: 420px; }
 .stage { flex: 1; min-height: 0; padding: 16px; overflow: hidden; }
 .tab { display: none; height: 100%; }
 .tab.on { display: flex; flex-direction: column; min-height: 0; }
+/* #law-panels הוא הילד היחיד של .tab.on - חייב להשתתף בשרשרת ה-flex
+   (flex:1 + min-height:0 + display:flex) בעצמו, אחרת .cols/.card
+   שבתוכו לא מוגבלים לגובה הזמין וגולשים החוצה בלי אפשרות גלילה -
+   .stage שמעליו עם overflow:hidden פשוט קוטע אותם (נתפס בבדיקה של
+   המשתמש: "אין לי אפשרות לגלילה... תוקע אותי"). */
+#law-panels { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
 /* ═══ חלוניות ═══ */
 .cols { flex: 1; display: grid; gap: 16px; min-height: 0; grid-template-columns: 1fr 1fr; }
@@ -211,7 +217,7 @@ select { font-weight: 600; max-width: 420px; }
 
 /* ═══ גיליון הוורד (".sheet"/".tbl" במוקאפ) ═══ */
 #docx-approx {
-  background: var(--shell); height: 100%; overflow: auto; padding: 22px; margin: 0;
+  background: var(--shell); flex: 1; overflow: auto; padding: 22px; margin: 0;
   border: 0; border-radius: 0; min-height: 0;
 }
 /* .sheet עוטף את שלושת הילדים (כותרת/יוזם/טבלה) בכרטיס "דף" אחד -
