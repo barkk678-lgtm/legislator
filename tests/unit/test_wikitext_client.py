@@ -14,7 +14,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 
-from wikitext_client import extract_revision_timestamp  # noqa: E402
+from wikitext_client import (  # noqa: E402
+    extract_revision_id,
+    extract_revision_timestamp,
+    extract_wikitext_body,
+)
 
 FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "wikitext"
 
@@ -70,6 +74,31 @@ def main():
         checks.append(("יש revision אבל אין timestamp -> שגיאה", False))
     except ValueError:
         checks.append(("יש revision אבל אין timestamp -> שגיאה", True))
+
+    checks.append(
+        (
+            "שולפת revision id נכון",
+            extract_revision_id(_EXPORT_XML) == int(_KAYTANOT_META["revision_id"]),
+        )
+    )
+    try:
+        extract_revision_id(no_timestamp_xml.replace("<id>1</id>", ""))
+        checks.append(("אין id ב-revision -> שגיאה", False))
+    except ValueError:
+        checks.append(("אין id ב-revision -> שגיאה", True))
+
+    checks.append(
+        (
+            "שולפת את גוף הוויקיטקסט עצמו, לא ה-XML",
+            extract_wikitext_body(_EXPORT_XML) == "תוכן כלשהו",
+        )
+    )
+    no_text_xml = "<mediawiki><page><revision><id>1</id></revision></page></mediawiki>"
+    try:
+        extract_wikitext_body(no_text_xml)
+        checks.append(("אין text ב-revision -> שגיאה", False))
+    except ValueError:
+        checks.append(("אין text ב-revision -> שגיאה", True))
 
     ok = all(passed for _, passed in checks)
     for name, passed in checks:

@@ -89,3 +89,32 @@ def extract_revision_timestamp(export_xml: str) -> str:
                     return child.text
             raise ValueError("נמצא revision ללא timestamp ב-export XML")
     raise ValueError("לא נמצא revision ב-export XML")
+
+
+def extract_revision_id(export_xml: str) -> int:
+    """שולפת את revision/id (מזהה גרסה מספרי) מתוך XML של Special:Export -
+    נדרש ל-law_versions.wikitext_revision_id (ראו supabase/migrations),
+    כדי לדעת אם גרסה מסוימת כבר נטענה בלי לטעון אותה שוב."""
+    root = ET.fromstring(export_xml)
+    for elem in root.iter():
+        if _local_tag(elem.tag) == "revision":
+            for child in elem:
+                if _local_tag(child.tag) == "id" and child.text:
+                    return int(child.text)
+            raise ValueError("נמצא revision ללא id ב-export XML")
+    raise ValueError("לא נמצא revision ב-export XML")
+
+
+def extract_wikitext_body(export_xml: str) -> str:
+    """שולפת את הוויקיטקסט הגולמי עצמו (revision/text) מתוך XML של
+    Special:Export - זה בדיוק מה שנשמר בקבצי tests/fixtures/wikitext/*.wikitext
+    (לא ה-XML המלא). זו הפעם הראשונה שזו פונקציה אמיתית - קודם זה נעשה
+    ידנית בסקריפט scratchpad שאבד (ראו extract_revision_timestamp)."""
+    root = ET.fromstring(export_xml)
+    for elem in root.iter():
+        if _local_tag(elem.tag) == "revision":
+            for child in elem:
+                if _local_tag(child.tag) == "text":
+                    return child.text or ""
+            raise ValueError("נמצא revision בלי טקסט ב-export XML")
+    raise ValueError("לא נמצא revision ב-export XML")
