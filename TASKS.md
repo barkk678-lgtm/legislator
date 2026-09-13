@@ -313,6 +313,33 @@ docx_path=None) -> list[Finding]`, טהור (בלי רשת/LLM). מריצה תמ
 
 ---
 
+### ✅ 1.1 · סכמת Postgres (plan.md §1.1)
+
+הורצה בפועל ב-Supabase (`legislator`, `aamxwjmmlsqkinrzirdz`) אחרי
+סבב עיצוב מלא: הצגת תרשים+DDL → 4 תיקוני ברק (immutable
+`law_versions` עם `ON DELETE RESTRICT`, `source_ref` עבר מ-`laws`
+ל-`law_versions`, `position`→`raw_order` עם הערה מפורשת שהמיון
+המשפטי בא מ-`parse_section_number` ולא ממנו, סדר insert מוגדר) →
+הרצה. ראו `supabase/migrations/20260913173000_corpus_schema_v1.sql`
+ו-`docs/strategy/decisions.md` לתהליך המלא.
+
+5 טבלאות: `laws`, `law_versions` (insert-only, PK של `nodes` הוא
+הזוג `(law_version_id, id)` בדיוק כדי שגרסאות לא ידרסו זו את זו),
+`nodes`, `law_citations`, `section_amendment_tokens`, + view
+`resolved_amendments` (לא טבלה - התאמה בין טוקן לציטוט היא שאילתה,
+לא עובדה מאוחסנת).
+
+**עדיין פתוח:** RLS כבוי על כל 5 הטבלאות (אזהרת Supabase
+אוטומטית) - לא טופל, ממתין להקשר ה-ingest/חיבור ה-API. pgvector
+לא בסכמה הזו - 1.3 תעצב chunking נפרד (node אחד = chunk אחד לא
+מספיק - ראו decisions.md).
+
+**הסתיים כאשר:** הסכמה קיימת ב-DB ומאומתת (`list_tables`) - קוד
+ה-ingest בפועל (שממלא את הטבלאות מ-wikitext) הוא משימה נפרדת,
+עדיין לא התחילה.
+
+---
+
 ## 7 · Ingest מלא + אינדוקס חיפוש
 
 כל ~5,900 החוקים והתקנות. חיפוש היברידי (BM25 + embeddings).
