@@ -329,10 +329,11 @@ docx_path=None) -> list[Finding]`, טהור (בלי רשת/LLM). מריצה תמ
 `resolved_amendments` (לא טבלה - התאמה בין טוקן לציטוט היא שאילתה,
 לא עובדה מאוחסנת).
 
-**עדיין פתוח:** RLS כבוי על כל 5 הטבלאות (אזהרת Supabase
-אוטומטית) - לא טופל, ממתין להקשר ה-ingest/חיבור ה-API. pgvector
-לא בסכמה הזו - 1.3 תעצב chunking נפרד (node אחד = chunk אחד לא
-מספיק - ראו decisions.md).
+**RLS הופעל** על כל 5 הטבלאות (בלי policies - יבואו בשלב 7), אומת
+בפועל (לא רק pg_roles: שורת בדיקה זמנית הראתה anon/authenticated
+חסומים, service_role עוקף - ראו decisions.md). pgvector לא בסכמה
+הזו - 1.3 תעצב chunking נפרד (node אחד = chunk אחד לא מספיק - ראו
+decisions.md).
 
 **הסתיים כאשר:** הסכמה קיימת ב-DB ומאומתת (`list_tables`) - קוד
 ה-ingest בפועל (שממלא את הטבלאות מ-wikitext) הוא משימה נפרדת,

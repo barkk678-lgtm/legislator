@@ -90,3 +90,21 @@ raw_order, סדר insert מוגדר) → תוקנו → הורצה בפועל ב
 מתאימות) - ממתין להקשר ה-ingest/חיבור ה-API כדי לדעת אם זה רלוונטי
 בפועל (anon key נחשף רק אם יש Supabase client-side; ה-backend כרגע
 Python בצד שרת).
+
+### 2026-09-13 · RLS הופעל (בלי policies)
+
+ברק אישר להפעיל מיד - הנימוק: Postgres ב-Supabase חשוף לאינטרנט
+דרך PostgREST כברירת מחדל, לא תלוי בכך שיש היום backend מחובר;
+"להפעיל RLS על טבלאות ריקות זה חינם, על מערכת חיה זה סיפור אחר".
+
+לפני ההרצה אומתו שתי עובדות שברק ביקש לא להניח:
+1. `apps/api` **לא מתחבר ל-Supabase/Postgres בכלל היום** - גרפ מלא
+   של הריפו (`supabase|psycopg|asyncpg|sqlalchemy|DATABASE_URL|
+   service_role`) החזיר אפס תוצאות. אין עדיין ingest/API-DB.
+2. `pg_roles`: `service_role`/`postgres` בעלי `rolbypassrls=true`,
+   `anon`/`authenticated` = `false`.
+
+RLS הופעל על כל 5 הטבלאות, בלי policies (יבואו בשלב 7). אומת
+בפועל, לא רק תיאורטית: שורת בדיקה זמנית הוכנסה ל-`laws`, נבדקה
+מ-`anon` (0 שורות), `authenticated` (0), `service_role` (1) - ואז
+נמחקה. `supabase/migrations/20260913180000_enable_rls_no_policies.sql`.
