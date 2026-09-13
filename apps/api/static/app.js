@@ -14,6 +14,7 @@ const LEVEL_LABELS = {
   subsection: "סעיף קטן",
   paragraph: "פסקה",
   subparagraph: "פסקת משנה",
+  definition: "הגדרה",
 };
 
 let currentLawId = null;
@@ -114,8 +115,15 @@ async function onLawChange(lawId) {
 }
 
 function levelsForNodeType(nodeType) {
+  if (nodeType === "definition") {
+    // הגדרות הן היררכיה נפרדת מסעיף/סעיף קטן/פסקה, לא חלק מהשרשרת -
+    // כרגע נתמכת רק הוספת הגדרה נוספת אחריה (ראו insert_preview.py:
+    // סעיף קטן/פסקה *בתוך* הגדרה ספציפית הוא פער ידוע, לא ממומש עדיין,
+    // ולכן לא מוצע כאן בכלל - לא רק מוסתר אחרי בדיקה, לא מוצג מלכתחילה).
+    return ["definition"];
+  }
   let idx = LEVEL_ORDER.indexOf(nodeType);
-  if (idx === -1) idx = 2; // סוגים אחרים (למשל "הגדרה"): מתנהגים כמו פסקה - ברירת מחדל תצוגתית, לא ניחוש משפטי
+  if (idx === -1) idx = 2; // סוגים אחרים: מתנהגים כמו פסקה - ברירת מחדל תצוגתית, לא ניחוש משפטי
   const upTo = Math.min(idx + 1, LEVEL_ORDER.length - 1);
   return LEVEL_ORDER.slice(0, upTo + 1);
 }
@@ -202,7 +210,10 @@ function renderNode(node, depth) {
     // כפתור "+" בסוף שורת הטקסט של הצומת עצמו (לא ליד הכותרת) - ראו
     // משוב המשתמש: המקום להוסיף סעיף/סעיף קטן חדש הוא איפה שנגמר
     // התוכן של הצומת הנוכחי, בכל היררכיה.
-    if (node.node_type === "section" || node.node_type === "subsection" || node.node_type === "paragraph") {
+    if (
+      node.node_type === "section" || node.node_type === "subsection" ||
+      node.node_type === "paragraph" || node.node_type === "definition"
+    ) {
       const addBtn = document.createElement("button");
       addBtn.className = "node-add-btn subtle";
       addBtn.textContent = "+";

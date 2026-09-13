@@ -149,6 +149,36 @@ def main():
          insert_preview_resp["supported"] is True and insert_preview_resp["label"]),
     )
 
+    # הוספת הגדרה (kind="definition") - אחרי הגדרת "חוק רישוי עסקים"
+    # בסעיף 1 (ראו משוב המשתמש: "אין לי אפשרות להוסיף הגדרות").
+    def_preview_req = {
+        "edits": [], "insertions": [],
+        "anchor_node_id": "kaytanot-1990/s1/p1", "level": "definition",
+    }
+    def_preview_resp = client.post(
+        "/api/laws/kaytanot-1990/insert-preview", json=def_preview_req
+    ).json()
+    checks.append(
+        ("insert-preview: הוספת הגדרה נתמכת (בלי מספור)",
+         def_preview_resp["supported"] is True),
+    )
+    def_insert_req = {
+        "edits": [],
+        "insertions": [
+            {"kind": "definition", "anchor_node_id": "kaytanot-1990/s1/p1",
+             "text": '"מונח בדיקה" – פירוש בדיקה.', "client_id": "def-test-1"},
+        ],
+        "bill": _GOOD_BILL,
+    }
+    def_render = client.post("/api/laws/kaytanot-1990/render", json=def_insert_req).json()
+    checks.append(
+        ("הוספת הגדרה: אין שגיאות הוספה", def_render["insertion_errors"] == []),
+    )
+    checks.append(
+        ("הוספת הגדרה: מנוסחת כ'אחרי ההגדרה ... יבוא'",
+         any('אחרי ההגדרה "חוק רישוי עסקים" יבוא' in ln["text"] for ln in def_render["lines"])),
+    )
+
     # שילוב: עריכה + הוספת סעיף ראשי חדש יחד, ואז /docx על אותה בקשה בדיוק.
     combined_req = {
         "edits": [

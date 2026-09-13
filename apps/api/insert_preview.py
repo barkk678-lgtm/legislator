@@ -19,6 +19,16 @@
   (לא של סעיף קטן) - הכנסת פסקה לתוך סעיף קטן קיים אינה נתמכת עדיין
   (transform.InsertAfter מוצא רק node_type=="section", לא "subsection";
   זה פער אמיתי, לא הוסתר - ראו reason).
+- "definition": זמין כשהצומת הנוכחי הוא הגדרה - מוסיף הגדרה חדשה
+  אחריה, ללא מספור (הגדרות ממוינות א"ב, לא ממוספרות - ראו
+  drafting-rules/validator בדיקה 11). משתמש ב-InsertAfter הקיים בדיוק
+  כמו קייטנות סעיף 1 (מקרה זהב).
+  **פער ידוע, לא מומש כאן:** הוספת סעיף-קטן/פסקה *בתוך* הגדרה ספציפית
+  (כשכבר יש לה כאלה) אינה נתמכת - transform.InsertAfter.apply() מחפש
+  את העוגן רק בין ילדיו הישירים של הסעיף עצמו, לא רקורסיבית בתוך ילד
+  שהוא הגדרה. אין עדיין מקרה זהב שמדגים הגדרה עם ילדים כאלה - הרחבה
+  אמיתית של transform.py, לא רק חיווט כאן, ותושאר לפעם הבאה שיהיה
+  מקרה אמיתי לבדוק מולו.
 - "subparagraph": לא נתמך בכלל כרגע - אין מקרה זהב.
 """
 
@@ -194,6 +204,24 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
             section_number=parent.number, anchor_id=current_node.id, node_type="paragraph",
         )
 
+    if level == "definition":
+        current_node = _find_by_id(root, node_id)
+        if current_node is None or current_node.node_type != "definition":
+            return _Resolution(
+                supported=False,
+                reason="הוספת הגדרה זמינה רק כשעומדים על הגדרה קיימת",
+            )
+        section = _ancestor_of_type(root, node_id, "section")
+        if section is None:
+            return _Resolution(supported=False, reason="לא נמצא סעיף אב להגדרה")
+        # הגדרות לא ממוספרות (ממוינות א"ב, לא מספור סידורי) - אין
+        # תווית לחשב, בניגוד לסעיף קטן/פסקה.
+        return _Resolution(
+            supported=True, label="ללא מספור", kind="insert_after",
+            section_number=section.number, anchor_id=current_node.id,
+            node_type="definition",
+        )
+
     return _Resolution(supported=False, reason=f"רמה לא נתמכת: {level!r}")
 
 
@@ -240,8 +268,11 @@ def build_insertion_transform(
         # r.label כבר מחושב על ידי _resolve (numbering.next_inserted_label/
         # next_appended_label) - InsertAfter הקיים (מקרה זהב 4/6) לא מחשב
         # מספור בעצמו, אז חייבים להצמיד את התווית כאן ולא להשאיר ריק.
+        # הגדרות הן חריגה: לא ממוספרות בכלל (r.label הוא רק טקסט תצוגה
+        # "ללא מספור", לא ערך שמותר לשים ב-number בפועל).
+        number = "" if r.node_type == "definition" else r.label
         new_child = LegislativeNode(
-            id=new_id or _fresh_id(r.node_type), node_type=r.node_type, number=r.label,
+            id=new_id or _fresh_id(r.node_type), node_type=r.node_type, number=number,
             margin_title=None, text=text,
         )
         return (

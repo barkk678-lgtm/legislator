@@ -49,7 +49,14 @@ class InsertParagraphIn(BaseModel):
     client_id: str
 
 
-InsertionIn = InsertSectionIn | InsertSubsectionIn | InsertParagraphIn
+class InsertDefinitionIn(BaseModel):
+    kind: Literal["definition"]
+    anchor_node_id: str
+    text: str
+    client_id: str
+
+
+InsertionIn = InsertSectionIn | InsertSubsectionIn | InsertParagraphIn | InsertDefinitionIn
 """client_id: מזהה יציב שהלקוח יוצר בעצמו (10ב) כשההוספה נוצרת -
 נשמר כ-id של הצומת החדש בעץ שחוזר מ-/render (ראו
 insert_preview.build_insertion_transform). בלי זה, מזהה הצומת החדש
@@ -78,4 +85,4 @@ class InsertPreviewRequestIn(BaseModel):
     edits: list[TextEditIn] = []
     insertions: list[InsertionIn] = []
     anchor_node_id: str
-    level: Literal["section", "subsection", "paragraph", "subparagraph"]
+    level: Literal["section", "subsection", "paragraph", "subparagraph", "definition"]
