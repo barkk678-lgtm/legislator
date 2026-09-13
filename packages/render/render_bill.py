@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from bill_title import PLACEHOLDER  # noqa: E402
+
 # ── קבועי התבנית (ראו docs/template-spec.md) ─────────────────────────────
 SIDE_W = 1871          # עמודת כותרת שוליים
 STEP_W = 624           # עמודת מספר / עמודת הזחה
@@ -50,22 +52,37 @@ def _t(text: str) -> str:
     return f"<w:t{sp}>{escape(text)}</w:t>"
 
 
-def run(text: str) -> str:
+def run(text: str, highlight: bool = False) -> str:
     """
     run עברי. מפצל אוטומטית סביב en-dash, כי בקבצים המקוריים ה-en-dash
     יושב ב-run נפרד ללא hint="cs" — וזה משנה את הרינדור בוורד.
+
+    highlight: מוסיף <w:highlight w:val="yellow"/> - לשימוש בטקסט
+    placeholder שהמערכת לא ידעה לנסח בעצמה (ראו
+    run_with_placeholder_highlight), לא לעיצוב תוכן רגיל.
     """
     if not text:
         return ""
+    hl = '<w:highlight w:val="yellow"/>' if highlight else ""
     out = []
     for i, part in enumerate(text.split(EN_DASH)):
         if i:
-            out.append(f'<w:r><w:rPr><w:rtl/></w:rPr>{_t(EN_DASH)}</w:r>')
+            out.append(f'<w:r><w:rPr>{hl}<w:rtl/></w:rPr>{_t(EN_DASH)}</w:r>')
         if part:
             out.append(
-                f'<w:r><w:rPr><w:rFonts w:hint="cs"/><w:rtl/></w:rPr>{_t(part)}</w:r>'
+                f'<w:r><w:rPr><w:rFonts w:hint="cs"/>{hl}<w:rtl/></w:rPr>{_t(part)}</w:r>'
             )
     return "".join(out)
+
+
+def run_with_placeholder_highlight(text: str) -> str:
+    """כמו run(), אבל אם bill_title.PLACEHOLDER מופיע בתוך text - המקטע
+    הזה בלבד מודגש ברקע צהוב, כדי שהמשתמש ישים לב שיש להשלים אותו
+    ידנית (ראו bill_title.default_bill_title)."""
+    if PLACEHOLDER not in text:
+        return run(text)
+    before, _, after = text.partition(PLACEHOLDER)
+    return run(before) + run(PLACEHOLDER, highlight=True) + run(after)
 
 
 def run_fnref(fid: int) -> str:
@@ -123,9 +140,11 @@ class Bill:
     bill_number: str = "פ/?????????"
     lines: list[Line] = field(default_factory=list)
     explanatory: list[str] = field(default_factory=list)
-    # ברירת המחדל (24 סימני שאלה) תואמת בדיוק את golden-kaytanot.docx:
-    # תאריך ההגשה נקבע בפועל על ידי מזכירות הכנסת כשההצעה מוגשת -
-    # לא ידוע ולא נקבע על ידי המנסח, ולכן לא שדה קלט למשתמש (ראו 10ב).
+    # לא מודפס בכלל ב-docx (ראו render_document.tail) - מזכירות הכנסת
+    # היא שכותבת את פסקת ההגשה, ורק אחרי שההצעה אושרה והונחה בפועל.
+    # נשאר כאן רק לצורך validator._check_8 (בדיקת עקביות שנה מול שם
+    # ההצעה, לשימוש עתידי כשהתאריך האמיתי יהיה ידוע) - לא שדה קלט
+    # למשתמש (ראו 10ב).
     submitted_date: str = "????????????????????????"
 
 
@@ -204,16 +223,18 @@ def render_document(bill: Bill, fn_ids: dict[str, int]) -> str:
         + para("David", run("_" * 46))
         + para("David", run(bill.bill_number))
         + para("David", "")
-        + para("HeadHatzaotHok", run(bill.title))
+        + para("HeadHatzaotHok", run_with_placeholder_highlight(bill.title))
     )
 
+    # אין כאן פסקת "הוגשה ליו"ר הכנסת והסגנים והונחה על שולחן הכנסת
+    # ביום ..." - זו לא הוראה שהמנסח (או המשתמש) כותבים: מזכירות
+    # הכנסת היא שמוסיפה אותה, ורק לאחר שההצעה אושרה והונחה בפועל.
+    # אישר המשתמש (2026-09) אחרי בדיקה ידנית - golden-kaytanot.docx
+    # כלל אותה עם placeholder, אבל זה תיעוד של מסמך שכבר קיבל את
+    # השורה הזו בדיעבד, לא תבנית לשלב הניסוח.
     tail = (
         para("HeadDivreiHesber", run("דברי הסבר"))
         + "".join(para("Hesber", run(p)) for p in bill.explanatory)
-        + para("a", run("-" * 32))
-        + para("a", run('הוגשה ליו"ר הכנסת והסגנים'))
-        + para("a", run("והונחה על שולחן הכנסת ביום"))
-        + para("a", run(bill.submitted_date))
     )
 
     sect = (

@@ -22,13 +22,17 @@ from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "render"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "validate"))
+from bill_title import default_bill_title  # noqa: E402
 from engine import amend  # noqa: E402
+from node import LegislativeNode  # noqa: E402
 from render_bill import Bill, write_docx  # noqa: E402
 from validator import validate  # noqa: E402
 
 from apply_changes import apply_pending_changes  # noqa: E402
+from explanatory_draft import draft_explanatory_notes  # noqa: E402
 from insert_preview import preview_insertion_label  # noqa: E402
 from law_registry import LAWS, load_law, law_summaries  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
@@ -73,16 +77,24 @@ def api_law(law_id: str) -> dict:
     }
 
 
-def _bill_from_meta(bill_meta: BillMetaIn, lines: list) -> Bill:
+def _bill_from_meta(bill_meta: BillMetaIn, lines: list, before: LegislativeNode) -> Bill:
     """submitted_date לא מגיע מהמשתמש - Bill מספק placeholder משלו
     (ראו render_bill.Bill.submitted_date): תאריך ההגשה נקבע בפועל על
-    ידי מזכירות הכנסת, לא ידוע ולא נקבע כאן."""
+    ידי מזכירות הכנסת, לא ידוע ולא נקבע כאן.
+
+    title: אם המשתמש לא הזין שם, נבנה ברירת מחדל דטרמיניסטית (שם החוק
+    + שנה נוכחית, ראו bill_title.default_bill_title) במקום להשאיר
+    כותרת ריקה - ראו משוב המשתמש: "אתה ממש העלמת את כל הכותרת".
+    תיאור התיקון עצמו (לא ניתן לגזירה אמינה) מסומן PLACEHOLDER, מודגש
+    צהוב ב-docx (ראו render_bill.run_with_placeholder_highlight)."""
+    title = bill_meta.title.strip() or default_bill_title(before.full_title or "")
+    explanatory = bill_meta.explanatory or draft_explanatory_notes(lines)
     return Bill(
         knesset="הכנסת העשרים וחמש",
-        title=bill_meta.title,
+        title=title,
         initiator=bill_meta.initiator,
         lines=lines,
-        explanatory=bill_meta.explanatory,
+        explanatory=explanatory,
     )
 
 
@@ -96,7 +108,7 @@ def _render(law_id: str, req: RenderRequest):
     before = load_law(law_id)
     result = apply_pending_changes(before, req.edits, req.insertions)
     lines = amend(before, result.after, result.annotations, law_footnote_key=cfg.footnote_key)
-    bill = _bill_from_meta(req.bill, lines)
+    bill = _bill_from_meta(req.bill, lines, before)
     # מראה המקום (ס"ח) ידוע מראש לכל חוק ב-law_registry - לא שדה קלט
     # מהמשתמש (10ב). אם לא ידוע (known_source_ref=None), נשאר ריק -
     # הוולידטור (בדיקה 2) יתריע במפורש, לא ננחש ערך.

@@ -190,6 +190,37 @@ def main():
         )
     )
 
+    # שם הצעה ריק + דברי הסבר ריקים (המשתמש לא מילא) -> המערכת בונה
+    # ברירת מחדל דטרמיניסטית לשניהם, לא משאירה ריק (ראו משוב המשתמש:
+    # "אתה ממש העלמת את כל הכותרת").
+    import io
+    import re
+    import zipfile
+
+    blank_meta_req = {
+        "edits": [
+            {
+                "node_id": "kaytanot-1990/s5/p0",
+                "text": "המנהל קייטנה בניגוד להוראות סעיפים 2 או 4, דינו – מאסר שנה.",
+            }
+        ],
+        "insertions": [],
+        "bill": {"title": "", "initiator": "בודק/ת", "explanatory": []},
+    }
+    blank_docx_resp = client.post("/api/laws/kaytanot-1990/docx", json=blank_meta_req)
+    with zipfile.ZipFile(io.BytesIO(blank_docx_resp.content)) as z:
+        blank_xml = z.read("word/document.xml").decode("utf-8")
+    checks.append(
+        ("כותרת ברירת מחדל: כוללת את שם החוק", "הקייטנות (רישוי ופיקוח)" in blank_xml),
+    )
+    checks.append(
+        ("כותרת ברירת מחדל: תיאור התיקון מסומן 'יש להשלים' עם רקע צהוב",
+         bool(re.search(r'<w:highlight w:val="yellow"/>[^<]*<w:rtl/></w:rPr><w:t>יש להשלים</w:t>', blank_xml))),
+    )
+    checks.append(
+        ("דברי הסבר ריקים -> נבנתה טיוטה אוטומטית", "מוצע ל" in blank_xml),
+    )
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)
