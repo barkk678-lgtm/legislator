@@ -133,7 +133,9 @@ def main():
     )
     checks.append(
         ("עריכת כותרת שוליים מנוסחת לפי §7.8",
-         len(title_render["lines"]) == 1 and "בכותרת השוליים" in title_render["lines"][0]["text"]),
+         len(title_render["lines"]) == 1
+         and "בכותרת השוליים"
+         in title_render["lines"][0]["text"] + title_render["lines"][0]["text_after"]),
     )
 
     # POST /insert-preview - תצוגה מקדימה של תווית לפני ביצוע

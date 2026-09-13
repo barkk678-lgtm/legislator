@@ -43,14 +43,16 @@ def main():
           "" if passed_title else f"-> {after.children[0].margin_title!r}")
 
     lines = amend(before, after, annotations, law_footnote_key="fake")
+    # מראה המקום מפוצל ל-text/text_after (יושב מיד אחרי השנה, לפני
+    # "(להלן..." - ראו engine._render_margin_title_mutation).
     want = (
         'בחוק לדוגמה, התש"ף–2020 (להלן – החוק העיקרי), בסעיף 5, '
         'בכותרת השוליים, במקום "עונשין" יבוא "עונשין וקנסות".'
     )
-    passed_line = len(lines) == 1 and lines[0].text == want
+    passed_line = len(lines) == 1 and lines[0].text + lines[0].text_after == want
     ok = ok and passed_line
     print(("OK  " if passed_line else "FAIL"), "מתלכד לשורה בודדת בניסוח §7.8",
-          "" if passed_line else f"-> {[l.text for l in lines]!r}")
+          "" if passed_line else f"-> {[l.text + l.text_after for l in lines]!r}")
 
     passed_heading = len(lines) == 1 and lines[0].side_heading == "תיקון סעיף 5"
     ok = ok and passed_heading

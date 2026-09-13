@@ -177,15 +177,38 @@ def _known_source_typo_correction(rows):
     return fixed
 
 
+def _known_missing_first_number_correction(rows):
+    """מתקנת פער **מתועד** נוסף במקור, לא סטייה כללית: golden-kaytanot.docx
+    משאיר את הוראת התיקון הראשונה (סעיף 1, שורה 0) בלי מספר סידורי
+    בכלל בעמודת המספור (תא 1 בשורה), בעוד שהוראות ההמשך ממוספרות
+    כרגיל ("2.", "3."...). הוכח שגוי מול reference/skeleton-pshia.docx -
+    הצעה פרטית טרומית *אמיתית* שאומתה מול ה-API של הכנסת (BillID
+    2233987) - שם הוראת התיקון הראשונה ממוספרת "1." בדיוק כמו כל
+    הוראה אחרת. אושר גם ישירות על ידי המשתמש, שמכיר את התהליך בפועל.
+    golden-kaytanot.docx כנראה הוקלד ידנית עם השמטה זו - לא תבנית
+    מכוונת. engine.py תוקן (2026-09) למספר תמיד מ-1; מתקנים כאן את
+    ה-*ציפייה* בנקודה המתועדת הזו בלבד."""
+    fixed = []
+    for i, row in enumerate(rows):
+        if i == 0 and len(row) > 1:
+            w, sp, st, text = row[1]
+            row = [row[0], (w, sp, st, "1.")] + list(row[2:])
+        fixed.append(row)
+    return fixed
+
+
 def main():
     out = Path("/tmp/kaytanot_rebuilt.docx")
     write_docx(BILL, REFS, SKELETON, out)
 
     got = table_shape(out)
-    want = _known_source_typo_correction(table_shape(ORIGINAL))
+    want = _known_missing_first_number_correction(
+        _known_source_typo_correction(table_shape(ORIGINAL))
+    )
 
     print(f"שורות: נוצרו {len(got)}, במקור {len(want)}\n")
-    print("(השוואה מול ORIGINAL עם תיקון שגיאת הקלדה המתועד ב-§5.7 - ראו _known_source_typo_correction)\n")
+    print("(השוואה מול ORIGINAL עם שני תיקונים מתועדים - ראו _known_source_typo_correction "
+          "ו-_known_missing_first_number_correction)\n")
     ok = True
     for i in range(max(len(got), len(want))):
         g = got[i] if i < len(got) else None

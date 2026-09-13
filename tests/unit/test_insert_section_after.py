@@ -70,7 +70,9 @@ def main():
           "" if passed_label else f"-> {inserted_number!r}")
 
     lines = amend(before, after, annotations, law_footnote_key="fake")
-    got_texts = [line.text for line in lines]
+    # מראה המקום מפוצל ל-text/text_after (יושב מיד אחרי השנה, לפני
+    # "(להלן..." - ראו engine._render_new_section) - משווים את הצירוף.
+    got_texts = [line.text + line.text_after for line in lines]
 
     want_phrase = (
         'בחוק לדוגמה, התש"ף–2020 (להלן – החוק העיקרי), אחרי סעיף 8 '

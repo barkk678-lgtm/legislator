@@ -76,7 +76,9 @@ def main():
           "" if passed_numbers else f"-> {new_numbers}")
 
     lines = amend(before, result.after, result.annotations, law_footnote_key="fake")
-    combined_text = " ".join(line.text for line in lines)
+    # מראה המקום מפוצל ל-text/text_after (ראו engine._render_mutation) -
+    # ממשיכים את שניהם כדי לתפוס תוכן שיושב אחרי הפיצול.
+    combined_text = " ".join(line.text + line.text_after for line in lines)
     combined_headings = " ".join(line.inner_heading for line in lines if line.inner_heading)
     passed_amend = '"מפוקחת"' in combined_text and "ביצוע" in combined_headings
     ok = ok and passed_amend

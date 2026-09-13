@@ -324,9 +324,15 @@ def _render_new_section(
     האחרון של תא התוכן."""
     phrase = f"אחרי סעיף {anchor_number} לחוק העיקרי יבוא:"
     if full_title is not None:
-        text = f"ב{full_title} (להלן – החוק העיקרי), {phrase}"
+        # מראה המקום (הערת השוליים למקור) חייב לשבת מיד אחרי שם החוק,
+        # לפני "(להלן..." - לכן הפיצול ל-text/text_after, לא מחרוזת
+        # אחת (ראו render_bill.render_line: מוסיף footnotes בדיוק בין
+        # text ל-text_after).
         phrase_line = Line(
-            text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0
+            text=f"ב{full_title}",
+            text_after=f" (להלן – החוק העיקרי), {phrase}",
+            footnotes=[law_footnote_key] if law_footnote_key else [],
+            depth=0,
         )
     else:
         phrase_line = Line(text=phrase, depth=0)
@@ -431,8 +437,14 @@ def _render_relabel_and_insert(
     # בלי סוגריים ("א"), לא תואם את הפורמט האמיתי מ-wikitext_parser.
     phrase = f'האמור בו יסומן "{item.relabeled_number}" ואחריו יבוא:'
     if full_title is not None:
-        text = f"ב{full_title} (להלן – החוק העיקרי), בסעיף {section_number}, {phrase}"
-        phrase_line = Line(text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0)
+        # ראו הערה מקבילה ב-_render_new_section: מראה המקום חייב לשבת
+        # מיד אחרי שם החוק, לפני "(להלן...".
+        phrase_line = Line(
+            text=f"ב{full_title}",
+            text_after=f" (להלן – החוק העיקרי), בסעיף {section_number}, {phrase}",
+            footnotes=[law_footnote_key] if law_footnote_key else [],
+            depth=0,
+        )
     else:
         text = f"בסעיף {section_number} לחוק העיקרי, {phrase}"
         phrase_line = Line(text=text, depth=0)
@@ -486,8 +498,14 @@ def _render_mutation(
         body = f'אחרי המילים "{anchor}" יבוא "{inserted}".'
 
     if full_title is not None:
-        text = f"ב{full_title} (להלן – החוק העיקרי), בסעיף {section_number}, {body}"
-        return Line(text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0)
+        # ראו הערה מקבילה ב-_render_new_section: מראה המקום חייב לשבת
+        # מיד אחרי שם החוק, לפני "(להלן...".
+        return Line(
+            text=f"ב{full_title}",
+            text_after=f" (להלן – החוק העיקרי), בסעיף {section_number}, {body}",
+            footnotes=[law_footnote_key] if law_footnote_key else [],
+            depth=0,
+        )
 
     text = f"בסעיף {section_number} לחוק העיקרי, {body}"
     return Line(text=text, depth=0)
@@ -517,8 +535,14 @@ def _render_margin_title_mutation(
     body = f'בכותרת השוליים, במקום "{replacement.old_phrase}" יבוא "{replacement.new_phrase}".'
 
     if full_title is not None:
-        text = f"ב{full_title} (להלן – החוק העיקרי), בסעיף {section_number}, {body}"
-        return Line(text=text, footnotes=[law_footnote_key] if law_footnote_key else [], depth=0)
+        # ראו הערה מקבילה ב-_render_new_section: מראה המקום חייב לשבת
+        # מיד אחרי שם החוק, לפני "(להלן...".
+        return Line(
+            text=f"ב{full_title}",
+            text_after=f" (להלן – החוק העיקרי), בסעיף {section_number}, {body}",
+            footnotes=[law_footnote_key] if law_footnote_key else [],
+            depth=0,
+        )
 
     text = f"בסעיף {section_number} לחוק העיקרי, {body}"
     return Line(text=text, depth=0)
@@ -609,8 +633,12 @@ def amend(
             else:
                 new_lines = _render_new_section(anchor_number, new_section, footnote)
             new_lines[0].side_heading = f"הוספת סעיף {number}"
-            if touched_count > 1:
-                new_lines[0].number = f"{touched_count}."
+            # תוקן (באג אמיתי, לא מוסכמה): golden-kaytanot.docx משאיר את
+            # הסעיף הראשון שנוגעים בו בלי מספר בכלל - הוכח שגוי מול
+            # reference/skeleton-pshia.docx (הצעה אמיתית שאומתה מול ה-API
+            # של הכנסת), ששם הוראת התיקון הראשונה ממוספרת "1." כרגיל.
+            # קובץ הזהב עצמו כנראה הוקלד ידנית עם השמטה - לא תבנית.
+            new_lines[0].number = f"{touched_count}."
             anchor_before_node = before_sections[anchor_number]
             for new_line in new_lines:
                 _stamp_provenance(new_line, anchor_before_node, before)
@@ -648,8 +676,7 @@ def amend(
             else:
                 title_line = _render_margin_title_mutation(number, instructions[0], replacement)
             title_line.side_heading = f"תיקון סעיף {number}"
-            if touched_count > 1:
-                title_line.number = f"{touched_count}."
+            title_line.number = f"{touched_count}."
             _stamp_provenance(title_line, instructions[0].before_node, before)
             lines.append(title_line)
             continue
@@ -676,8 +703,7 @@ def amend(
             else:
                 mutation_line = _render_mutation(number, instructions[0], replacement)
             mutation_line.side_heading = f"תיקון סעיף {number}"
-            if touched_count > 1:
-                mutation_line.number = f"{touched_count}."
+            mutation_line.number = f"{touched_count}."
             _stamp_provenance(mutation_line, instructions[0].before_node, before)
             lines.append(mutation_line)
             continue
@@ -698,8 +724,7 @@ def amend(
             else:
                 relabel_lines = _render_relabel_and_insert(number, item, footnote)
             relabel_lines[0].side_heading = f"תיקון סעיף {number}"
-            if touched_count > 1:
-                relabel_lines[0].number = f"{touched_count}."
+            relabel_lines[0].number = f"{touched_count}."
             for relabel_line in relabel_lines:
                 _stamp_provenance(relabel_line, item.before_node, before)
             lines.extend(relabel_lines)
@@ -718,6 +743,7 @@ def amend(
                 # עצמאיים אחרים באותו מסמך (כולל אזכור נפרד של אותה שנה בדברי
                 # ההסבר) - שגיאת הקלדה חד-פעמית בקובץ המקור, לא מוסכמה.
                 # המערכת לא משחזרת את השגיאה הזו.
+                number=f"{touched_count}.",
                 text="ב" + (before.full_title or ""),
                 text_after=f" (להלן – החוק העיקרי), בסעיף {number} – ",
                 footnotes=[law_footnote_key],

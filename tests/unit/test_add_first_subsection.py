@@ -64,7 +64,9 @@ def main():
     ])
     lines = amend(before, after, annotations, law_footnote_key="fake")
 
-    got_texts = [line.text for line in lines]
+    # מראה המקום מפוצל ל-text/text_after (יושב מיד אחרי השנה, לפני
+    # "(להלן..." - ראו engine._render_relabel_and_insert).
+    got_texts = [line.text + line.text_after for line in lines]
     # touched_count==1 - הסעיף הראשון שנוגעים בו מקבל את שם החוק המלא
     # (drafting-rules.md §7.3), בדיוק כמו בהתלכדות _Mutation.
     want_phrase = (

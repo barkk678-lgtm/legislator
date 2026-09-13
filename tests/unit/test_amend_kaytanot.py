@@ -44,6 +44,7 @@ _AS_OF = _META["revision_timestamp"]  # ראו TASKS.md משימה 5א
 EXPECTED_LINES = [
     Line(
         side_heading="תיקון סעיף 1",
+        number="1.",
         text='בחוק הקייטנות (רישוי ופיקוח), התש"ן–1990',
         text_after=' (להלן – החוק העיקרי), בסעיף 1 – ',
         footnotes=["kaytanot"],
