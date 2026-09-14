@@ -112,28 +112,40 @@ _TOC_DIV_OPEN_RE = re.compile(r'^<div class="law-toc">$')  # תוכן העניי
 # class="law-toc"> יחיד ו-</div> יחיד בשורה נפרדת (נבדק בפועל, ראו
 # TASKS.md משימה 7) - לא זקוק לספירת קינון, רק זיהוי הפתיחה/סגירה.
 _TOC_DIV_CLOSE_LINE = "</div>"
+_TABLE_OPEN_RE = re.compile(r"(?i)^<table\b")  # אותו regex בדיוק כמו
+# wikitext_parser._TABLE_OPEN_RE - בלוקי <table> גולמיים נצרכים בפועל
+# עכשיו כצומת raw_block (ראו TASKS.md משימה 7), לא אבודים יותר.
+_TABLE_CLOSE_RE = re.compile(r"(?i)</table\s*>")
 _MAX_UNCONSUMED_EXAMPLES = 5
 
 
 def check_no_unconsumed_content(wikitext: str) -> list[str]:
     """הכיוון ההפוך מ-check_no_unknown_templates: לא "מה נוצר", אלא
-    "מה אבד" (ברק, 2026-09-14). parse_wikitext מדלגת בשקט על **כל**
-    שורה לא-ריקה שלא מתחילה ב-'{{' (ראו for raw_line ... if not
-    line.startswith('{{'): continue) - ללא יוצא מן הכלל, וללא שום
-    בדיקה שתופסת את זה. זה בדיוק התרחיש המסוכן ביותר שהוגדר בפרויקט:
-    פרסור שמצליח ומייצר עץ *חסר* בשקט (למשל בלוקי <table>/<tr>/<td>
-    גולמיים ב-HTML, שנבלעים לגמרי כי אף שורה בהם לא מתחילה ב-{{ - ראו
-    TASKS.md משימה 7, 97/1,021 חוקים עם <table>).
+    "מה אבד" (ברק, 2026-09-14). לפני 2026-09-14, parse_wikitext דילגה
+    בשקט על **כל** שורה לא-ריקה שלא מתחילה ב-'{{' - ללא יוצא מן הכלל,
+    וללא שום בדיקה שתופסת את זה (התרחיש המסוכן ביותר שהוגדר בפרויקט:
+    פרסור שמצליח ומייצר עץ *חסר* בשקט). בלוקי <table> גולמיים (97/1,021
+    חוקים - ראו TASKS.md משימה 7) **נצרכים כעת בפועל** כצומת raw_block
+    (ראו wikitext_parser._consume_html_table) - הבדיקה הזו מזהה את אותם
+    אזורי טבלה ולא מתריעה עליהם (ראו _TABLE_OPEN_RE/_TABLE_CLOSE_RE
+    למטה, זהים ל-wikitext_parser). מה שנשאר להתריע עליו: תוכן לא-ריק,
+    לא-{{, שבאמת עדיין לא נצרך על ידי שום ענף - לא נשמר בשום מקום.
 
-    לא מתריעה על תוכן שכן מכוסה במקום אחר, ולא בכוונה חלק מהנוסח:
+    לא מתריעה גם על תוכן שכן מכוסה במקום אחר, ולא בכוונה חלק מהנוסח:
     שורות בתוך קופסת פתיח-התחלה/חתימות/מבוא (בין הפתיחה ל-{{ח:סוגר}}
-    התואם - ציטוטים/חתימות/הערות עריכה, לא נוסח), ו-[[קטגוריה:...]]."""
+    התואם - ציטוטים/חתימות/הערות עריכה, לא נוסח), תוכן עניינים אוטומטי
+    (<div class="law-toc">...</div>), ו-[[קטגוריה:...]]."""
     problems: list[str] = []
     in_skip_zone = False
     in_toc_zone = False
+    in_table_zone = False
     for line_number, raw_line in enumerate(wikitext.splitlines(), start=1):
         line = raw_line.strip()
         if not line:
+            continue
+        if in_table_zone:
+            if _TABLE_CLOSE_RE.search(line):
+                in_table_zone = False
             continue
         if in_toc_zone:
             if line == _TOC_DIV_CLOSE_LINE:
@@ -142,6 +154,11 @@ def check_no_unconsumed_content(wikitext: str) -> list[str]:
         if _TOC_DIV_OPEN_RE.match(line):
             in_toc_zone = True
             continue
+        if _TABLE_OPEN_RE.match(line):
+            # טבלה "יתומה" (לא אחרי {{ח:ת...}}) - נצרכת בפועל כ-raw_block.
+            if not _TABLE_CLOSE_RE.search(line):
+                in_table_zone = True
+            continue
         if line.startswith("{{"):
             match = re.match(r"\{\{([^|}]+)", line)
             name = match.group(1) if match else ""
@@ -149,6 +166,12 @@ def check_no_unconsumed_content(wikitext: str) -> list[str]:
                 in_skip_zone = True
             elif name == _SKIP_ZONE_CLOSER:
                 in_skip_zone = False
+            elif "}}" in line:
+                # טבלה מוטבעת מיד אחרי תבנית עומק, למשל {{ח:ת}} <table...>
+                # (ראו wikitext_parser._TABLE_OPEN_RE - אותה בדיקה בדיוק).
+                remainder = line.split("}}", 1)[1].strip()
+                if _TABLE_OPEN_RE.match(remainder) and not _TABLE_CLOSE_RE.search(remainder):
+                    in_table_zone = True
             continue
         if in_skip_zone:
             continue

@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpu
 
 from db_ingest import (  # noqa: E402
     NetworkIngestError,
-    SanityIngestError,
     _lit,
     build_ingest_plan,
     fetch_with_retry,
@@ -116,21 +115,15 @@ def main():
     )
     checks.append(("law_is_new=False -> בלי insert into laws", "insert into laws " not in plan_existing.sql))
 
-    # --- עונשין: קטע1/קטע3/ח:מבוא/חוקי עונשין תוקנו בזה אחר זה עד
-    # 2026-09-14 (ראו TASKS.md משימה 7). עכשיו נכשל שוב, אבל על סיבה
-    # *חדשה ואמיתית*: check_no_unconsumed_content תופסת 327 שורות
-    # <table>/<tr>/<td> גולמיות ("לוח השוואה") שנבלעו בשקט קודם - בדיוק
-    # התרחיש המסוכן ביותר שהוגדר בפרויקט. לא רגרסיה - תיקון. ---
+    # --- עונשין: קטע1/קטע3/ח:מבוא/חוקי עונשין/<table> (raw_block) תוקנו
+    # בזה אחר זה עד 2026-09-14 (ראו TASKS.md משימה 7). מצליח לגמרי עכשיו. ---
     def fake_fetch_penal(title):
         return _fake_export("penal")
 
-    try:
-        build_ingest_plan(
-            "penal-1977", "חוק העונשין", source_ref="", law_is_new=True, fetch=fake_fetch_penal
-        )
-        checks.append(("עונשין -> SanityIngestError (unconsumed content)", False))
-    except SanityIngestError as exc:
-        checks.append(("עונשין -> SanityIngestError (unconsumed content)", "שורות תוכן שלא נצרכו" in str(exc)))
+    plan_penal = build_ingest_plan(
+        "penal-1977", "חוק העונשין", source_ref="", law_is_new=True, fetch=fake_fetch_penal
+    )
+    checks.append(("עונשין: מצליח (לא קורס יותר על שום בעיית שפיות)", plan_penal.node_count > 0))
 
     # --- קטגוריית retry: כשל רשת חולף, מצליח בניסיון השלישי ---
     attempts = {"n": 0}

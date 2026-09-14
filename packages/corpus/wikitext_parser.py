@@ -183,6 +183,37 @@ def _short_hash(text: str) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
 
 
+_TABLE_OPEN_RE = re.compile(r"(?i)^<table\b")
+_TABLE_CLOSE_RE = re.compile(r"(?i)</table\s*>")
+
+
+def _consume_html_table(first_chunk: str, lines: list[str], next_index: int) -> tuple[str, int]:
+    """אוספת בלוק <table>...</table> גולמי (HTML, לא MediaWiki) - ראו
+    TASKS.md משימה 7: 97/1,021 חוקים בקורפוס, ולא רק "לוח השוואה"
+    עיטורי - חוק הביטוח הלאומי (תקרות שכר טרחה) וחוק מיסוי מקרקעין
+    (מדרגות מס צמודות) הם דוגמאות אמיתיות לתוכן מהותי בתוך טבלה.
+    ברק (2026-09-14): "לא מפרסרים אותן, כן טוענים את החוקים" - נשמר
+    כצומת raw_block שלם, בלי ניסיון לפרק את מבנה הטבלה הפנימי.
+
+    first_chunk כבר ידוע כמתחיל ב-<table (לא רגיש לרישיות - הבדיקה
+    נעשית לפני הקריאה לפונקציה הזו). lines[next_index:] הן שורות
+    המשך אפשריות. מחזירה (html_raw, אינדקס השורה האחרונה שנצרכה
+    מ-lines - next_index-1 אם לא נצרכה אף שורה נוספת מעבר ל-first_chunk).
+    לא מטפלת בטבלאות מקוננות (לא נצפו בפועל בקורפוס); אם </table>
+    לא נמצא עד סוף הטקסט - מחזירה את כל מה שיש, לא קורסת ולא ממציאה
+    סגירה שלא קיימת במקור."""
+    block = [first_chunk]
+    if _TABLE_CLOSE_RE.search(first_chunk):
+        return first_chunk, next_index - 1
+    idx = next_index
+    while idx < len(lines):
+        block.append(lines[idx])
+        if _TABLE_CLOSE_RE.search(lines[idx]):
+            return "\n".join(block), idx
+        idx += 1
+    return "\n".join(block), idx - 1
+
+
 def _lookahead_content(lines: list[str], from_index: int) -> str | None:
     """מציצה קדימה מ-lines[from_index+1] לתוכן {{ח:ת...}} הראשון (הבא,
     לא ריק) - בלי לשנות את מצב הפרסור הראשי, רק חלון קדימה מקומי (לא
@@ -243,9 +274,32 @@ def parse_wikitext(
     ]
 
     lines = text.splitlines()
-    for line_index, raw_line in enumerate(lines):
+    line_index = 0
+    while line_index < len(lines):
+        raw_line = lines[line_index]
         line = raw_line.strip()
         if not line.startswith("{{"):
+            if _TABLE_OPEN_RE.match(line):
+                # בלוק <table> גולמי "יתום" - לא מקושר לשום {{ח:ת...}}
+                # (למשל "לוח השוואה" בעונשין). מצורף כילד לצומת הפתוח
+                # הנוכחי - נשמר גולמי, לא מפורסר (ראו _consume_html_table).
+                parent_node = stack[-1][1]
+                numbering_space = stack[-1][2]
+                html, last_consumed = _consume_html_table(line, lines, line_index + 1)
+                node = LegislativeNode(
+                    id=_unique_child_id(parent_node, f"table-{_short_hash(html)}", collisions),
+                    node_type="raw_block",
+                    number="",
+                    margin_title=None,
+                    text=html,
+                    text_raw=html,
+                    is_normative=True,
+                    numbering_space=numbering_space,
+                )
+                parent_node.children.append(node)
+                line_index = last_consumed + 1
+                continue
+            line_index += 1
             continue
         call = _find_template(line, 0)
         name = call.name
@@ -253,12 +307,14 @@ def parse_wikitext(
         if name == "ח:כותרת":
             if call.args:
                 root.full_title = normalize_text(_flatten(call.args[0]))
+            line_index += 1
             continue
 
         if name == "ח:קטע4":
             # קטע4 עצמו מכיל את כל תוכנו (הערה) כארגומנט מוטבע באותה
             # קריאה - אין שורה נפרדת לדלג עליה אחריו. לא ממופה כלל
             # (החלטה: מופע יחיד/בודד שעוטף הערה, לא רמת מבנה אמיתית).
+            line_index += 1
             continue
 
         if name in _CONTAINER_TEMPLATES:
@@ -266,6 +322,7 @@ def parse_wikitext(
             anchor = call.args[0] if call.args else ""
             title = _flatten(call.args[1]) if len(call.args) > 1 else ""
             if title == "תוכן עניינים":
+                line_index += 1
                 continue  # תוכן העניינים האוטומטי - לא רמת מבנה
             while stack[-1][0] >= structural_level:
                 stack.pop()
@@ -282,6 +339,7 @@ def parse_wikitext(
             )
             parent_node.children.append(node)
             stack.append((structural_level, node, numbering_space))
+            line_index += 1
             continue
 
         if name in ("ח:סעיף", "ח:סעיף*"):
@@ -322,6 +380,7 @@ def parse_wikitext(
             )
             parent_node.children.append(node)
             stack.append((_STRUCTURAL_LEVEL_SECTION, node, numbering_space))
+            line_index += 1
             continue
 
         if name in _CONTENT_DEPTH:
@@ -334,15 +393,36 @@ def parse_wikitext(
                 elif label is None and arg:
                     label = arg
             remainder = line[call.end :]
-
-            note_text = _is_pure_note(remainder)
-            is_normative = note_text is None
-            flattened = note_text if note_text is not None else _flatten(remainder).strip()
+            remainder_stripped = remainder.strip()
 
             while stack[-1][0] >= depth:
                 stack.pop()
             parent_node = stack[-1][1]
             numbering_space = stack[-1][2]
+
+            if _TABLE_OPEN_RE.match(remainder_stripped):
+                # טבלה מוטבעת מיד אחרי תבנית עומק (למשל {{ח:תת}}
+                # <table...> בחוק הביטוח הלאומי - תקרת שכר טרחה, תוכן
+                # מהותי, לא רק עיטור). נשמרת גולמית, לא ניתנת לעריכה.
+                html, last_consumed = _consume_html_table(remainder_stripped, lines, line_index + 1)
+                node = LegislativeNode(
+                    id=_unique_child_id(parent_node, f"table-{_short_hash(html)}", collisions),
+                    node_type="raw_block",
+                    number=label or "",
+                    margin_title=None,
+                    text=html,
+                    text_raw=html,
+                    is_normative=True,
+                    numbering_space=numbering_space,
+                )
+                parent_node.children.append(node)
+                stack.append((depth, node, numbering_space))
+                line_index = last_consumed + 1
+                continue
+
+            note_text = _is_pure_note(remainder)
+            is_normative = note_text is None
+            flattened = note_text if note_text is not None else _flatten(remainder).strip()
             node_type = _classify(name, label, kind_attr)
             node = LegislativeNode(
                 id=_unique_child_id(parent_node, _slug(label, len(parent_node.children)), collisions),
@@ -356,12 +436,14 @@ def parse_wikitext(
             )
             parent_node.children.append(node)
             stack.append((depth, node, numbering_space))
+            line_index += 1
             continue
 
         # תבנית לא-מוכרת ברמה העליונה (מאגר/תיבה/חתימות/וכו') - מדולגת.
         # {{ח:כותרת}} נלכד למעלה (למשימה 4); {{ח:מאגר}}/{{ח:תיבה}}/
         # {{ח:חתימות}} עדיין לא נדרשים להגדרת הסיום של משימה 3 ומתועדים
         # כפער פתוח.
+        line_index += 1
 
     # סעיף עם כותרת ריקה שכל תוכנו לא-נורמטיבי (הערה בלבד) = לא בתוקף עוד.
     # מבחין בין "שולב" (merged, במפורש) ל"נמחק/בטל" (repealed, ברירת המחדל

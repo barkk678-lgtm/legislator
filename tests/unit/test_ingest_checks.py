@@ -78,13 +78,21 @@ def main():
     checks.append(("עונשין: check_no_unknown_templates נקי לגמרי", check_no_unknown_templates(penal_text) == []))
 
     # check_no_unconsumed_content (2026-09-14) - הכיוון ההפוך: "מה אבד",
-    # לא "מה נוצר". עונשין חושף בדיוק את התרחיש שהיא נועדה לתפוס: 327
-    # שורות <table>/<tr>/<td> גולמיות ב-"לוח השוואה" (מספור ישן מול חדש)
-    # שנבלעות בשקט לגמרי כי אף שורה בהן לא מתחילה ב-{{ - ראו TASKS.md
-    # משימה 7. run_sanity_checks לכן נכשל על עונשין שוב - נכון, לא רגרסיה.
-    unconsumed = check_no_unconsumed_content(penal_text)
-    checks.append(("עונשין: check_no_unconsumed_content תופס את לוח ההשוואה", len(unconsumed) == 1 and "327 שורות" in unconsumed[0]))
-    checks.append(("עונשין: run_sanity_checks נכשל רק על unconsumed (לא על שום דבר אחר)", run_sanity_checks(penal_text, penal_tree) == unconsumed))
+    # לא "מה נוצר". חשפה בהתחלה בדיוק את התרחיש שהיא נועדה לתפוס: 327
+    # שורות <table>/<tr>/<td> גולמיות ב"לוח השוואה" של עונשין. **תוקן
+    # באותו יום** - בלוקי <table> נצרכים כעת כצומת raw_block (ראו
+    # wikitext_parser._consume_html_table) - עונשין נקי לגמרי עכשיו.
+    checks.append(("עונשין: check_no_unconsumed_content נקי (טבלאות נצרכות כ-raw_block)", check_no_unconsumed_content(penal_text) == []))
+    checks.append(("עונשין: run_sanity_checks נקי לגמרי", run_sanity_checks(penal_text, penal_tree) == []))
+    def _walk_nodes(node):
+        yield node
+        for child in node.children:
+            yield from _walk_nodes(child)
+
+    penal_raw_blocks = [n for n in _walk_nodes(penal_tree) if n.node_type == "raw_block"]
+    checks.append(("עונשין: 14 צמתי raw_block (לוח ההשוואה, לא אבודים)", len(penal_raw_blocks) == 14))
+    checks.append(("עונשין: raw_block הוא is_normative=True", all(n.is_normative for n in penal_raw_blocks)))
+    checks.append(("עונשין: raw_block שומר HTML גולמי (יש <table)", all("<table" in n.text.lower() for n in penal_raw_blocks)))
 
     # ויקיפדיה/ח:מאגר2 - נוספו ל-allowlist 2026-09-14 אחרי בדיקת תוכן
     # אמיתי (ראו TASKS.md משימה 7): שתיהן עיטוריות בלבד, אין נוסח.
@@ -100,16 +108,34 @@ def main():
     )
 
     # check_no_unconsumed_content (2026-09-14) - "מה אבד", לא "מה נוצר".
+    # <table> - תוקן באותו יום (raw_block, ראו wikitext_parser) - הבדיקה
+    # כבר לא אמורה לתפוס אותו, כי הוא באמת נצרך עכשיו (לא רק שנראה ככה).
     orphaned_table_text = (
         "{{ח:כותרת|חוק לדוגמה}}\n"
         "{{ח:סעיף|1||}}\n"
         "{{ח:ת}} תוכן תקין.\n"
         "\n"
         '<table border="0">\n'
-        "<tr><td>נתון שאבד בשקט</td></tr>\n"
+        "<tr><td>נתון שנשמר כ-raw_block</td></tr>\n"
         "</table>\n"
     )
-    checks.append(("unconsumed: תופס <table> יתום", len(check_no_unconsumed_content(orphaned_table_text)) == 1))
+    checks.append(("unconsumed: <table> לא נתפס יותר - נצרך כ-raw_block", check_no_unconsumed_content(orphaned_table_text) == []))
+    orphaned_table_tree = parse_wikitext(orphaned_table_text, law_id="test-table")
+
+    def _has_raw_block(node):
+        return node.node_type == "raw_block" or any(_has_raw_block(c) for c in node.children)
+
+    checks.append(("unconsumed: <table> אכן קיים כצומת raw_block בעץ", _has_raw_block(orphaned_table_tree)))
+
+    # תוכן שבאמת עדיין לא נצרך - כדי לוודא שהבדיקה לא הפכה חסרת-שיניים
+    # אחרי תיקון הטבלה. <div> רגיל (לא law-toc) עדיין לא מוכר.
+    still_orphaned_text = (
+        "{{ח:כותרת|חוק לדוגמה}}\n"
+        "{{ח:סעיף|1||}}\n"
+        "{{ח:ת}} תוכן תקין.\n"
+        '<div class="some-other-thing">תוכן שעדיין אבוד בשקט</div>\n'
+    )
+    checks.append(("unconsumed: עדיין תופס div שאינו law-toc/table", len(check_no_unconsumed_content(still_orphaned_text)) == 1))
 
     toc_text = (
         "{{ח:כותרת|חוק לדוגמה}}\n"

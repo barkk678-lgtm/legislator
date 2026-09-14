@@ -252,6 +252,18 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
     for child in after_children:
         prior = before_by_id.get(child.id)
         if prior is not None and prior.text != child.text:
+            if prior.node_type == "raw_block":
+                # בלוק <table> גולמי (ראו node.py, wikitext_parser
+                # ._consume_html_table) - נטען כדי לא לזרוק את כל החוק,
+                # אבל לא ניתן לעריכה תכנותית: אין ניסיון לפרק/להשוות
+                # מבנה טבלה פנימי, ואין ניחוש של הוראת תיקון עליו. ברק
+                # (2026-09-14): "הוראת תיקון על טבלה = NotImplementedError
+                # מפורש, לא ניסיון."
+                raise NotImplementedError(
+                    f"תיקון על תוכן מסוג raw_block (טבלת HTML גולמית, "
+                    f"id={prior.id!r}) אינו נתמך - טבלאות נטענות לתצוגה "
+                    "בלבד, לא לעריכה תכנותית."
+                )
             instructions.append(_Mutation(before_node=prior, before_text=prior.text, after_text=child.text))
 
     return instructions

@@ -78,7 +78,13 @@ from typing import Literal
 @dataclass
 class LegislativeNode:
     id: str  # מזהה יציב: "penal-1977/s4/a/1"
-    node_type: str  # law|part|chapter|siman|section|subsection|paragraph|subparagraph|definition
+    node_type: str  # law|part|chapter|siman|section|subsection|paragraph|subparagraph|definition|raw_block
+    # raw_block (2026-09-14): בלוק <table> גולמי ב-HTML (לא MediaWiki) -
+    # ראו wikitext_parser._consume_html_table. text/text_raw מכילים את
+    # ה-HTML הגולמי כפי שהוא, is_normative=True (לרוב תוכן מהותי - תעריפים/
+    # מדרגות מס, לא רק "לוח השוואה" עיטורי - ראו TASKS.md משימה 7).
+    # **לא ניתן לעריכה תכנותית** - packages/amend מעלה NotImplementedError
+    # מפורש על ניסיון תיקון; בממשק (טרם קיים) יוצג בלבד, לא ייערך.
     number: str  # "4", "3א", "34כד", "(א)", "(1)" - מספור החוק המתוקן בלבד
     margin_title: str | None  # כותרת שוליים, טקסט שטוח - רק לסעיף ראשי
     text: str  # טקסט מנורמל (ראו text_normalize.normalize_text)
