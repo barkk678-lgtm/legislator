@@ -6,8 +6,12 @@
 בלי לכתוב ל-DB - זו בדיקת "כמה יעבור נקי" (ראו docs/strategy/decisions.md
 "1.2 - שלוש מנות"), לא ה-ingest המלא עצמו.
 
+מסונן כברירת מחדל לחוקים/חוקי-יסוד בלבד (is_primary_legislation_title) -
+הוכרע במפורש 2026-09-13 שתקנות/צווים/כללים/פקודות לא נכנסים לקורפוס
+כלל (לא רק לא-נבדקים) - ראו docs/strategy/decisions.md.
+
 שימוש:
-    python3 tools/batch_validate_ingest.py <n> [--seed N]
+    python3 tools/batch_validate_ingest.py <n> [--seed N] [--include-secondary]
 """
 
 import argparse
@@ -23,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packages" / "corpus"))
 
 from db_ingest import NetworkIngestError, SanityIngestError, build_ingest_plan  # noqa: E402
-from wikitext_client import list_category_titles  # noqa: E402
+from wikitext_client import is_primary_legislation_title, list_category_titles  # noqa: E402
 
 
 def slugify(title: str, index: int) -> str:
@@ -38,6 +42,7 @@ def main():
     parser.add_argument("n", type=int)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--titles-cache", type=Path, default=None)
+    parser.add_argument("--include-secondary", action="store_true", help="לכלול תקנות/צווים/כללים/פקודות (לא ברירת המחדל - ראו decisions.md)")
     args = parser.parse_args()
 
     if args.titles_cache and args.titles_cache.exists():
@@ -46,6 +51,11 @@ def main():
         all_titles = list_category_titles()
         if args.titles_cache:
             args.titles_cache.write_text(json.dumps(all_titles, ensure_ascii=False), encoding="utf-8")
+
+    if not args.include_secondary:
+        before = len(all_titles)
+        all_titles = [t for t in all_titles if is_primary_legislation_title(t)]
+        print(f"מסונן לחוקים/חוקי-יסוד בלבד: {before:,} -> {len(all_titles):,}", file=sys.stderr)
 
     rng = random.Random(args.seed)
     sample = rng.sample(all_titles, min(args.n, len(all_titles)))
@@ -98,7 +108,7 @@ def main():
         print()
         print(f"סה\"כ nodes במדגם: {total_nodes}, ממוצע {total_nodes/len(successes):.0f} nodes/חוק")
         print(f"סה\"כ תווי טקסט (node.text בלבד): {total_chars:,}, ממוצע {total_chars/len(successes):,.0f}/חוק")
-        print(f"גודל הקטגוריה המלאה: {len(all_titles):,} כותרות")
+        print(f"גודל הקורפוס (אחרי סינון חוקים/חוקי-יסוד בלבד): {len(all_titles):,} כותרות")
         est_total_chars = total_chars / len(successes) * len(all_titles)
         est_total_tokens = est_total_chars / 4  # קירוב גס מקובל: ~4 תווים לטוקן
         print(f"הערכה לקורפוס המלא: ~{est_total_chars:,.0f} תווים, ~{est_total_tokens:,.0f} טוקנים")
