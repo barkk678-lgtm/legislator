@@ -113,10 +113,39 @@ def _pick_valid_candidate(candidates: list[dict]) -> dict | None:
     return valid[0] if len(valid) == 1 else None
 
 
-def classify_validity(wikisource_title: str, kns_records: list[dict]) -> ValidityMatch:
+_YEAR_SUFFIX_RE = re.compile(r"-(\d{4})\s*(?:\[.*\])?\s*$")  # אחרי _normalize_punctuation,
+# כל וריאנטי המקף כבר אוחדו ל-"-" - ראו שם.
+
+
+def _extract_year(name: str) -> str | None:
+    """שולפת שנה לועזית מסוף שם חוק (אחרי מקף, לפני '[...]' אם יש) -
+    למשל '...התש"ן-1990' -> '1990'. None אם אין שנה בתבנית הזו."""
+    n = _normalize_punctuation(name)
+    m = _YEAR_SUFFIX_RE.search(n)
+    return m.group(1) if m else None
+
+
+def classify_validity(
+    wikisource_title: str,
+    kns_records: list[dict],
+    *,
+    wikitext_full_title: str | None = None,
+) -> ValidityMatch:
     """מסווגת כותרת ויקיטקסט מול רשימת KNS_IsraelLaw. פונקציה טהורה -
     kns_records מועברת מבחוץ (מ-fetch_israel_laws, פעם אחת לכל ריצה),
-    לא נשלפת כאן - כדי שאפשר יהיה לבדוק בלי רשת."""
+    לא נשלפת כאן - כדי שאפשר יהיה לבדוק בלי רשת.
+
+    wikitext_full_title (אופציונלי, ברק 2026-09-14): הכותרת המלאה
+    מ-{{ח:כותרת}} בוויקיטקסט (כולל שנה לועזית) - **לא** wikisource_title
+    עצמו, שברוב המקרים לא כולל שנה כלל (זו בדיוק הסיבה שהבאג הבא
+    קרה). כשניתנת, כל התאמה (exact/normalized) מאומתת גם מול שנה:
+    אם יש שנה בשני הצדדים והן שונות, המועמד נדחה (לא "עמימות" -
+    ידוע בוודאות שהוא שגוי, ממשיכים לנסות שכבת התאמה אחרת). זה
+    המנגנון שגילה שחוק "התוכנית לסיוע כלכלי (הוראת שעה - חרבות
+    ברזל)" של 2025 הותאם בשקט לרשומת 2023 - ראו TASKS.md משימה 7.
+    בלי wikitext_full_title (ברירת המחדל) - ההתנהגות זהה לגמרי
+    לגרסה הקודמת (משתמשת בזה כרגע רק law_id.resolve_law_id, לא
+    סינון התוקף המקורי - ראו שם למה)."""
     by_exact: dict[str, list[dict]] = {}
     by_skeleton: dict[str, list[dict]] = {}
     for r in kns_records:
@@ -124,39 +153,61 @@ def classify_validity(wikisource_title: str, kns_records: list[dict]) -> Validit
         by_exact.setdefault(b, []).append(r)
         by_skeleton.setdefault(strip_matres_lectionis(b), []).append(r)
 
+    def _year_ok(candidate_name: str) -> bool:
+        if wikitext_full_title is None:
+            return True
+        wiki_year = _extract_year(wikitext_full_title)
+        kns_year = _extract_year(candidate_name)
+        if wiki_year is None or kns_year is None:
+            return True  # אין מספיק מידע לפסול - לא ממציאים חוסר-התאמה
+        return wiki_year == kns_year
+
+    def _try_tier(candidates: list[dict], method_name: str) -> ValidityMatch | None:
+        """None = לא נמצאה כאן התאמה מהימנה - לנסות שכבה הבאה.
+        ValidityMatch = תוצאה סופית (כולל ambiguous - עמימות אמיתית
+        לא ממשיכה הלאה, בדיוק כמו ההתנהגות המקורית)."""
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            r = candidates[0]
+            if _year_ok(r["Name"]):
+                return ValidityMatch(r["LawValidityDesc"], method_name, r["Name"])
+            return None  # שנה לא תואמת - ממשיכים לנסות
+        chosen = _pick_valid_candidate(candidates)
+        if chosen is None:
+            return ValidityMatch(None, "ambiguous")
+        if _year_ok(chosen["Name"]):
+            return ValidityMatch(chosen["LawValidityDesc"], method_name, chosen["Name"])
+        return None  # הנבחר שגוי-שנה - ממשיכים לנסות
+
     wiki_base = base_title(wikisource_title)
-    exact_candidates = by_exact.get(wiki_base, [])
-    if exact_candidates:
-        if len(exact_candidates) == 1:
-            r = exact_candidates[0]
-            return ValidityMatch(r["LawValidityDesc"], "exact", r["Name"])
-        chosen = _pick_valid_candidate(exact_candidates)
-        if chosen:
-            return ValidityMatch(chosen["LawValidityDesc"], "exact", chosen["Name"])
-        return ValidityMatch(None, "ambiguous")
-
-    skeleton_candidates = by_skeleton.get(strip_matres_lectionis(wiki_base), [])
-    if skeleton_candidates:
-        if len(skeleton_candidates) == 1:
-            r = skeleton_candidates[0]
-            return ValidityMatch(r["LawValidityDesc"], "normalized", r["Name"])
-        chosen = _pick_valid_candidate(skeleton_candidates)
-        if chosen:
-            return ValidityMatch(chosen["LawValidityDesc"], "normalized", chosen["Name"])
-        return ValidityMatch(None, "ambiguous")
-
+    result = _try_tier(by_exact.get(wiki_base, []), "exact")
+    if result is not None:
+        return result
+    result = _try_tier(by_skeleton.get(strip_matres_lectionis(wiki_base), []), "normalized")
+    if result is not None:
+        return result
     return ValidityMatch(None, "not_found")
 
 
-def find_israel_law_id(wikisource_title: str, kns_records: list[dict]) -> int | None:
+def find_israel_law_id(
+    wikisource_title: str,
+    kns_records: list[dict],
+    wikitext_full_title: str | None = None,
+) -> int | None:
     """כמו classify_validity, אבל מחזירה את ה-Id של הרשומה התואמת
     במקום את סיווג התוקף שלה - ל-law_id.resolve_law_id (ברק,
     2026-09-14: "הלוגיקה לא יכולה להסתמך רק על איזו תבנית מופיעה
     בוויקיטקסט - צריך לבדוק התאמה ל-IsraelLaw תחילה, בלי קשר למה
     שכתוב בדף"). משתמשת באותה לוגיקת התאמה/עמימות בדיוק (קוראת
     ל-classify_validity עצמה - לא כפילות), רק מתרגמת את השם התואם
-    בחזרה ל-Id. None אם לא נמצאה התאמה חד-משמעית (not_found/ambiguous)."""
-    match = classify_validity(wikisource_title, kns_records)
+    בחזרה ל-Id. None אם לא נמצאה התאמה חד-משמעית (not_found/ambiguous).
+
+    wikitext_full_title מועבר הלאה ל-classify_validity לאימות שנה -
+    ראו שם. **חובה להעביר אותו כאן** (בניגוד לסינון התוקף המקורי,
+    שעדיין לא מעביר) - law_id הוא מפתח קבוע, לא רק דגל תוקף, והמחיר
+    של טעות שקטה גבוה משמעותית."""
+    match = classify_validity(wikisource_title, kns_records, wikitext_full_title=wikitext_full_title)
     if match.matched_kns_name is None:
         return None
     for r in kns_records:

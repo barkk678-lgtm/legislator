@@ -132,17 +132,23 @@ def main():
 
         magar1 = None
         magar2 = None
+        full_title = None
         for line in wikitext.split("\n"):
             s = line.strip()
             if magar1 is None and s.startswith("{{ח:מאגר|"):
                 magar1 = s[len("{{ח:מאגר|") : s.index("}}")]
             if magar2 is None and s.startswith("{{ח:מאגר2|"):
                 magar2 = s[len("{{ח:מאגר2|") : s.index("}}")]
-            if magar1 and magar2:
+            if full_title is None and s.startswith("{{ח:כותרת|"):
+                full_title = s[len("{{ח:כותרת|") : s.index("}}")]
+            if magar1 and magar2 and full_title:
                 break
 
         try:
-            law_id = resolve_law_id(wikitext_title=title, magar1=magar1, magar2=magar2, kns_records=kns_records)
+            law_id = resolve_law_id(
+                wikitext_title=title, magar1=magar1, magar2=magar2,
+                kns_records=kns_records, wikitext_full_title=full_title,
+            )
         except LawIdResolutionError as exc:
             resolution_failures.append({"title": title, "error": str(exc)})
             print(f"FAIL [{i+1}/{len(all_titles)}] {title} - [law_id] {exc}")

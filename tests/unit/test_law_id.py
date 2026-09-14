@@ -85,6 +85,31 @@ def main():
     except LawIdResolutionError:
         checks.append(("resolve: אין שום מקור -> LawIdResolutionError", True))
 
+    # מקרה 6 - הקריטי (באג law-2211393 שברק גילה בפועל): שם-בסיס
+    # (אחרי הסרת שנה) תואם לרשומת KNS יחידה, אבל היא משנה *אחרת*.
+    # בלי wikitext_full_title התאמת השם הייתה מצליחה בשקט לרשומה
+    # הלא-נכונה (2023 במקום 2025). עם wikitext_full_title - השנים
+    # לא תואמות, ההתאמה נדחית, ונופלים ל-bill- (לא law- שגוי).
+    year_kns_records = [
+        {"Id": 3000001, "Name": 'חוק לדוגמה (הוראת שעה), התשפ"ג-2023', "LawValidityDesc": "תקף"},
+    ]
+    r6 = resolve_law_id(
+        wikitext_title="חוק לדוגמה (הוראת שעה)",
+        magar1=None, magar2="4000002", kns_records=year_kns_records,
+        wikitext_full_title='חוק לדוגמה (הוראת שעה), התשפ"ה-2025',
+    )
+    checks.append(("resolve: שנה לא תואמת (2025 מול 2023) -> נדחה, נופל ל-bill- (לא law-3000001)", r6 == "bill-4000002"))
+
+    # מקרה 7: אותו מצב, אבל בלי wikitext_full_title - ההתנהגות
+    # הקודמת (בלי אימות שנה) נשמרת: מתאים בשקט ל-law-3000001. בודק
+    # שההוספה היא strictly additive (לא שוברת קריאות קיימות שלא
+    # מעבירות את הפרמטר החדש).
+    r7 = resolve_law_id(
+        wikitext_title="חוק לדוגמה (הוראת שעה)",
+        magar1=None, magar2="4000002", kns_records=year_kns_records,
+    )
+    checks.append(("resolve: בלי wikitext_full_title -> ללא אימות שנה (תאימות לאחור)", r7 == "law-3000001"))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)

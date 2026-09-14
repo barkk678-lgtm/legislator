@@ -86,6 +86,7 @@ def resolve_law_id(
     magar1: str | None,
     magar2: str | None,
     kns_records: list[dict],
+    wikitext_full_title: str | None = None,
 ) -> str:
     """קובעת את ה-law_id הסופי לחוק אחד, לפי סדר הקדימות המחייב
     שמתואר למעלה - IsraelLaw, אז Bill, אז מיפוי ידני, אחרת חריגה.
@@ -96,14 +97,18 @@ def resolve_law_id(
     magar1/magar2: המספרים הגולמיים מ-{{ח:מאגר}}/{{ח:מאגר2}} בוויקיטקסט
     (או None אם התבנית לא נמצאה) - ראו wikitext_parser/tools/
     load_corpus.py לחילוץ. kns_records: כל רשומות KNS_IsraelLaw
-    (מ-knesset_odata.fetch_israel_laws)."""
+    (מ-knesset_odata.fetch_israel_laws). wikitext_full_title (אופציונלי,
+    ברק 2026-09-14): הכותרת המלאה מ-{{ח:כותרת}} (כוללת שנה) - מועברת
+    ל-find_israel_law_id לאימות שנה, כדי למנוע התאמה בשקט לרשומת
+    KNS של שנה אחרת (ראו knesset_odata.classify_validity docstring
+    ו-TASKS.md משימה 7, באג law-2211393)."""
     israel_law_ids = {r["Id"] for r in kns_records}
 
     israel_id: int | None = None
     if magar1 is not None and int(magar1) in israel_law_ids:
         israel_id = int(magar1)
     if israel_id is None:
-        israel_id = find_israel_law_id(wikitext_title, kns_records)
+        israel_id = find_israel_law_id(wikitext_title, kns_records, wikitext_full_title)
     if israel_id is not None:
         return build_law_id("israel_law", israel_id)
 
