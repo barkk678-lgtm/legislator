@@ -60,6 +60,8 @@ class IngestPlan:
     citation_count: int
     token_count: int
     total_text_chars: int  # סכום len(node.text) על כל העץ - בסיס אמיתי להערכת עלות embeddings
+    id_collisions: list[str]  # ראו node.LegislativeNode.id_collisions - לא שגיאה (העץ
+    # תקין), אבל שכיחות גבוהה בקורפוס המלא היא סימן לדפוס לא-מזוהה (ברק, 2026-09-14)
 
 
 def fetch_with_retry(
@@ -98,10 +100,17 @@ def build_ingest_plan(
     source_ref: str,
     law_is_new: bool,
     fetch=fetch_with_retry,
+    validity: "ValidityMatch | None" = None,
 ) -> IngestPlan:
     """בונה תוכנית ingest מלאה (SQL, לא מבוצע) לחוק בודד. זורקת
     NetworkIngestError או SanityIngestError לפי הקטגוריה - שתיהן לא
-    כותבות שום דבר ל-DB (הבנייה כולה בזיכרון, לפני שנפתחת טרנזקציה)."""
+    כותבות שום דבר ל-DB (הבנייה כולה בזיכרון, לפני שנפתחת טרנזקציה).
+
+    validity (אופציונלי, ראו knesset_odata.ValidityMatch) - הסיווג
+    מול KNS_IsraelLaw, אם קיים. לא נשלף כאן (הפרדת מקורות רשת - ראו
+    knesset_odata.py) - האחריות על הקורא לבדוק should_ingest *לפני*
+    קריאה לפונקציה הזו (סינון, לא רק תיעוד); הפרמטר הזה קובע רק מה
+    נכתב ל-laws.law_validity_desc/validity_match_method בפועל."""
     export = fetch(wikitext_title)
     export_xml = export["export_xml"]
     wikitext = extract_wikitext_body(export_xml)
@@ -125,6 +134,7 @@ def build_ingest_plan(
         tree=tree,
         citations=citations,
         law_is_new=law_is_new,
+        validity=validity,
     )
 
     return IngestPlan(
@@ -142,6 +152,7 @@ def build_ingest_plan(
             if n.raw_amendment_note
         ),
         total_text_chars=sum(len(n.text) for n in _walk(tree)),
+        id_collisions=tree.id_collisions,
     )
 
 
@@ -169,14 +180,22 @@ def _render_transaction_sql(
     tree: LegislativeNode,
     citations: list[CitationEntry],
     law_is_new: bool,
+    validity: "ValidityMatch | None" = None,
 ) -> str:
     statements: list[str] = ["begin;"]
 
     if law_is_new:
-        statements.append(
-            "insert into laws (id, full_title, wikitext_title) values "
-            f"({_lit(law_id)}, {_lit(tree.full_title or law_id)}, {_lit(wikitext_title)});"
-        )
+        if validity is not None:
+            statements.append(
+                "insert into laws (id, full_title, wikitext_title, law_validity_desc, validity_match_method) values "
+                f"({_lit(law_id)}, {_lit(tree.full_title or law_id)}, {_lit(wikitext_title)}, "
+                f"{_lit(validity.law_validity_desc)}, {_lit(validity.match_method)});"
+            )
+        else:
+            statements.append(
+                "insert into laws (id, full_title, wikitext_title) values "
+                f"({_lit(law_id)}, {_lit(tree.full_title or law_id)}, {_lit(wikitext_title)});"
+            )
 
     # אין RETURNING/\gset בכוונה - execute_sql (mcp Supabase) מריצה
     # מחרוזת SQL אחת כטקסט, לא psql אינטראקטיבי, ואין לנו משתנה session

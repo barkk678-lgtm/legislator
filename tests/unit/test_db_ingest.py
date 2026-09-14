@@ -80,6 +80,32 @@ def main():
         )
     )
 
+    # --- validity (2026-09-14) - כשמועבר, נכתב ל-insert into laws ---
+    from knesset_odata import ValidityMatch  # noqa: E402 - כאן ולא בראש, כדי שלא ליצור תלות קשה ב-db_ingest.py עצמו
+
+    plan_valid = build_ingest_plan(
+        "kaytanot-1990",
+        "חוק הקייטנות (רישוי ופיקוח)",
+        source_ref="",
+        law_is_new=True,
+        fetch=fake_fetch_kaytanot,
+        validity=ValidityMatch("תקף", "exact", "חוק הקייטנות (רישוי ופיקוח), התש\"ן-1990"),
+    )
+    checks.append(("validity מועבר -> law_validity_desc ב-SQL", "law_validity_desc" in plan_valid.sql and "'תקף'" not in plan_valid.sql))
+    checks.append(("validity מועבר -> match_method ב-SQL", "$q$exact$q$" in plan_valid.sql or "exact" in plan_valid.sql))
+
+    plan_unknown = build_ingest_plan(
+        "kaytanot-1990",
+        "חוק הקייטנות (רישוי ופיקוח)",
+        source_ref="",
+        law_is_new=True,
+        fetch=fake_fetch_kaytanot,
+        validity=ValidityMatch(None, "not_found"),
+    )
+    checks.append(("validity=לא ידוע -> law_validity_desc הוא NULL", "NULL" in plan_unknown.sql.split("insert into laws")[1].split(";")[0]))
+
+    checks.append(("validity לא מועבר (ברירת מחדל) -> אין עמודות תוקף ב-SQL", "law_validity_desc" not in plan.sql))
+
     # law_is_new=False -> אין insert into laws
     plan_existing = build_ingest_plan(
         "kaytanot-1990",

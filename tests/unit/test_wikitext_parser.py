@@ -154,6 +154,9 @@ def main():
     checks.append(("id כפול מובנה: הראשון נשאר בלי סיומת", s25.children[0].id == "test-law/s25/א"))
     checks.append(("id כפול מובנה: השני מקבל סיומת סידורית", s25.children[1].id == "test-law/s25/א-2"))
     checks.append(("id כפול מובנה: check_unique_ids נקי", check_unique_ids(dual_label_tree) == []))
+    checks.append(("id כפול מובנה: id_collisions נרשם", dual_label_tree.id_collisions == ["test-law/s25/א -> test-law/s25/א-2"]))
+    checks.append(("קייטנות: id_collisions ריק (אין התנגשות אמיתית)", load("kaytanot", "kaytanot-1990")[0].id_collisions == []))
+    checks.append(("מאבק: id_collisions ריק (אחרי תיקון ה-id, לא רק אחרי סיומת)", crime.id_collisions == []))
 
     ok = all(passed for _, passed in checks)
     for name, passed in checks:

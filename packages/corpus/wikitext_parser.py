@@ -148,7 +148,7 @@ def _slug(label: str | None, fallback_index: int) -> str:
     return re.sub(r"[()]", "", label)
 
 
-def _unique_child_id(parent_node: LegislativeNode, local_id: str) -> str:
+def _unique_child_id(parent_node: LegislativeNode, local_id: str, collisions: list[str]) -> str:
     """בונה id ילד ייחודי בין אחיו, בלי לנחש *למה* יש התנגשות.
 
     ההיוריסטיקה הטבעית (label/מספר-סעיף) לא תמיד ייחודית בפועל - ראו
@@ -160,8 +160,10 @@ def _unique_child_id(parent_node: LegislativeNode, local_id: str) -> str:
     ידוע או לא, נתפס כאן באופן מבני, בלי לנחש על טקסט חופשי בעברית
     (ראו ההחלטה המקבילה לגבי התאמת שמות מול KNS_IsraelLaw -
     docs/strategy/decisions.md). אם אין התנגשות - מתנהג בדיוק כמו
-    קודם. אם יש - מוסיף סיומת סידורית יציבה (-2, -3, ...), ו-
-    check_unique_ids נשאר קו ההגנה האחרון."""
+    קודם. אם יש - מוסיף סיומת סידורית יציבה (-2, -3, ...), ומדווח
+    לתוך collisions (נשמר על root.id_collisions - ראו node.py) כדי
+    שכל השכיחות בקורפוס המלא תהיה ניתנת לספירה, לא רק לזיהוי אילם.
+    check_unique_ids נשאר קו ההגנה האחרון גם ככה."""
     base_id = f"{parent_node.id}/{local_id}"
     existing = {child.id for child in parent_node.children}
     if base_id not in existing:
@@ -169,7 +171,9 @@ def _unique_child_id(parent_node: LegislativeNode, local_id: str) -> str:
     n = 2
     while f"{base_id}-{n}" in existing:
         n += 1
-    return f"{base_id}-{n}"
+    final_id = f"{base_id}-{n}"
+    collisions.append(f"{base_id} -> {final_id}")
+    return final_id
 
 
 def parse_wikitext(
@@ -198,6 +202,7 @@ def parse_wikitext(
         is_normative=False,  # השורש הוא מטא-דאטה של החוק, לא נוסח
         as_of=as_of,
     )
+    collisions: list[str] = []
 
     # מחסנית של (רמה_מבנית, צומת, מרחב_מספור_נוכחי)
     stack: list[tuple[int, LegislativeNode, str]] = [
@@ -235,7 +240,7 @@ def parse_wikitext(
             # תוספת יכולה עקרונית להיפתח בכל רמת מכל, לא רק ב-קטע2.
             numbering_space = "schedule" if anchor.startswith("תוספת") else stack[-1][2]
             node = LegislativeNode(
-                id=_unique_child_id(parent_node, _slug(anchor, len(parent_node.children))),
+                id=_unique_child_id(parent_node, _slug(anchor, len(parent_node.children)), collisions),
                 node_type=node_type,
                 number=anchor,
                 margin_title=normalize_text(title),
@@ -258,7 +263,7 @@ def parse_wikitext(
             parent_node = stack[-1][1]
             numbering_space = stack[-1][2]
             node = LegislativeNode(
-                id=_unique_child_id(parent_node, f"s{number}"),
+                id=_unique_child_id(parent_node, f"s{number}", collisions),
                 node_type="section",
                 number=number,
                 margin_title=normalize_text(title),
@@ -292,7 +297,7 @@ def parse_wikitext(
             numbering_space = stack[-1][2]
             node_type = _classify(name, label, kind_attr)
             node = LegislativeNode(
-                id=_unique_child_id(parent_node, _slug(label, len(parent_node.children))),
+                id=_unique_child_id(parent_node, _slug(label, len(parent_node.children)), collisions),
                 node_type=node_type,
                 number=label or "",
                 margin_title=None,
@@ -327,4 +332,5 @@ def parse_wikitext(
             node.status = "merged" if "שולב" in combined else "repealed"
 
     _mark_status(root)
+    root.id_collisions = collisions
     return root
