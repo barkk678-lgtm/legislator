@@ -18,6 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "corpus"))
+from law_search import search_laws  # noqa: E402
 from node import LegislativeNode  # noqa: E402
 from wikitext_parser import parse_wikitext  # noqa: E402
 
@@ -74,3 +75,22 @@ def law_summaries() -> list[dict]:
             }
         )
     return summaries
+
+
+def search_law_titles(query: str, limit: int = 20) -> list[dict]:
+    """חיפוש שם-חוק (משימה A, ברק 2026-09-14) - שכבה דקה מעל
+    law_search.search_laws (הלוגיקה הטהורה, נבדקת בנפרד ב-
+    tests/unit/test_law_search.py).
+
+    **מקור הנתונים כרגע: `LAWS` (שני fixtures בלבד) - כמו כל שאר
+    apps/api היום, לא הקורפוס המלא ב-Supabase.** חיפוש על הקורפוס
+    המלא (998 חוקים) דורש חיבור Postgres אמיתי (`psycopg` +
+    `DATABASE_URL`) - בדיוק כפי שתועד מראש ב-db_ingest.py ("בעתיד
+    (ingest מתוזמן, משימה 7) דרך psycopg + DATABASE_URL אמיתי").
+    זו תלות חדשה שלא הותקנה הלילה (הוראה מפורשת - ראו docs/night-
+    report.md). **כדי לחבר בעתיד:** להחליף את `law_summaries()`
+    כמקור הרשומות ב-שאילתת `select id, full_title as title from
+    laws` אמיתית - `search_laws` עצמה לא משתנה (מקבלת כל רשימת
+    dicts עם id/title)."""
+    laws = [{"id": s["id"], "title": s["title"]} for s in law_summaries()]
+    return search_laws(query, laws, limit=limit)

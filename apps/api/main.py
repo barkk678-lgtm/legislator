@@ -34,7 +34,7 @@ from validator import validate  # noqa: E402
 from apply_changes import apply_pending_changes  # noqa: E402
 from explanatory_draft import draft_explanatory_notes  # noqa: E402
 from insert_preview import preview_insertion_label  # noqa: E402
-from law_registry import LAWS, load_law, law_summaries  # noqa: E402
+from law_registry import LAWS, load_law, law_summaries, search_law_titles  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
 from schemas import BillMetaIn, InsertPreviewRequestIn, RenderRequest  # noqa: E402
 
@@ -57,6 +57,14 @@ def index() -> str:
 @app.get("/api/laws")
 def api_laws() -> list[dict]:
     return law_summaries()
+
+
+@app.get("/api/laws/search")
+def api_search_laws(q: str = "") -> list[dict]:
+    """חיפוש שם-חוק בטקסט חופשי (משימה A) - ראו law_registry.
+    search_law_titles לפירוט מקור הנתונים הנוכחי (fixtures, לא
+    הקורפוס המלא) ומה חסר לחיבור המלא."""
+    return search_law_titles(q)
 
 
 @app.get("/api/laws/{law_id}")

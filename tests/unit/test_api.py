@@ -42,6 +42,23 @@ def main():
         )
     )
 
+    # GET /api/laws/search - משימה A. ראו law_registry.search_law_titles/
+    # law_search.search_laws (הלוגיקה עצמה נבדקת ב-test_law_search.py).
+    search_r1 = client.get("/api/laws/search", params={"q": "קייטנות"}).json()
+    checks.append(
+        ("GET /api/laws/search: תת-מחרוזת מוצאת את חוק הקייטנות בלבד",
+         [law["id"] for law in search_r1] == ["kaytanot-1990"]),
+    )
+    search_r2 = client.get("/api/laws/search", params={"q": "מאבק ארגוני"}).json()
+    checks.append(
+        ("GET /api/laws/search: ריבוי טוקנים מוצא את חוק מאבק בארגוני פשיעה",
+         [law["id"] for law in search_r2] == ["maavak-2003"]),
+    )
+    search_r3 = client.get("/api/laws/search", params={"q": "לא קיים בכלל"}).json()
+    checks.append(("GET /api/laws/search: אין התאמה -> רשימה ריקה", search_r3 == []))
+    search_r4 = client.get("/api/laws/search").json()
+    checks.append(("GET /api/laws/search: בלי q כלל -> רשימה ריקה, לא שגיאה", search_r4 == []))
+
     # GET /api/laws/{id} - as_of בניסוח הנכון, עץ מלא, בלי is_normative=False
     law_detail = client.get("/api/laws/kaytanot-1990").json()
     checks.append(
