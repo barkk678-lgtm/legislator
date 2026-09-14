@@ -2,9 +2,11 @@
 
 penal.wikitext (חוק העונשין) - מקרה הזהב לחלק/פרק/סימן (משימה 7).
 עד 2026-09-14 נכשל ב-check_no_unknown_templates על {{ח:קטע1}}/{{ח:קטע3}}
-(חלק/סימן) - תוקן (ראו wikitext_parser._CONTAINER_TEMPLATES). עדיין
-נכשל על פער *אחר*, לא קשור: {{ח:מבוא}}/תבניות תיוג (`חוקי עונשין`) -
-זה תיעוד של פער ידוע, לא מקרה סינתטי.
+(חלק/סימן) - תוקן (ראו wikitext_parser._CONTAINER_TEMPLATES). {{ח:מבוא}}
+תוקן גם הוא (נוסף ל-_KNOWN_BENIGN_SKIP_TEMPLATES). עדיין נכשל על פער
+*אחר*, לא קשור: תבנית תיוג (`חוקי עונשין`) - עדיין לא ב-allowlist
+(ראו TASKS.md משימה 7, סעיף allowlist ממתין לאישור מרוכז) - זה תיעוד
+של פער ידוע, לא מקרה סינתטי.
 """
 
 import sys
@@ -69,12 +71,12 @@ def main():
     checks.append(("עונשין: 20 צמתי chapter", _count_type(penal_tree, "chapter") == 20))
     checks.append(("עונשין: 75 צמתי siman", _count_type(penal_tree, "siman") == 75))
 
-    # פער *אחר*, לא קשור לחלק/פרק/סימן, עדיין קיים בכוונה: ח:מבוא +
-    # תבניות תיוג (חוקי עונשין) - ראו TASKS.md משימה 7 להמשך.
+    # פער *אחר*, לא קשור לחלק/פרק/סימן, עדיין קיים בכוונה: תבנית תיוג
+    # (חוקי עונשין) - ראו TASKS.md משימה 7 להמשך (allowlist ממתין לאישור).
     penal_problems = check_no_unknown_templates(penal_text)
-    checks.append(("עונשין: נכשל רק על ח:מבוא/תיוג (לא קטע1/קטע3 יותר)", len(penal_problems) == 1))
-    checks.append(("עונשין: קטע1/קטע3 לא מופיעים יותר בבעיה", "ח:קטע1" not in penal_problems[0] and "ח:קטע3" not in penal_problems[0]))
-    checks.append(("עונשין: הבעיה מזהה את ח:מבוא", "ח:מבוא" in penal_problems[0]))
+    checks.append(("עונשין: נכשל רק על תבנית תיוג (לא קטע1/קטע3/מבוא יותר)", len(penal_problems) == 1))
+    checks.append(("עונשין: קטע1/קטע3/מבוא לא מופיעים יותר בבעיה", not any(x in penal_problems[0] for x in ("ח:קטע1", "ח:קטע3", "ח:מבוא"))))
+    checks.append(("עונשין: הבעיה מזהה את חוקי עונשין", "חוקי עונשין" in penal_problems[0]))
 
     # ויקיפדיה/ח:מאגר2 - נוספו ל-allowlist 2026-09-14 אחרי בדיקת תוכן
     # אמיתי (ראו TASKS.md משימה 7): שתיהן עיטוריות בלבד, אין נוסח.

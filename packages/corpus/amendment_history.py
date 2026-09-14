@@ -53,6 +53,14 @@ raw_amendment_note הוא העובדה שנשמרת בקורפוס - כמו שה
    נשמר גולמי ב-ParsedAmendmentNote.other_raw. 255 מופעים בקורפוס,
    בפורמט עקבי [אות/מספר] - לא נבדקה משמעותו (ראו TASKS.md, משימת
    חקירה נפרדת, לא נפתחה עדיין לעבודה).
+4. טוקן עם "־" אבל בלי מספר תקין אחריו (למשל "תשס״ה־3 תשע״ד" בחוק
+   העמותות - כנראה פסיק חסר במקור בין שני טוקנים, ראו TASKS.md
+   משימה 7) - **לא קורס** (2026-09-14, ברק: "תוכנה שקורסת על קלט
+   פגום היא באג בתוכנה"). נשמר גולמי (`AmendmentToken.raw`),
+   `unparsed=True`, `hebrew_year=None`/`ordinal_in_year=None` - לא
+   מנחש חלוקה לשני טוקנים, לא זורק. `resolve_amendment_tokens`
+   מתעלמת מטוקנים כאלה ממילא (hebrew_year=None לא תואם שום רשומה
+   ברשימה - 0 מועמדים, בדיוק כמו "לא נמצא").
 """
 
 import re
@@ -65,9 +73,12 @@ _HEBREW_MAQAF = "־"  # "־" - המפריד בין שנה למספר סידור�
 class AmendmentToken:
     """טוקן בודד בתוך רשימת 'תיקון: ...'."""
 
-    hebrew_year: str  # "תשנ״ד", או שנה גולמית טרום-1977 (עברית או לועזית) לטוקן legacy
+    hebrew_year: str | None  # "תשנ״ד" וכו'; None רק אם unparsed=True (ראו שם)
     ordinal_in_year: int | None  # מיקום 1-based, רק אם צוין במקור כ-"־N"; None = לא ידוע, לא מנוחש
     is_legacy: bool  # True = טוקן בסוגריים מרובעים (טרום-קונסולידציה)
+    raw: str = ""  # הטקסט הגולמי של הטוקן, תמיד נשמר - גם כשהפענוח הצליח
+    unparsed: bool = False  # True = לא הצלחנו לפענח בכלל (ראו סעיף 4 למעלה) -
+    # hebrew_year/ordinal_in_year לא משמעותיים, raw הוא היחיד שאפשר לסמוך עליו
 
 
 @dataclass(frozen=True)
@@ -113,15 +124,21 @@ def parse_amendment_note(raw: str | None) -> ParsedAmendmentNote:
 
 def _parse_token(chunk: str) -> AmendmentToken:
     if chunk.startswith("[") and chunk.endswith("]"):
-        return AmendmentToken(hebrew_year=chunk[1:-1].strip(), ordinal_in_year=None, is_legacy=True)
+        return AmendmentToken(hebrew_year=chunk[1:-1].strip(), ordinal_in_year=None, is_legacy=True, raw=chunk)
     if _HEBREW_MAQAF in chunk:
         year, _, ordinal_str = chunk.rpartition(_HEBREW_MAQAF)
-        return AmendmentToken(
-            hebrew_year=year.strip(),
-            ordinal_in_year=int(ordinal_str.strip()),
-            is_legacy=False,
-        )
-    return AmendmentToken(hebrew_year=chunk.strip(), ordinal_in_year=None, is_legacy=False)
+        ordinal_str = ordinal_str.strip()
+        if ordinal_str.isdigit():
+            return AmendmentToken(
+                hebrew_year=year.strip(),
+                ordinal_in_year=int(ordinal_str),
+                is_legacy=False,
+                raw=chunk,
+            )
+        # "־" קיים אבל מה שאחריו לא מספר תקין (ראו סעיף 4 בדוקסטרינג
+        # המודול) - לא קורסים, לא מנחשים חלוקה - נשמר גולמי בלבד.
+        return AmendmentToken(hebrew_year=None, ordinal_in_year=None, is_legacy=False, raw=chunk, unparsed=True)
+    return AmendmentToken(hebrew_year=chunk.strip(), ordinal_in_year=None, is_legacy=False, raw=chunk)
 
 
 @dataclass(frozen=True)

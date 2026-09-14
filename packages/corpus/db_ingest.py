@@ -264,11 +264,11 @@ def _render_tokens_sql(law_id: str, tree: LegislativeNode) -> list[str]:
         for order, token in enumerate(parsed.tokens):
             statements.append(
                 "insert into section_amendment_tokens (law_version_id, node_id, token_order, "
-                "hebrew_year, ordinal_in_year, is_legacy) values ("
+                "hebrew_year, ordinal_in_year, is_legacy, raw_token, is_unparsed) values ("
                 f"(select max(id) from law_versions where law_id = {_lit(law_id)}), "
                 f"{_lit(node.id)}, {order}, {_lit(token.hebrew_year)}, "
                 f"{token.ordinal_in_year if token.ordinal_in_year is not None else 'NULL'}, "
-                f"{_bool(token.is_legacy)});"
+                f"{_bool(token.is_legacy)}, {_lit(token.raw)}, {_bool(token.unparsed)});"
             )
     return statements
 

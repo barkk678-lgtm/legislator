@@ -122,6 +122,18 @@ def main():
         )
     )
 
+    # --- טוקן פגום (2026-09-14) - לא קורס, נשמר גולמי (חוק העמותות) ---
+    note_malformed = "תיקון: תשנ״ו, תשס״ה־2, תשס״ה־3 תשע״ד"
+    parsed_malformed = parse_amendment_note(note_malformed)
+    checks.append(("טוקן פגום: לא קורס, 3 טוקנים", len(parsed_malformed.tokens) == 3))
+    checks.append(("טוקן פגום: הטוקן השלישי מסומן unparsed", parsed_malformed.tokens[2].unparsed is True))
+    checks.append(("טוקן פגום: hebrew_year=None (לא מנוחש)", parsed_malformed.tokens[2].hebrew_year is None))
+    checks.append(("טוקן פגום: raw נשמר גולמי", parsed_malformed.tokens[2].raw == "תשס״ה־3 תשע״ד"))
+    checks.append(("טוקן פגום: שני הטוקנים התקינים לא הושפעו", parsed_malformed.tokens[1].hebrew_year == "תשס״ה" and parsed_malformed.tokens[1].ordinal_in_year == 2))
+    resolved_malformed = resolve_amendment_tokens(parsed_malformed.tokens, _REGISTRY)
+    checks.append(("טוקן פגום: resolve לא קורס, 0 מועמדים", resolved_malformed[2][1] == ()))
+    checks.append(("טוקן תקין: raw נשמר גם בהצלחה", parsed_malformed.tokens[0].raw == "תשנ״ו"))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)
