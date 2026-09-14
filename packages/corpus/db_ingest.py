@@ -64,6 +64,8 @@ class IngestPlan:
     # תקין), אבל שכיחות גבוהה בקורפוס המלא היא סימן לדפוס לא-מזוהה (ברק, 2026-09-14)
     content_derived_ids: list[str]  # ראו node.LegislativeNode.content_derived_ids -
     # id-ים שנגזרו מ-hash תוכן במקום ממיקום (רשימות לא-ממוספרות), לספירה
+    raw_block_count: int  # כמה צמתי raw_block (בלוק <table> גולמי) בעץ - לספירה
+    # (ברק, 2026-09-14): "כמה חוקים מכילים raw_block בסך הכול במנה"
 
 
 def fetch_with_retry(
@@ -156,6 +158,7 @@ def build_ingest_plan(
         total_text_chars=sum(len(n.text) for n in _walk(tree)),
         id_collisions=tree.id_collisions,
         content_derived_ids=tree.content_derived_ids,
+        raw_block_count=_count_node_type(tree, "raw_block"),
     )
 
 

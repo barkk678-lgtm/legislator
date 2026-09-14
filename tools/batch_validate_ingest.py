@@ -101,6 +101,7 @@ def main():
     # (בדיוק המקרה החריג שנמצא, ראו TASKS.md משימה 7 / decisions.md 2026-09-14).
     all_content_derived_ids = []  # ראו node.LegislativeNode.content_derived_ids -
     # id-ים שנגזרו מ-hash תוכן (רשימות לא-ממוספרות) - נספר גם אותם, כמבוקש.
+    laws_with_raw_block = []  # כמה חוקים מכילים לפחות צומת raw_block אחד (<table> גולמי)
 
     for i, title in enumerate(sample):
         law_id = slugify(title, i)
@@ -122,6 +123,7 @@ def main():
                     "token_count": plan.token_count,
                     "total_text_chars": plan.total_text_chars,
                     "elapsed_s": round(elapsed, 2),
+                    "raw_block_count": plan.raw_block_count,
                 }
             )
             if plan.id_collisions:
@@ -130,6 +132,8 @@ def main():
                     print(f"  [id_collision] {title}: {c}", file=sys.stderr)
             if plan.content_derived_ids:
                 all_content_derived_ids.append((title, plan.content_derived_ids))
+            if plan.raw_block_count:
+                laws_with_raw_block.append((title, plan.raw_block_count))
             print(f"OK   [{i+1}/{len(sample)}] {title} - {plan.node_count} nodes ({elapsed:.1f}s)")
         except NetworkIngestError as exc:
             failures.append({"title": title, "category": "network", "error": str(exc)})
@@ -156,6 +160,11 @@ def main():
     print(
         f"content_derived_ids: {total_content_derived} id-ים נגזרו מתוכן ב-"
         f"{len(all_content_derived_ids)} חוקים מתוך {len(successes)} שהצליחו"
+    )
+    total_raw_blocks = sum(c for _, c in laws_with_raw_block)
+    print(
+        f"raw_block: {total_raw_blocks} צמתי <table> גולמי ב-"
+        f"{len(laws_with_raw_block)} חוקים מתוך {len(successes)} שהצליחו"
     )
     if failures:
         by_category = Counter(f["category"] for f in failures)
