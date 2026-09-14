@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "autoMode": {
+      "allow": [
+        "$defaults",
+        "Bash(git push*)",
+        "Bash(git commit*)",
+        "Bash(python3 tools/*)",
+        "Bash(python3 packages/*)",
+        "mcp__Supabase__execute_sql",
+        "mcp__Supabase__apply_migration",
+        "mcp__Supabase__list_tables",
+        "mcp__Supabase__list_migrations",
+        "mcp__Supabase__get_advisors",
+        "mcp__Supabase__search_docs",
+        "mcp__Supabase__get_project",
+        "mcp__Supabase__get_project_url",
+        "mcp__Supabase__list_projects"
+      ],
+      "hard_deny": [
+        "$defaults",
+        "Bash(rm -rf*)",
+        "Bash(git reset --hard*)",
+        "Bash(git push --force*)",
+        "Bash(git push -f*)",
+        "Bash(git clean -f*)",
+        "Any Supabase execute_sql or apply_migration call whose SQL text contains DROP TABLE, DROP DATABASE, DROP SCHEMA, or TRUNCATE, on any project",
+        "Any Supabase MCP tool call (execute_sql, apply_migration, or any other Supabase tool) whose project_id is not aamxwjmmlsqkinrzirdz (the 'legislator' project) - specifically never uctxqideqqclsuofipmd ('121') or ossgqqiuwkvpgyoeyuul ('ניהול מפעלים')",
+        "Any Vercel deployment, promotion, or production release action"
+      ]
+    },
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(git reset --hard*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)"
+    ]
+  }
+}
