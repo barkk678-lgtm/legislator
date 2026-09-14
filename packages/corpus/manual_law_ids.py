@@ -2,11 +2,13 @@
 KNS_IsraelLaw.Id (ח:מאגר) ולא KNS_Bill.Id (ח:מאגר2) - ראו TASKS.md
 משימה 7 (2026-09-14) ו-packages/corpus/law_id.py.
 
-**חשוב: הערכים כאן הם ה-slug הגולמי בלבד, בלי תחילית "manual-".**
-התחילית נאכפת במקום אחד יחיד - law_id.build_law_id("manual", slug) -
-לא כאן ולא בשום מקום אחר (ברק, 2026-09-14: "התחילית חייבת להיאכף
-בקוד, לא במוסכמה. פונקציה אחת שבונה law_id, ושום מקום אחר לא מרכיב
-אותו ידנית"). להרכבת ה-law_id המלא: get_manual_law_id(title) למטה.
+**חשוב: הערכים כאן הם ה-slug הגולמי בלבד, בלי תחילית "manual-", וגם
+`get_manual_slug` למטה מחזירה slug גולמי, לא law_id מלא.** התחילית
+נאכפת במקום אחד יחיד - `law_id.resolve_law_id` (לא כאן) - כדי למנוע
+circular import (law_id.py כבר מייבא מהקובץ הזה) ולשמור על עיקרון
+ברק: "התחילית חייבת להיאכף בקוד, לא במוסכמה. פונקציה אחת שבונה
+law_id, ושום מקום אחר לא מרכיב אותו ידנית" - "מקום אחד" הוא
+`resolve_law_id`, לא כל קובץ שנוגע ב-slug.
 
 הקובץ הזה הוא ה-**יוצא מן הכלל היחיד**, ל-4 חוקים בלבד שבהם אין שום
 מספר כזה - ברק: "המיפוי הידני הוא שלי, לא שליפה מהכנסת... אתה לא
@@ -19,8 +21,6 @@ KNS_IsraelLaw.Id (ח:מאגר) ולא KNS_Bill.Id (ח:מאגר2) - ראו TASKS.
 הזה - הטעינה שלו נכשלת ברעש (חריגה מפורשת), בלי fallback אוטומטי.
 ראו tools/load_corpus.py.
 """
-
-from law_id import build_law_id
 
 MANUAL_LAW_IDS: dict[str, tuple[str, str]] = {
     # wikitext_title -> (slug גולמי בלי תחילית, הסבר למה אין מספר)
@@ -51,12 +51,12 @@ MANUAL_LAW_IDS: dict[str, tuple[str, str]] = {
 }
 
 
-def get_manual_law_id(wikitext_title: str) -> str | None:
-    """מרכיבה את ה-law_id המלא (עם תחילית "manual-") לחוק שיש לו
-    רשומה במיפוי, או None אם אין - נקודת הגישה היחידה למיפוי הזה
-    שאמורה לשמש קוד ingest (ראו law_id.build_law_id)."""
+def get_manual_slug(wikitext_title: str) -> str | None:
+    """מחזירה את ה-slug הגולמי (בלי תחילית) לחוק שיש לו רשומה
+    במיפוי, או None אם אין. התחילית "manual-" מתווספת רק ב-
+    law_id.resolve_law_id, לא כאן - ראו docstring המודול."""
     entry = MANUAL_LAW_IDS.get(wikitext_title)
     if entry is None:
         return None
     slug, _explanation = entry
-    return build_law_id("manual", slug)
+    return slug

@@ -148,6 +148,23 @@ def classify_validity(wikisource_title: str, kns_records: list[dict]) -> Validit
     return ValidityMatch(None, "not_found")
 
 
+def find_israel_law_id(wikisource_title: str, kns_records: list[dict]) -> int | None:
+    """כמו classify_validity, אבל מחזירה את ה-Id של הרשומה התואמת
+    במקום את סיווג התוקף שלה - ל-law_id.resolve_law_id (ברק,
+    2026-09-14: "הלוגיקה לא יכולה להסתמך רק על איזו תבנית מופיעה
+    בוויקיטקסט - צריך לבדוק התאמה ל-IsraelLaw תחילה, בלי קשר למה
+    שכתוב בדף"). משתמשת באותה לוגיקת התאמה/עמימות בדיוק (קוראת
+    ל-classify_validity עצמה - לא כפילות), רק מתרגמת את השם התואם
+    בחזרה ל-Id. None אם לא נמצאה התאמה חד-משמעית (not_found/ambiguous)."""
+    match = classify_validity(wikisource_title, kns_records)
+    if match.matched_kns_name is None:
+        return None
+    for r in kns_records:
+        if r["Name"] == match.matched_kns_name:
+            return r["Id"]
+    return None  # לא אמור לקרות - matched_kns_name הגיע מתוך kns_records עצמה
+
+
 def should_ingest(match: ValidityMatch) -> bool:
     """עיקרון: שום חוק לא נזרק בגלל שלא הצלחנו לבדוק אותו (ברק,
     2026-09-14). True לתקף/לא-ידוע (not_found/ambiguous) - רק
