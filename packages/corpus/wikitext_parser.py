@@ -5,8 +5,9 @@
 שליפת הוויקיטקסט מהרשת חיה ב-wikitext_client.py, קובץ נפרד לגמרי.
 
 היקף (TASKS.md משימה 3): חוק הקייטנות וחוק מאבק בארגוני פשיעה בלבד.
-חוק העונשין (משימה 7) חושף מבנה עשיר יותר (חלק/קטע3/קטע1) שהפרסר הזה
-לא בהכרח מכסה נכון עדיין.
+חוק העונשין (משימה 7) חושף מבנה עשיר יותר (חלק/פרק/סימן, קטע1/2/3) -
+נתמך כעת (2026-09-14): שלוש הרמות ממופות ל-node_type=part/chapter/siman
+(ראו _CONTAINER_TEMPLATES).
 
 הכרעות עיצוב מרכזיות (ראו data-sources.md "תקלות ידועות בוויקיטקסט"):
 
@@ -39,9 +40,21 @@ _CONTENT_DEPTH = {
     "ח:תתתת": 3,
     "ח:תתתתת": 4,
 }
-_STRUCTURAL_LEVEL_LAW = -3
-_STRUCTURAL_LEVEL_CHAPTER = -2
+_STRUCTURAL_LEVEL_LAW = -5
+_STRUCTURAL_LEVEL_PART = -4
+_STRUCTURAL_LEVEL_CHAPTER = -3
+_STRUCTURAL_LEVEL_SIMAN = -2
 _STRUCTURAL_LEVEL_SECTION = -1
+
+# {{ח:קטע1/2/3}} - שלוש רמות המכל בין חוק לסעיף: חלק (משימה 7, קיים
+# בעונשין כ"חלק 0"/"חלק א"/"חלק ב") > פרק (היה היחיד שטופל עד עכשיו)
+# > סימן (תת-פרק, למשל "פרק ג סימן א"). אותה צורת ארגומנטים בשלושתן:
+# [עוגן, כותרת, תיקון-אופציונלי] - ראו tests/fixtures/wikitext/penal.wikitext.
+_CONTAINER_TEMPLATES = {
+    "ח:קטע1": (_STRUCTURAL_LEVEL_PART, "part"),
+    "ח:קטע2": (_STRUCTURAL_LEVEL_CHAPTER, "chapter"),
+    "ח:קטע3": (_STRUCTURAL_LEVEL_SIMAN, "siman"),
+}
 
 _SUBSECTION_LABEL = re.compile(r"^\([א-ת][א-ת0-9]*\)$")  # (א), (א1) - מתחיל באות
 _PARAGRAPH_LABEL = re.compile(r"^\(\d+\)$")  # (1), (2) - ספרות בלבד
@@ -185,24 +198,27 @@ def parse_wikitext(
             # (החלטה: מופע יחיד/בודד שעוטף הערה, לא רמת מבנה אמיתית).
             continue
 
-        if name in ("ח:קטע2",):
+        if name in _CONTAINER_TEMPLATES:
+            structural_level, node_type = _CONTAINER_TEMPLATES[name]
             anchor = call.args[0] if call.args else ""
             title = _flatten(call.args[1]) if len(call.args) > 1 else ""
             if title == "תוכן עניינים":
                 continue  # תוכן העניינים האוטומטי - לא רמת מבנה
-            numbering_space = "schedule" if anchor.startswith("תוספת") else "law"
-            while stack[-1][0] >= _STRUCTURAL_LEVEL_CHAPTER:
+            while stack[-1][0] >= structural_level:
                 stack.pop()
             parent_node = stack[-1][1]
+            # ברירת מחדל: לרשת את מרחב המספור מההורה (לא "law" קבוע) -
+            # תוספת יכולה עקרונית להיפתח בכל רמת מכל, לא רק ב-קטע2.
+            numbering_space = "schedule" if anchor.startswith("תוספת") else stack[-1][2]
             node = LegislativeNode(
                 id=f"{parent_node.id}/{_slug(anchor, len(parent_node.children))}",
-                node_type="chapter",
+                node_type=node_type,
                 number=anchor,
                 margin_title=normalize_text(title),
                 text="",
             )
             parent_node.children.append(node)
-            stack.append((_STRUCTURAL_LEVEL_CHAPTER, node, numbering_space))
+            stack.append((structural_level, node, numbering_space))
             continue
 
         if name in ("ח:סעיף", "ח:סעיף*"):

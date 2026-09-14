@@ -90,7 +90,8 @@ def main():
     )
     checks.append(("law_is_new=False -> בלי insert into laws", "insert into laws " not in plan_existing.sql))
 
-    # --- כשל בדיקת שפיות (עונשין - קטע1/קטע3 לא מוכרים) ---
+    # --- כשל בדיקת שפיות (עונשין - ח:מבוא/תיוג לא מוכרים; קטע1/קטע3
+    # תוקנו ב-2026-09-14, ראו TASKS.md משימה 7) ---
     def fake_fetch_penal(title):
         return _fake_export("penal")
 
@@ -100,7 +101,7 @@ def main():
         )
         checks.append(("עונשין -> SanityIngestError", False))
     except SanityIngestError as exc:
-        checks.append(("עונשין -> SanityIngestError", "קטע1" in str(exc)))
+        checks.append(("עונשין -> SanityIngestError", "ח:מבוא" in str(exc) and "קטע1" not in str(exc)))
 
     # --- קטגוריית retry: כשל רשת חולף, מצליח בניסיון השלישי ---
     attempts = {"n": 0}
