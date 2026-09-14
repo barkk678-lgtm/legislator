@@ -127,15 +127,24 @@ def main():
 
     checks.append(("unconsumed: <table> אכן קיים כצומת raw_block בעץ", _has_raw_block(orphaned_table_tree)))
 
-    # תוכן שבאמת עדיין לא נצרך - כדי לוודא שהבדיקה לא הפכה חסרת-שיניים
-    # אחרי תיקון הטבלה. <div> רגיל (לא law-toc) עדיין לא מוכר.
+    # 2026-09-14: שורה לא-מוכרת (למשל <div> רגיל, לא law-toc) כבר לא
+    # "אבודה בשקט" - מצורפת כהשלמה לצומת האחרון שנפתח, ומסומנת (ראו
+    # wikitext_parser, הלולאה הראשית; node.LegislativeNode.
+    # completed_by_continuation). לכן הבדיקה לא-אמורה לתפוס אותה יותר -
+    # אותו דפוס בדיוק כמו <table>->raw_block. במקום זה בודקים שהעץ בפועל
+    # קיבל את התוכן, מסומן כראוי.
     still_orphaned_text = (
         "{{ח:כותרת|חוק לדוגמה}}\n"
         "{{ח:סעיף|1||}}\n"
         "{{ח:ת}} תוכן תקין.\n"
         '<div class="some-other-thing">תוכן שעדיין אבוד בשקט</div>\n'
     )
-    checks.append(("unconsumed: עדיין תופס div שאינו law-toc/table", len(check_no_unconsumed_content(still_orphaned_text)) == 1))
+    checks.append(("unconsumed: div שאינו law-toc/table נצרך כהשלמה", check_no_unconsumed_content(still_orphaned_text) == []))
+    still_orphaned_tree = parse_wikitext(still_orphaned_text, law_id="test-continuation")
+    completed_node = still_orphaned_tree.children[0].children[0]
+    checks.append(("continuation: הצומת מסומן completed_by_continuation", completed_node.completed_by_continuation))
+    checks.append(("continuation: הטקסט המושלם מופיע ב-text", "תוכן שעדיין אבוד בשקט" in completed_node.text))
+    checks.append(("continuation: root.continuation_completions מכיל את ה-id", completed_node.id in still_orphaned_tree.continuation_completions))
 
     toc_text = (
         "{{ח:כותרת|חוק לדוגמה}}\n"

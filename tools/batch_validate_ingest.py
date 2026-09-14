@@ -102,6 +102,8 @@ def main():
     all_content_derived_ids = []  # ראו node.LegislativeNode.content_derived_ids -
     # id-ים שנגזרו מ-hash תוכן (רשימות לא-ממוספרות) - נספר גם אותם, כמבוקש.
     laws_with_raw_block = []  # כמה חוקים מכילים לפחות צומת raw_block אחד (<table> גולמי)
+    all_continuation_completions = []  # ראו node.LegislativeNode.continuation_completions -
+    # צמתים שהושלמו משורה בלי תבנית פותחת משלה - נספר גם אותם, כמבוקש.
 
     for i, title in enumerate(sample):
         law_id = slugify(title, i)
@@ -134,6 +136,10 @@ def main():
                 all_content_derived_ids.append((title, plan.content_derived_ids))
             if plan.raw_block_count:
                 laws_with_raw_block.append((title, plan.raw_block_count))
+            if plan.continuation_completions:
+                all_continuation_completions.append((title, plan.continuation_completions))
+                for node_id in plan.continuation_completions:
+                    print(f"  [continuation_completion] {title}: {node_id}", file=sys.stderr)
             print(f"OK   [{i+1}/{len(sample)}] {title} - {plan.node_count} nodes ({elapsed:.1f}s)")
         except NetworkIngestError as exc:
             failures.append({"title": title, "category": "network", "error": str(exc)})
@@ -165,6 +171,12 @@ def main():
     print(
         f"raw_block: {total_raw_blocks} צמתי <table> גולמי ב-"
         f"{len(laws_with_raw_block)} חוקים מתוך {len(successes)} שהצליחו"
+    )
+    total_continuation_completions = sum(len(cs) for _, cs in all_continuation_completions)
+    print(
+        f"continuation_completions: {total_continuation_completions} צמתים הושלמו משורה בלי "
+        f"תבנית פותחת ב-{len(all_continuation_completions)} חוקים מתוך {len(successes)} שהצליחו "
+        f"(ראו stderr לפירוט)"
     )
     if failures:
         by_category = Counter(f["category"] for f in failures)

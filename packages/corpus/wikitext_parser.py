@@ -186,6 +186,27 @@ def _short_hash(text: str) -> str:
 _TABLE_OPEN_RE = re.compile(r"(?i)^<table\b")
 _TABLE_CLOSE_RE = re.compile(r"(?i)</table\s*>")
 
+# אזורי דילוג/תוכן-בוט שאינם נוסח - אותה לוגיקה בדיוק כמו
+# ingest_checks.py (_SKIP_ZONE_OPENERS/_TOC_DIV_OPEN_RE/וכו') - שוכפלה
+# במכוון, לא יובאה (שני המודולים נשארים עצמאיים, כמו _TABLE_OPEN_RE
+# למעלה). קריטי שהפרסר יזהה את אלה *לפני* שקטע "מצורף לצומת הקודם"
+# (ראו הלולאה הראשית) - אחרת שורות חתימה/תוכן-עניינים-אוטומטי/קטגוריה
+# היו נדבקות בטעות כהשלמת נוסח לצומת הלא-נכון (ברק, 2026-09-14: נבדק
+# בפועל מול tests/fixtures/wikitext/kaytanot.wikitext ו-maavak, ששניהם
+# מכילים בדיוק את התבניות האלה).
+_SKIP_ZONE_OPENERS = {"ח:פתיח-התחלה", "ח:חתימות", "ח:מבוא"}
+_SKIP_ZONE_CLOSER = "ח:סוגר"
+_CATEGORY_LINE_RE = re.compile(r"^\[\[קטגוריה:")
+_TOC_DIV_OPEN_RE = re.compile(r'^<div class="law-toc">$')
+_TOC_DIV_CLOSE_LINE = "</div>"
+_INCLUDEONLY_CATEGORY_RE = re.compile(r"(?i)^<includeonly>.*קטגוריה.*</includeonly>$")
+# זריקת קטגוריה אוטומטית עטופה ב-<includeonly> (למשל חוק הרשות לפיתוח
+# ירושלים) - אותה משפחת תוכן-בוט בדיוק כמו [[קטגוריה:...]] הרגיל, רק
+# עטופה (ברק, 2026-09-14, אחרי סריקת הקורפוס השלם - TASKS.md משימה 7).
+_STRAY_PUNCTUATION_RE = re.compile(r"^[.,;:]$")
+# תו פיסוק בודד בשורה נפרדת (למשל "." בחוק הנוער) - רעש עריכה במקור,
+# לא תוכן (אותה סריקה, אותה החלטה).
+
 
 def _consume_html_table(first_chunk: str, lines: list[str], next_index: int) -> tuple[str, int]:
     """אוספת בלוק <table>...</table> גולמי (HTML, לא MediaWiki) - ראו
@@ -267,17 +288,34 @@ def parse_wikitext(
     )
     collisions: list[str] = []
     content_derived_ids: list[str] = []
+    continuation_completions: list[str] = []
 
     # מחסנית של (רמה_מבנית, צומת, מרחב_מספור_נוכחי)
     stack: list[tuple[int, LegislativeNode, str]] = [
         (_STRUCTURAL_LEVEL_LAW, root, "law")
     ]
 
+    in_skip_zone = False  # בין {{ח:פתיח-התחלה}}/{{ח:חתימות}}/{{ח:מבוא}}
+    # ל-{{ח:סוגר}} התואם - ציטוטים/חתימות, לא נוסח (ראו _SKIP_ZONE_OPENERS).
+    in_toc_zone = False  # בתוך <div class="law-toc">...</div> - תוכן
+    # עניינים אוטומטי, עודף לגמרי מול העץ שכבר נבנה (ראו _TOC_DIV_OPEN_RE).
+
     lines = text.splitlines()
     line_index = 0
     while line_index < len(lines):
         raw_line = lines[line_index]
         line = raw_line.strip()
+
+        if in_toc_zone:
+            if line == _TOC_DIV_CLOSE_LINE:
+                in_toc_zone = False
+            line_index += 1
+            continue
+        if _TOC_DIV_OPEN_RE.match(line):
+            in_toc_zone = True
+            line_index += 1
+            continue
+
         if not line.startswith("{{"):
             if _TABLE_OPEN_RE.match(line):
                 # בלוק <table> גולמי "יתום" - לא מקושר לשום {{ח:ת...}}
@@ -299,10 +337,47 @@ def parse_wikitext(
                 parent_node.children.append(node)
                 line_index = last_consumed + 1
                 continue
+            if in_skip_zone:
+                line_index += 1
+                continue
+            if (
+                not line
+                or _CATEGORY_LINE_RE.match(line)
+                or _INCLUDEONLY_CATEGORY_RE.match(line)
+                or _STRAY_PUNCTUATION_RE.match(line)
+            ):
+                line_index += 1
+                continue
+            # תוכן אמיתי שלא מתחיל ב-{{ ואינו באחד האזורים המוכרים
+            # למעלה - ברק (2026-09-14, אחרי סריקת קורפוס-שלם שחשפה 7
+            # מקרים אמיתיים מתוך 1,021 חוקים - TASKS.md משימה 7):
+            # "שורה שאינה מתחילה ב-{{ ואינה באזור מוכר מצורפת לצומת
+            # הקודם, בלי לנחש מבנה. זה שומר את הנוסח... אבל היא חייבת
+            # להיות מסומנת." מצורף כהשלמה לצומת האחרון שנפתח (stack[-1]) -
+            # לא בונה מבנה חדש, לא מנחש לאיזה תת-סעיף/הגדרה זה שייך
+            # באמת (למשל חוק מוסדות חינוך תרבותיים ייחודיים, שבו התבנית
+            # עצמה פגומה במקור - לא רק חסרה; אותו טיפול, בלי ניסיון שחזור).
+            target_node = stack[-1][1]
+            appended = _flatten(line).strip()
+            if appended:
+                target_node.text = normalize_text(f"{target_node.text} {appended}".strip())
+                target_node.text_raw = f"{target_node.text_raw}\n{line}" if target_node.text_raw else line
+                if not target_node.completed_by_continuation:
+                    target_node.completed_by_continuation = True
+                    continuation_completions.append(target_node.id)
             line_index += 1
             continue
         call = _find_template(line, 0)
         name = call.name
+
+        if name in _SKIP_ZONE_OPENERS:
+            in_skip_zone = True
+            line_index += 1
+            continue
+        if name == _SKIP_ZONE_CLOSER:
+            in_skip_zone = False
+            line_index += 1
+            continue
 
         if name == "ח:כותרת":
             if call.args:
@@ -439,10 +514,11 @@ def parse_wikitext(
             line_index += 1
             continue
 
-        # תבנית לא-מוכרת ברמה העליונה (מאגר/תיבה/חתימות/וכו') - מדולגת.
-        # {{ח:כותרת}} נלכד למעלה (למשימה 4); {{ח:מאגר}}/{{ח:תיבה}}/
-        # {{ח:חתימות}} עדיין לא נדרשים להגדרת הסיום של משימה 3 ומתועדים
-        # כפער פתוח.
+        # תבנית לא-מוכרת ברמה העליונה (מאגר/תיבה/וכו') - מדולגת.
+        # {{ח:כותרת}} נלכד למעלה (למשימה 4); {{ח:פתיח-התחלה}}/
+        # {{ח:חתימות}}/{{ח:מבוא}}/{{ח:סוגר}} מטופלות למעלה כאזור דילוג
+        # (_SKIP_ZONE_OPENERS/_SKIP_ZONE_CLOSER) - {{ח:מאגר}}/{{ח:תיבה}}
+        # עדיין לא נדרשות להגדרת הסיום של משימה 3 ומתועדות כפער פתוח.
         line_index += 1
 
     # סעיף עם כותרת ריקה שכל תוכנו לא-נורמטיבי (הערה בלבד) = לא בתוקף עוד.
@@ -464,4 +540,5 @@ def parse_wikitext(
     _mark_status(root)
     root.id_collisions = collisions
     root.content_derived_ids = content_derived_ids
+    root.continuation_completions = continuation_completions
     return root

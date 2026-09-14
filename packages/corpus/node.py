@@ -109,6 +109,17 @@ class LegislativeNode:
     # id יציב הנגזר מ-hash של תוכנו (לא ממיקום) - ראו wikitext_parser._lookahead_content.
     # ברק (2026-09-14): id לפי מיקום "שובר את הבסיס" של יציבות provenance בין
     # גרסאות - נרשם כאן כדי לספור שכיחות על הקורפוס המלא, כמו id_collisions.
+    completed_by_continuation: bool = False  # True אם טקסט הצומת הזה
+    # כולל לפחות שורה שצורפה אליו כהשלמה (שורה בוויקיטקסט שלא התחילה
+    # ב-{{ ולא הייתה באזור מוכר - ראו wikitext_parser, הלולאה הראשית),
+    # לא מתבנית מפורשת משלה. בלי לנחש מבנה - מצורף לצומת האחרון שנפתח
+    # כפי שהוא (ברק, 2026-09-14, אחרי סריקת קורפוס-שלם שחשפה 7 מקרים
+    # כאלה - TASKS.md משימה 7). שדה על הצומת עצמו, לא רק לוג בשורש -
+    # ברק ביקש "לדעת אילו צמתים במערכת נבנו מהשלמה ולא מתבנית מפורשת".
+    continuation_completions: list[str] = field(default_factory=list)  # יושב
+    # בשורש בלבד - כל id של צומת שקיבל completed_by_continuation=True,
+    # לספירה על הקורפוס המלא (אותו דפוס בדיוק כמו id_collisions/
+    # content_derived_ids למעלה).
 
 
 def effective_source_ref(root: LegislativeNode, target: LegislativeNode) -> str:

@@ -116,6 +116,12 @@ _TABLE_OPEN_RE = re.compile(r"(?i)^<table\b")  # אותו regex בדיוק כמ�
 # wikitext_parser._TABLE_OPEN_RE - בלוקי <table> גולמיים נצרכים בפועל
 # עכשיו כצומת raw_block (ראו TASKS.md משימה 7), לא אבודים יותר.
 _TABLE_CLOSE_RE = re.compile(r"(?i)</table\s*>")
+_INCLUDEONLY_CATEGORY_RE = re.compile(r"(?i)^<includeonly>.*קטגוריה.*</includeonly>$")
+# זריקת קטגוריה אוטומטית עטופה ב-<includeonly> (חוק הרשות לפיתוח
+# ירושלים) - אותה משפחת תוכן-בוט כמו [[קטגוריה:...]] הרגיל, רק עטופה
+# (נמצא בסריקת הקורפוס השלם, ראו TASKS.md משימה 7, 2026-09-14).
+_STRAY_PUNCTUATION_RE = re.compile(r"^[.,;:]$")  # תו פיסוק בודד בשורה
+# נפרדת (למשל "." בחוק הנוער) - רעש עריכה במקור, לא תוכן (אותה סריקה).
 _MAX_UNCONSUMED_EXAMPLES = 5
 
 
@@ -128,13 +134,23 @@ def check_no_unconsumed_content(wikitext: str) -> list[str]:
     חוקים - ראו TASKS.md משימה 7) **נצרכים כעת בפועל** כצומת raw_block
     (ראו wikitext_parser._consume_html_table) - הבדיקה הזו מזהה את אותם
     אזורי טבלה ולא מתריעה עליהם (ראו _TABLE_OPEN_RE/_TABLE_CLOSE_RE
-    למטה, זהים ל-wikitext_parser). מה שנשאר להתריע עליו: תוכן לא-ריק,
-    לא-{{, שבאמת עדיין לא נצרך על ידי שום ענף - לא נשמר בשום מקום.
+    למטה, זהים ל-wikitext_parser).
 
     לא מתריעה גם על תוכן שכן מכוסה במקום אחר, ולא בכוונה חלק מהנוסח:
     שורות בתוך קופסת פתיח-התחלה/חתימות/מבוא (בין הפתיחה ל-{{ח:סוגר}}
     התואם - ציטוטים/חתימות/הערות עריכה, לא נוסח), תוכן עניינים אוטומטי
-    (<div class="law-toc">...</div>), ו-[[קטגוריה:...]]."""
+    (<div class="law-toc">...</div>), [[קטגוריה:...]], אותה קטגוריה
+    עטופה ב-<includeonly>, ותו פיסוק בודד בשורה נפרדת.
+
+    **מ-2026-09-14: כל שורה אחרת (לא-ריקה, לא-{{, לא באחד מהאזורים
+    למעלה) נצרכת בפועל על ידי הלולאה הראשית ב-wikitext_parser** -
+    מצורפת כהשלמה לצומת האחרון שנפתח (LegislativeNode.
+    completed_by_continuation, ראו node.py) במקום ללכת לאיבוד בשקט.
+    זה נמצא אחרי סריקת קורפוס-שלם (1,021 חוקים, לא מדגם) שחשפה 7
+    מקרים אמיתיים בלבד - ראו TASKS.md משימה 7. הבדיקה הזו, אחרי התיקון,
+    לכן לא-אמורה למצוא עוד בעיות מהמשפחה הזו על קלט תקין - היא נשארת
+    קו-הגנה שקוף (לא הוסרה) למקרה שבעתיד תיפתח דרך פרסור חדשה שכן
+    מדלגת בשקט על תוכן בלי לעבור דרך הענף הזה."""
     problems: list[str] = []
     in_skip_zone = False
     in_toc_zone = False
@@ -175,9 +191,11 @@ def check_no_unconsumed_content(wikitext: str) -> list[str]:
             continue
         if in_skip_zone:
             continue
-        if _CATEGORY_LINE_RE.match(line):
+        if _CATEGORY_LINE_RE.match(line) or _INCLUDEONLY_CATEGORY_RE.match(line):
             continue
-        problems.append(f"שורה {line_number}: {line[:100]!r}")
+        if _STRAY_PUNCTUATION_RE.match(line):
+            continue
+        # כל מה שנשאר: נצרך כהשלמה (ראו docstring למעלה) - לא פער.
 
     if not problems:
         return []

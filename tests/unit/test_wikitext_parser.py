@@ -187,6 +187,67 @@ def main():
     list_tree_again = parse_wikitext(unnumbered_list_wikitext, law_id="test-list")
     checks.append(("רשימה לא-ממוספרת: יציב בין ריצות פרסור", [c.id for c in siman.children] == [c.id for c in list_tree_again.children[0].children]))
 
+    # השלמת תוכן בלי תבנית פותחת (2026-09-14) - שחזור סינתטי של 7 המקרים
+    # האמיתיים שנמצאו בסריקת הקורפוס השלם (TASKS.md משימה 7): משפט
+    # שנשבר לשתי שורות פיזיות (חוק התחשבנות/הגבלת שכר טרחה/עונש מוות
+    # למחבלים), הגדרה/פסקה נוספת בלי תבנית משלה (מכוני כושר/הסכמים
+    # קיבוציים/איסור הונאה בכשרות), ותבנית פגומה במקור (מוסדות חינוך
+    # תרבותיים ייחודיים - ":ף (4)" במקום "{{ח:תתת|(4)}}"). ברק: "שורה
+    # שאינה מתחילה ב-{{ ואינה באזור מוכר מצורפת לצומת הקודם, בלי לנחש
+    # מבנה... אבל היא חייבת להיות מסומנת."
+    continuation_wikitext = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:סעיף|1||}}
+{{ח:תת|(א)}} על אף האמור, נדרש אישור לפי סעיף
+47א1 למפגש עם שני עורכי דין לכל היותר.
+"""
+    continuation_tree = parse_wikitext(continuation_wikitext, law_id="test-continuation")
+    s1a = continuation_tree.children[0].children[0]
+    checks.append(("השלמת נוסח: הטקסט המושלם מחובר (בלי לאבד את השורה השנייה)", "47א1" in s1a.text))
+    checks.append(("השלמת נוסח: completed_by_continuation=True", s1a.completed_by_continuation is True))
+    checks.append(("השלמת נוסח: root.continuation_completions מכיל את ה-id", continuation_tree.continuation_completions == [s1a.id]))
+    checks.append(("השלמת נוסח: text_raw מכיל את שתי השורות", s1a.text_raw.count("\n") == 1))
+
+    # תו פיסוק בודד בשורה נפרדת - רעש עריכה (חוק הנוער), לא תוכן.
+    stray_punct_wikitext = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:סעיף|1||}}
+{{ח:ת}} משפט שכבר הסתיים.
+.
+"""
+    stray_punct_tree = parse_wikitext(stray_punct_wikitext, law_id="test-punct")
+    s1_punct = stray_punct_tree.children[0].children[0]
+    checks.append(("תו פיסוק בודד: לא מצורף לטקסט", s1_punct.text == "משפט שכבר הסתיים."))
+    checks.append(("תו פיסוק בודד: לא מסומן completed_by_continuation", s1_punct.completed_by_continuation is False))
+
+    # קטגוריה עטופה ב-<includeonly> (חוק הרשות לפיתוח ירושלים) - אותה
+    # משפחה בדיוק כמו [[קטגוריה:...]] הרגיל, לא תוכן.
+    includeonly_wikitext = (
+        "{{ח:כותרת|חוק לדוגמה}}\n"
+        "{{ח:סעיף|1||}}\n"
+        "{{ח:ת}} משפט תקין.\n"
+        '<includeonly>{{#ifeq:{{NAMESPACENUMBER}}|0|[[קטגוריה:שלטון מקומי]]}}</includeonly>\n'
+    )
+    includeonly_tree = parse_wikitext(includeonly_wikitext, law_id="test-includeonly")
+    s1_inc = includeonly_tree.children[0].children[0]
+    checks.append(("includeonly קטגוריה: לא מצורף לטקסט", s1_inc.text == "משפט תקין."))
+    checks.append(("includeonly קטגוריה: לא מסומן completed_by_continuation", s1_inc.completed_by_continuation is False))
+
+    # אזור דילוג (חתימות) לא נדבק בטעות לצומת התוכן שלפניו - זה בדיוק
+    # הסיכון שנבדק מול tests/fixtures/wikitext/kaytanot.wikitext ו-maavak
+    # (שני fixtures האמת מכילים {{ח:חתימות}} עם שורות חתימה שלא מתחילות
+    # ב-{{, ושניהם עדיין עוברים run_sanity_checks נקי - ראו למעלה).
+    signatures_wikitext = (
+        "{{ח:כותרת|חוק לדוגמה}}\n"
+        "{{ח:סעיף|1||}}\n"
+        "{{ח:ת}} משפט תקין.\n\n"
+        "{{ח:חתימות|התקבל בכנסת.}}\n"
+        "* '''ראש הממשלה'''<br>חתימה\n"
+        "{{ח:סוגר}}\n"
+    )
+    signatures_tree = parse_wikitext(signatures_wikitext, law_id="test-signatures")
+    s1_sig = signatures_tree.children[0].children[0]
+    checks.append(("אזור חתימות: לא נדבק לצומת התוכן שלפניו", s1_sig.text == "משפט תקין."))
+    checks.append(("אזור חתימות: לא מסומן completed_by_continuation", s1_sig.completed_by_continuation is False))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)

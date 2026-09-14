@@ -66,6 +66,10 @@ class IngestPlan:
     # id-ים שנגזרו מ-hash תוכן במקום ממיקום (רשימות לא-ממוספרות), לספירה
     raw_block_count: int  # כמה צמתי raw_block (בלוק <table> גולמי) בעץ - לספירה
     # (ברק, 2026-09-14): "כמה חוקים מכילים raw_block בסך הכול במנה"
+    continuation_completions: list[str]  # ראו node.LegislativeNode.
+    # continuation_completions - כל צומת שקיבל טקסט שהושלם משורה בלי
+    # תבנית פותחת משלה (ברק, 2026-09-14, אחרי סריקת קורפוס-שלם: 7 מקרים
+    # אמיתיים מתוך 1,021 חוקים - ראו TASKS.md משימה 7), לספירה על הקורפוס.
 
 
 def fetch_with_retry(
@@ -159,6 +163,7 @@ def build_ingest_plan(
         id_collisions=tree.id_collisions,
         content_derived_ids=tree.content_derived_ids,
         raw_block_count=_count_node_type(tree, "raw_block"),
+        continuation_completions=tree.continuation_completions,
     )
 
 
