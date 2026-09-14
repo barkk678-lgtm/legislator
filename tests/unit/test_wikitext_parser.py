@@ -137,6 +137,24 @@ def main():
         ("raw_amendment_note נשמר גולמית עבור סעיף עם תיקון", find_section(crime, "19").raw_amendment_note == "תיקון: תשס״ט")
     )
 
+    # id כפול מובנה (2026-09-14) - שחזור סינטטי של הדפוס האמיתי בחוק
+    # החוזים (חלק כללי) סעיף 25: תיקון עתידי (תוקף 7.1.2026) גורם
+    # לשני {{ח:תת|(א)}} נפרדים באותו סעיף, מובחנים רק ב-{{ח:הערה}}
+    # מוטבעת, לא בתווית. ראו _unique_child_id ב-wikitext_parser.py.
+    dual_label_wikitext = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:סעיף|25|פירוש}}
+{{ח:תת|(א)}} {{ח:הערה|(נוסח ישן):}} נוסח א.
+{{ח:תת|(א)}} {{ח:הערה|(נוסח חדש):}} נוסח ב.
+{{ח:תתת|(1)}} פירוט.
+"""
+    dual_label_tree = parse_wikitext(dual_label_wikitext, law_id="test-law")
+    s25 = dual_label_tree.children[0]
+    checks.append(("id כפול מובנה: שני ילדי סעיף 25", len(s25.children) == 2))
+    checks.append(("id כפול מובנה: ה-id-ים שונים זה מזה", s25.children[0].id != s25.children[1].id))
+    checks.append(("id כפול מובנה: הראשון נשאר בלי סיומת", s25.children[0].id == "test-law/s25/א"))
+    checks.append(("id כפול מובנה: השני מקבל סיומת סידורית", s25.children[1].id == "test-law/s25/א-2"))
+    checks.append(("id כפול מובנה: check_unique_ids נקי", check_unique_ids(dual_label_tree) == []))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)

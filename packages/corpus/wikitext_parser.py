@@ -148,6 +148,30 @@ def _slug(label: str | None, fallback_index: int) -> str:
     return re.sub(r"[()]", "", label)
 
 
+def _unique_child_id(parent_node: LegislativeNode, local_id: str) -> str:
+    """בונה id ילד ייחודי בין אחיו, בלי לנחש *למה* יש התנגשות.
+
+    ההיוריסטיקה הטבעית (label/מספר-סעיף) לא תמיד ייחודית בפועל - ראו
+    חוק החוזים (חלק כללי) סעיף 25, שבו תיקון עתידי (תוקף 7.1.2026)
+    גורם לוויקיטקסט להציג שני {{ח:תת|(א)}} נפרדים באותו סעיף (נוסח
+    ישן מול חדש, מובחנים רק ב-{{ח:הערה}} מוטבעת, לא בתווית עצמו).
+    זו לא המשפחה של באג ה-id הישן (מספור-מחדש בתוספת, שתוקן ביחס
+    ל-parent_node.id) - זו תופעה כללית: כל מקור עתידי של התנגשות,
+    ידוע או לא, נתפס כאן באופן מבני, בלי לנחש על טקסט חופשי בעברית
+    (ראו ההחלטה המקבילה לגבי התאמת שמות מול KNS_IsraelLaw -
+    docs/strategy/decisions.md). אם אין התנגשות - מתנהג בדיוק כמו
+    קודם. אם יש - מוסיף סיומת סידורית יציבה (-2, -3, ...), ו-
+    check_unique_ids נשאר קו ההגנה האחרון."""
+    base_id = f"{parent_node.id}/{local_id}"
+    existing = {child.id for child in parent_node.children}
+    if base_id not in existing:
+        return base_id
+    n = 2
+    while f"{base_id}-{n}" in existing:
+        n += 1
+    return f"{base_id}-{n}"
+
+
 def parse_wikitext(
     text: str, *, law_id: str, source_ref: str = "", as_of: str | None = None
 ) -> LegislativeNode:
@@ -211,7 +235,7 @@ def parse_wikitext(
             # תוספת יכולה עקרונית להיפתח בכל רמת מכל, לא רק ב-קטע2.
             numbering_space = "schedule" if anchor.startswith("תוספת") else stack[-1][2]
             node = LegislativeNode(
-                id=f"{parent_node.id}/{_slug(anchor, len(parent_node.children))}",
+                id=_unique_child_id(parent_node, _slug(anchor, len(parent_node.children))),
                 node_type=node_type,
                 number=anchor,
                 margin_title=normalize_text(title),
@@ -234,7 +258,7 @@ def parse_wikitext(
             parent_node = stack[-1][1]
             numbering_space = stack[-1][2]
             node = LegislativeNode(
-                id=f"{parent_node.id}/s{number}",
+                id=_unique_child_id(parent_node, f"s{number}"),
                 node_type="section",
                 number=number,
                 margin_title=normalize_text(title),
@@ -268,7 +292,7 @@ def parse_wikitext(
             numbering_space = stack[-1][2]
             node_type = _classify(name, label, kind_attr)
             node = LegislativeNode(
-                id=f"{parent_node.id}/{_slug(label, len(parent_node.children))}",
+                id=_unique_child_id(parent_node, _slug(label, len(parent_node.children))),
                 node_type=node_type,
                 number=label or "",
                 margin_title=None,
