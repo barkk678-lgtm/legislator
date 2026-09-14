@@ -59,6 +59,7 @@ class IngestPlan:
     node_count: int
     citation_count: int
     token_count: int
+    total_text_chars: int  # סכום len(node.text) על כל העץ - בסיס אמיתי להערכת עלות embeddings
 
 
 def fetch_with_retry(
@@ -140,6 +141,7 @@ def build_ingest_plan(
             for n in _walk(tree)
             if n.raw_amendment_note
         ),
+        total_text_chars=sum(len(n.text) for n in _walk(tree)),
     )
 
 

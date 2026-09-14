@@ -53,6 +53,36 @@ def search_title(query: str, *, limit: int = 10) -> list[dict]:
     return data["query"]["search"]
 
 
+LAW_CATEGORY = "קטגוריה:בוט חוקים"  # ראו docs/strategy/decisions.md - מנגנון המניה למשימה 1.2/7
+
+
+def list_category_titles(category: str = LAW_CATEGORY) -> list[str]:
+    """מונה את כל כותרות הדפים בקטגוריה נתונה, עם pagination מלא (cmcontinue).
+    זה מנגנון המניה של הקורפוס השלם - אומת בפועל (2026-09-13): 6,121
+    כותרות, קרוב ל-'~5,900' המתועד ב-docs/data-sources.md/TASKS.md
+    משימה 7 (המספר המדויק תמיד ישתנה מעט - זה תיאור, לא קבוע)."""
+    titles: list[str] = []
+    cmcontinue: str | None = None
+    while True:
+        params = {
+            "action": "query",
+            "list": "categorymembers",
+            "cmtitle": category,
+            "cmlimit": "500",
+            "format": "json",
+        }
+        if cmcontinue:
+            params["cmcontinue"] = cmcontinue
+        url = f"{API_URL}?{urllib.parse.urlencode(params)}"
+        data = json.loads(_get(url))
+        titles.extend(member["title"] for member in data["query"]["categorymembers"])
+        cont = data.get("continue")
+        if not cont:
+            break
+        cmcontinue = cont["cmcontinue"]
+    return titles
+
+
 def fetch_wikitext(title: str) -> dict:
     """שולף ויקיטקסט גולמי + מטא-דאטה של דף (page id, revision id,
     revision timestamp) דרך Special:Export. מחזיר מבנה מתאים לשמירה
