@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpu
 
 from ingest_checks import (  # noqa: E402
     check_has_normative_content,
+    check_no_unconsumed_content,
     check_no_unknown_templates,
     check_section_count,
     check_unique_ids,
@@ -71,12 +72,19 @@ def main():
     checks.append(("עונשין: 20 צמתי chapter", _count_type(penal_tree, "chapter") == 20))
     checks.append(("עונשין: 75 צמתי siman", _count_type(penal_tree, "siman") == 75))
 
-    # פער *אחר*, לא קשור לחלק/פרק/סימן, עדיין קיים בכוונה: תבנית תיוג
-    # (חוקי עונשין) - ראו TASKS.md משימה 7 להמשך (allowlist ממתין לאישור).
-    penal_problems = check_no_unknown_templates(penal_text)
-    checks.append(("עונשין: נכשל רק על תבנית תיוג (לא קטע1/קטע3/מבוא יותר)", len(penal_problems) == 1))
-    checks.append(("עונשין: קטע1/קטע3/מבוא לא מופיעים יותר בבעיה", not any(x in penal_problems[0] for x in ("ח:קטע1", "ח:קטע3", "ח:מבוא"))))
-    checks.append(("עונשין: הבעיה מזהה את חוקי עונשין", "חוקי עונשין" in penal_problems[0]))
+    # allowlist מרוכז אושר (ברק, 2026-09-14, כולל חוקי עונשין) - עונשין
+    # נקי לגמרי עכשיו. ראו TASKS.md משימה 7 להיסטוריה (קטע1/קטע3/מבוא/
+    # תבניות תיוג - כולם תוקנו בזה אחר זה).
+    checks.append(("עונשין: check_no_unknown_templates נקי לגמרי", check_no_unknown_templates(penal_text) == []))
+
+    # check_no_unconsumed_content (2026-09-14) - הכיוון ההפוך: "מה אבד",
+    # לא "מה נוצר". עונשין חושף בדיוק את התרחיש שהיא נועדה לתפוס: 327
+    # שורות <table>/<tr>/<td> גולמיות ב-"לוח השוואה" (מספור ישן מול חדש)
+    # שנבלעות בשקט לגמרי כי אף שורה בהן לא מתחילה ב-{{ - ראו TASKS.md
+    # משימה 7. run_sanity_checks לכן נכשל על עונשין שוב - נכון, לא רגרסיה.
+    unconsumed = check_no_unconsumed_content(penal_text)
+    checks.append(("עונשין: check_no_unconsumed_content תופס את לוח ההשוואה", len(unconsumed) == 1 and "327 שורות" in unconsumed[0]))
+    checks.append(("עונשין: run_sanity_checks נכשל רק על unconsumed (לא על שום דבר אחר)", run_sanity_checks(penal_text, penal_tree) == unconsumed))
 
     # ויקיפדיה/ח:מאגר2 - נוספו ל-allowlist 2026-09-14 אחרי בדיקת תוכן
     # אמיתי (ראו TASKS.md משימה 7): שתיהן עיטוריות בלבד, אין נוסח.
@@ -90,6 +98,47 @@ def main():
     checks.append(
         ("ויקיפדיה/ח:מאגר2: לא נחשבות תבניות לא-מוכרות", check_no_unknown_templates(decorative_text) == [])
     )
+
+    # check_no_unconsumed_content (2026-09-14) - "מה אבד", לא "מה נוצר".
+    orphaned_table_text = (
+        "{{ח:כותרת|חוק לדוגמה}}\n"
+        "{{ח:סעיף|1||}}\n"
+        "{{ח:ת}} תוכן תקין.\n"
+        "\n"
+        '<table border="0">\n'
+        "<tr><td>נתון שאבד בשקט</td></tr>\n"
+        "</table>\n"
+    )
+    checks.append(("unconsumed: תופס <table> יתום", len(check_no_unconsumed_content(orphaned_table_text)) == 1))
+
+    toc_text = (
+        "{{ח:כותרת|חוק לדוגמה}}\n"
+        '{{ח:קטע2||תוכן עניינים}}\n\n'
+        '<div class="law-toc">\n'
+        '<div class="law-toc-2">{{ח:פנימי|פרק א|פרק א}}</div>\n'
+        "</div>\n\n"
+        "{{ח:סעיף|1||}}\n"
+        "{{ח:ת}} תוכן תקין.\n"
+    )
+    checks.append(("unconsumed: תוכן עניינים אוטומטי (law-toc) לא נתפס", check_no_unconsumed_content(toc_text) == []))
+
+    signatures_text = (
+        "{{ח:כותרת|חוק לדוגמה}}\n"
+        "{{ח:חתימות|התקבל בכנסת.}}\n"
+        "* '''פלוני אלמוני'''<br>ראש הממשלה\n"
+        "{{ח:סוגר}}\n"
+        "{{ח:סעיף|1||}}\n"
+        "{{ח:ת}} תוכן תקין.\n"
+    )
+    checks.append(("unconsumed: חתימות בתוך הקופסה לא נתפסות", check_no_unconsumed_content(signatures_text) == []))
+
+    category_text = (
+        "{{ח:כותרת|חוק לדוגמה}}\n"
+        "{{ח:סעיף|1||}}\n"
+        "{{ח:ת}} תוכן תקין.\n"
+        "[[קטגוריה:בוט חוקים]]\n"
+    )
+    checks.append(("unconsumed: שורת קטגוריה לא נתפסת", check_no_unconsumed_content(category_text) == []))
 
     # מקרים סינתטיים לבדיקות הנוספות - עץ מזויף במכוון.
     empty_root = LegislativeNode(

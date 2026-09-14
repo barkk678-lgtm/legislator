@@ -62,6 +62,8 @@ class IngestPlan:
     total_text_chars: int  # סכום len(node.text) על כל העץ - בסיס אמיתי להערכת עלות embeddings
     id_collisions: list[str]  # ראו node.LegislativeNode.id_collisions - לא שגיאה (העץ
     # תקין), אבל שכיחות גבוהה בקורפוס המלא היא סימן לדפוס לא-מזוהה (ברק, 2026-09-14)
+    content_derived_ids: list[str]  # ראו node.LegislativeNode.content_derived_ids -
+    # id-ים שנגזרו מ-hash תוכן במקום ממיקום (רשימות לא-ממוספרות), לספירה
 
 
 def fetch_with_retry(
@@ -153,6 +155,7 @@ def build_ingest_plan(
         ),
         total_text_chars=sum(len(n.text) for n in _walk(tree)),
         id_collisions=tree.id_collisions,
+        content_derived_ids=tree.content_derived_ids,
     )
 
 

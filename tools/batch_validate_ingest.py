@@ -99,6 +99,8 @@ def main():
     all_id_collisions = []  # ראו node.LegislativeNode.id_collisions - נספר על פני
     # הקורפוס כדי לראות אם _unique_child_id יורה הרבה (דפוס לא-מזוהה) או נדיר
     # (בדיוק המקרה החריג שנמצא, ראו TASKS.md משימה 7 / decisions.md 2026-09-14).
+    all_content_derived_ids = []  # ראו node.LegislativeNode.content_derived_ids -
+    # id-ים שנגזרו מ-hash תוכן (רשימות לא-ממוספרות) - נספר גם אותם, כמבוקש.
 
     for i, title in enumerate(sample):
         law_id = slugify(title, i)
@@ -126,6 +128,8 @@ def main():
                 all_id_collisions.append((title, plan.id_collisions))
                 for c in plan.id_collisions:
                     print(f"  [id_collision] {title}: {c}", file=sys.stderr)
+            if plan.content_derived_ids:
+                all_content_derived_ids.append((title, plan.content_derived_ids))
             print(f"OK   [{i+1}/{len(sample)}] {title} - {plan.node_count} nodes ({elapsed:.1f}s)")
         except NetworkIngestError as exc:
             failures.append({"title": title, "category": "network", "error": str(exc)})
@@ -147,6 +151,11 @@ def main():
     print(
         f"id_collisions: {total_collision_events} מקרים ב-{len(all_id_collisions)} חוקים "
         f"מתוך {len(successes)} שהצליחו (ראו stderr לפירוט)"
+    )
+    total_content_derived = sum(len(cs) for _, cs in all_content_derived_ids)
+    print(
+        f"content_derived_ids: {total_content_derived} id-ים נגזרו מתוכן ב-"
+        f"{len(all_content_derived_ids)} חוקים מתוך {len(successes)} שהצליחו"
     )
     if failures:
         by_category = Counter(f["category"] for f in failures)

@@ -116,8 +116,11 @@ def main():
     )
     checks.append(("law_is_new=False -> בלי insert into laws", "insert into laws " not in plan_existing.sql))
 
-    # --- כשל בדיקת שפיות (עונשין - תבנית תיוג לא מוכרת (חוקי עונשין);
-    # קטע1/קטע3/ח:מבוא תוקנו ב-2026-09-14, ראו TASKS.md משימה 7) ---
+    # --- עונשין: קטע1/קטע3/ח:מבוא/חוקי עונשין תוקנו בזה אחר זה עד
+    # 2026-09-14 (ראו TASKS.md משימה 7). עכשיו נכשל שוב, אבל על סיבה
+    # *חדשה ואמיתית*: check_no_unconsumed_content תופסת 327 שורות
+    # <table>/<tr>/<td> גולמיות ("לוח השוואה") שנבלעו בשקט קודם - בדיוק
+    # התרחיש המסוכן ביותר שהוגדר בפרויקט. לא רגרסיה - תיקון. ---
     def fake_fetch_penal(title):
         return _fake_export("penal")
 
@@ -125,9 +128,9 @@ def main():
         build_ingest_plan(
             "penal-1977", "חוק העונשין", source_ref="", law_is_new=True, fetch=fake_fetch_penal
         )
-        checks.append(("עונשין -> SanityIngestError", False))
+        checks.append(("עונשין -> SanityIngestError (unconsumed content)", False))
     except SanityIngestError as exc:
-        checks.append(("עונשין -> SanityIngestError", "חוקי עונשין" in str(exc) and "קטע1" not in str(exc) and "ח:מבוא" not in str(exc)))
+        checks.append(("עונשין -> SanityIngestError (unconsumed content)", "שורות תוכן שלא נצרכו" in str(exc)))
 
     # --- קטגוריית retry: כשל רשת חולף, מצליח בניסיון השלישי ---
     attempts = {"n": 0}

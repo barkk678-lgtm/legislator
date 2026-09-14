@@ -98,6 +98,11 @@ class LegislativeNode:
     # (העץ תקין, check_unique_ids נקי) - רק סימן שהמבנה לא כמצופה. ברק (2026-09-14):
     # "אם זה קורה באלפי מקומות, יש דפוס שלא זיהינו" - נרשם כאן כעובדה גולמית
     # (בלי I/O בפרסר עצמו), כדי שקוד ה-ingest/batch יוכל לספור/לרשום ביומן.
+    content_derived_ids: list[str] = field(default_factory=list)  # יושב בשורש בלבד -
+    # כל סעיף בלי מספר טבעי (ראו התנגשויות ה-id ב-חוק מועצת הצמחים וכו') שקיבל
+    # id יציב הנגזר מ-hash של תוכנו (לא ממיקום) - ראו wikitext_parser._lookahead_content.
+    # ברק (2026-09-14): id לפי מיקום "שובר את הבסיס" של יציבות provenance בין
+    # גרסאות - נרשם כאן כדי לספור שכיחות על הקורפוס המלא, כמו id_collisions.
 
 
 def effective_source_ref(root: LegislativeNode, target: LegislativeNode) -> str:

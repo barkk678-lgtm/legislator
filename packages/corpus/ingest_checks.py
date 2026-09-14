@@ -57,6 +57,20 @@ _KNOWN_BENIGN_SKIP_TEMPLATES = {
     "ח:מפריד",
     "ויקיפדיה",  # קישור-חוץ עיטורי לערך ויקיפדיה תואם - נבדק בפועל
     # (2026-09-14): הארגומנט היחיד הוא שם החוק עצמו כטקסט, אין נוסח.
+    # 11 תבניות תיוג/עיטור, אושרו במרוכז (ברק, 2026-09-14) אחרי הצגת
+    # תוכן אמיתי לכל אחת - ראו TASKS.md משימה 7 לטבלה המלאה. כולן
+    # תבניות ניווט/קטגוריה בעליל, אין נוסח באף דוגמה.
+    "מיזמים",
+    "חוקי יסוד",
+    "חוקי מקרקעין",
+    "חוקי בחירות",
+    "חוקי אזרחות, תושבות וכניסה לישראל",  # שם תבנית אחד עם פסיק
+    # בתוכו - לא שתי תבניות (אומת במפורש, ראו TASKS.md).
+    "חוקי עונשין",
+    "חוקי ביטחון סוציאלי",
+    "חוקי קורונה",
+    "חוקי מס",
+    "חוק נתוני אשראי",  # תבנית ניווט, שם זהה לשם חוק אמיתי, בלי ארגומנטים
 }
 
 
@@ -83,6 +97,70 @@ def check_no_unknown_templates(wikitext: str) -> list[str]:
     if unknown:
         return [f"תבנית לא מוכרת ברמה העליונה: {', '.join(sorted(unknown))}"]
     return []
+
+
+_SKIP_ZONE_OPENERS = {"ח:פתיח-התחלה", "ח:חתימות", "ח:מבוא"}  # קופסאות
+# עם תוכן פנימי שאינו {{...}} (ציטוטים/חתימות/הערות) - לגיטימי בכוונה,
+# לא פער. ראו _KNOWN_BENIGN_SKIP_TEMPLATES; parse_citation_registry
+# (amendment_history.py) היא זו שקוראת בפועל את תוכן ה-פתיח-התחלה.
+_SKIP_ZONE_CLOSER = "ח:סוגר"
+_CATEGORY_LINE_RE = re.compile(r"^\[\[קטגוריה:")  # [[קטגוריה:...]] - מנוהל
+# בנפרד (wikitext_client.list_category_titles), לא חלק מהנוסח בכלל.
+_TOC_DIV_OPEN_RE = re.compile(r'^<div class="law-toc">$')  # תוכן העניינים
+# האוטומטי של ויקיטקסט - בלוק HTML גולמי, עודף לגמרי מול העץ שכבר נבנה
+# (כל {{ח:פנימי}} בפנים כבר קיים כ-node אמיתי). תמיד תחום ב-<div
+# class="law-toc"> יחיד ו-</div> יחיד בשורה נפרדת (נבדק בפועל, ראו
+# TASKS.md משימה 7) - לא זקוק לספירת קינון, רק זיהוי הפתיחה/סגירה.
+_TOC_DIV_CLOSE_LINE = "</div>"
+_MAX_UNCONSUMED_EXAMPLES = 5
+
+
+def check_no_unconsumed_content(wikitext: str) -> list[str]:
+    """הכיוון ההפוך מ-check_no_unknown_templates: לא "מה נוצר", אלא
+    "מה אבד" (ברק, 2026-09-14). parse_wikitext מדלגת בשקט על **כל**
+    שורה לא-ריקה שלא מתחילה ב-'{{' (ראו for raw_line ... if not
+    line.startswith('{{'): continue) - ללא יוצא מן הכלל, וללא שום
+    בדיקה שתופסת את זה. זה בדיוק התרחיש המסוכן ביותר שהוגדר בפרויקט:
+    פרסור שמצליח ומייצר עץ *חסר* בשקט (למשל בלוקי <table>/<tr>/<td>
+    גולמיים ב-HTML, שנבלעים לגמרי כי אף שורה בהם לא מתחילה ב-{{ - ראו
+    TASKS.md משימה 7, 97/1,021 חוקים עם <table>).
+
+    לא מתריעה על תוכן שכן מכוסה במקום אחר, ולא בכוונה חלק מהנוסח:
+    שורות בתוך קופסת פתיח-התחלה/חתימות/מבוא (בין הפתיחה ל-{{ח:סוגר}}
+    התואם - ציטוטים/חתימות/הערות עריכה, לא נוסח), ו-[[קטגוריה:...]]."""
+    problems: list[str] = []
+    in_skip_zone = False
+    in_toc_zone = False
+    for line_number, raw_line in enumerate(wikitext.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        if in_toc_zone:
+            if line == _TOC_DIV_CLOSE_LINE:
+                in_toc_zone = False
+            continue
+        if _TOC_DIV_OPEN_RE.match(line):
+            in_toc_zone = True
+            continue
+        if line.startswith("{{"):
+            match = re.match(r"\{\{([^|}]+)", line)
+            name = match.group(1) if match else ""
+            if name in _SKIP_ZONE_OPENERS:
+                in_skip_zone = True
+            elif name == _SKIP_ZONE_CLOSER:
+                in_skip_zone = False
+            continue
+        if in_skip_zone:
+            continue
+        if _CATEGORY_LINE_RE.match(line):
+            continue
+        problems.append(f"שורה {line_number}: {line[:100]!r}")
+
+    if not problems:
+        return []
+    shown = problems[:_MAX_UNCONSUMED_EXAMPLES]
+    more = f" (+{len(problems) - len(shown)} נוספות)" if len(problems) > len(shown) else ""
+    return [f"{len(problems)} שורות תוכן שלא נצרכו על ידי אף ענף בפרסר: " + "; ".join(shown) + more]
 
 
 def check_section_count(wikitext: str, tree: LegislativeNode) -> list[str]:
@@ -140,6 +218,7 @@ def run_sanity_checks(wikitext: str, tree: LegislativeNode) -> list[str]:
     """מריצה את כל הבדיקות, מחזירה רשימת תיאורי בעיות (ריקה = תקין)."""
     problems: list[str] = []
     problems += check_no_unknown_templates(wikitext)
+    problems += check_no_unconsumed_content(wikitext)
     problems += check_section_count(wikitext, tree)
     problems += check_has_normative_content(tree)
     problems += check_unique_ids(tree)

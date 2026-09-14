@@ -27,6 +27,7 @@
   זו קריאה של הניסוח שכבר קיים במקור, לא ניחוש של עובדה משפטית חדשה.
 """
 
+import hashlib
 import re
 from typing import NamedTuple
 
@@ -176,6 +177,37 @@ def _unique_child_id(parent_node: LegislativeNode, local_id: str, collisions: li
     return final_id
 
 
+def _short_hash(text: str) -> str:
+    """hash יציב בין ריצות/תהליכים - לא hash() המובנה של פייתון, שמלוח
+    (PYTHONHASHSEED) ומשתנה בין תהליכים למחרוזות. ראו _lookahead_content."""
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
+
+
+def _lookahead_content(lines: list[str], from_index: int) -> str | None:
+    """מציצה קדימה מ-lines[from_index+1] לתוכן {{ח:ת...}} הראשון (הבא,
+    לא ריק) - בלי לשנות את מצב הפרסור הראשי, רק חלון קדימה מקומי (לא
+    מעבר שני על העץ). משמשת אך ורק לגזירת id יציב-לפי-תוכן לסעיף בלי
+    מספר טבעי (ראו {{ח:סעיף*}} ברשימות לא-ממוספרות, למשל חוק מועצת
+    הצמחים - "אבטיח"/"אספרגוס"/וכו', כל אחד {{ח:ת}} יחיד מיד אחרי
+    {{ח:סעיף*}} הריק). אם השורה הבאה (הלא-ריקה) אינה בדיוק תבנית עומק
+    תוכן - מחזירה None (נופלים חזרה ל-_unique_child_id הרגיל, לפי
+    מיקום+סיומת - לא מנחשים תוכן שלא ברור)."""
+    for raw_line in lines[from_index + 1 :]:
+        line = raw_line.strip()
+        if not line:
+            continue
+        if not line.startswith("{{"):
+            return None
+        call = _find_template(line, 0)
+        if call.name not in _CONTENT_DEPTH:
+            return None
+        remainder = line[call.end :]
+        note_text = _is_pure_note(remainder)
+        flattened = note_text if note_text is not None else _flatten(remainder).strip()
+        return flattened or None
+    return None
+
+
 def parse_wikitext(
     text: str, *, law_id: str, source_ref: str = "", as_of: str | None = None
 ) -> LegislativeNode:
@@ -203,13 +235,15 @@ def parse_wikitext(
         as_of=as_of,
     )
     collisions: list[str] = []
+    content_derived_ids: list[str] = []
 
     # מחסנית של (רמה_מבנית, צומת, מרחב_מספור_נוכחי)
     stack: list[tuple[int, LegislativeNode, str]] = [
         (_STRUCTURAL_LEVEL_LAW, root, "law")
     ]
 
-    for raw_line in text.splitlines():
+    lines = text.splitlines()
+    for line_index, raw_line in enumerate(lines):
         line = raw_line.strip()
         if not line.startswith("{{"):
             continue
@@ -262,8 +296,22 @@ def parse_wikitext(
                 stack.pop()
             parent_node = stack[-1][1]
             numbering_space = stack[-1][2]
+            if number:
+                local_id = f"s{number}"
+            else:
+                # סעיף בלי מספר טבעי (רשימה לא-ממוספרת, ראו חוק מועצת
+                # הצמחים) - id לפי מיקום היה "שובר את הבסיס" של יציבות
+                # provenance בין גרסאות (ברק, 2026-09-14). לגזור מתוכן
+                # הפריט עצמו (hash יציב) כשאפשר לזהות אותו בבירור.
+                content_hint = _lookahead_content(lines, line_index)
+                if content_hint is not None:
+                    local_id = f"s-{_short_hash(content_hint)}"
+                    content_derived_ids.append(f"{parent_node.id}/{local_id}")
+                else:
+                    local_id = "s"  # אין תוכן ברור לגזור ממנו - נופל
+                    # חזרה למנגנון הרגיל (מיקום + סיומת סידורית).
             node = LegislativeNode(
-                id=_unique_child_id(parent_node, f"s{number}", collisions),
+                id=_unique_child_id(parent_node, local_id, collisions),
                 node_type="section",
                 number=number,
                 margin_title=normalize_text(title),
@@ -333,4 +381,5 @@ def parse_wikitext(
 
     _mark_status(root)
     root.id_collisions = collisions
+    root.content_derived_ids = content_derived_ids
     return root

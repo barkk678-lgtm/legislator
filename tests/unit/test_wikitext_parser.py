@@ -158,6 +158,35 @@ def main():
     checks.append(("קייטנות: id_collisions ריק (אין התנגשות אמיתית)", load("kaytanot", "kaytanot-1990")[0].id_collisions == []))
     checks.append(("מאבק: id_collisions ריק (אחרי תיקון ה-id, לא רק אחרי סיומת)", crime.id_collisions == []))
 
+    # id לפי תוכן לרשימה לא-ממוספרת (2026-09-14) - שחזור סינתטי של הדפוס
+    # האמיתי בחוק מועצת הצמחים: {{ח:סעיף*}} בלי מספר, {{ח:ת}} יחיד אחריו.
+    # כולל שני פריטים עם תוכן זהה ("(נמחק)") - fallback ל-_unique_child_id.
+    unnumbered_list_wikitext = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:קטע3|תוספת פרק ג|ענף הירקות}}
+{{ח:סעיף*}}
+{{ח:ת}} אבטיח
+
+{{ח:סעיף*}}
+{{ח:ת}} אספרגוס
+
+{{ח:סעיף*}}
+{{ח:ת}} {{ח:הערה|(נמחק)}}
+
+{{ח:סעיף*}}
+{{ח:ת}} {{ח:הערה|(נמחק)}}
+"""
+    list_tree = parse_wikitext(unnumbered_list_wikitext, law_id="test-list")
+    siman = list_tree.children[0]
+    checks.append(("רשימה לא-ממוספרת: 4 סעיפים", len(siman.children) == 4))
+    checks.append(("רשימה לא-ממוספרת: id לפי תוכן (לא s/s-2/...)", all(c.id.startswith("test-list/תוספת פרק ג/s-") for c in siman.children)))
+    checks.append(("רשימה לא-ממוספרת: אבטיח ≠ אספרגוס (תוכן שונה)", siman.children[0].id != siman.children[1].id))
+    checks.append(("רשימה לא-ממוספרת: אותו תוכן ('(נמחק)') -> אותו hash בסיסי, fallback לסיומת", siman.children[3].id.startswith(siman.children[2].id + "-")))
+    checks.append(("רשימה לא-ממוספרת: check_unique_ids נקי (fallback עבד)", check_unique_ids(list_tree) == []))
+    checks.append(("רשימה לא-ממוספרת: 4 ids נגזרו מתוכן", len(list_tree.content_derived_ids) == 4))
+    # יציבות: פרסור שוב מאותו טקסט חייב לתת בדיוק אותם ids (לא hash() מלוח)
+    list_tree_again = parse_wikitext(unnumbered_list_wikitext, law_id="test-list")
+    checks.append(("רשימה לא-ממוספרת: יציב בין ריצות פרסור", [c.id for c in siman.children] == [c.id for c in list_tree_again.children[0].children]))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)
