@@ -29,6 +29,17 @@
         "Any Vercel deployment, promotion, or production release action"
       ]
     },
+    "allow": [
+      "mcp__Supabase__execute_sql",
+      "mcp__Supabase__apply_migration",
+      "mcp__Supabase__list_tables",
+      "mcp__Supabase__list_migrations",
+      "mcp__Supabase__get_advisors",
+      "mcp__Supabase__search_docs",
+      "mcp__Supabase__get_project",
+      "mcp__Supabase__get_project_url",
+      "mcp__Supabase__list_projects"
+    ],
     "deny": [
       "Bash(rm -rf*)",
       "Bash(git reset --hard*)",
