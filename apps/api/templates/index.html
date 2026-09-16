@@ -20,7 +20,15 @@
 
   <div class="main">
     <div class="topbar">
-      <select id="law-select"></select>
+      <div class="law-picker">
+        <input id="law-search-input" class="inp" type="text"
+               placeholder="חיפוש חוק לפי שם… (למשל: עונשין, פקודת הנזיקין)"
+               autocomplete="off" />
+        <div id="law-search-results" class="law-search-results" hidden></div>
+      </div>
+      <div class="law-loading" id="law-loading" hidden>
+        <span class="spinner"></span>טוען את נוסח החוק…
+      </div>
       <div class="asof" id="as-of-note"></div>
       <div class="grow"></div>
       <button id="download-btn" class="primary">הורדת docx</button>

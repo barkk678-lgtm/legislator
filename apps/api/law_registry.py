@@ -49,6 +49,7 @@ lines=[] בשקט (אין אף סעיף ב-before.children). זה בדיוק ס�
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -288,6 +289,16 @@ def get_law_config(law_id: str, root: LegislativeNode) -> LawConfig:
     return LawConfig(id=law_id, footnote_key=law_id, known_source_ref=root.source_ref or None)
 
 
+# מטמון 15 דקות ל-law_summaries() בלבד (ברק, 2026-09-16) - "רשימת
+# 1,093 השמות היא נתון שמשתנה פעם ביום אחרי ingest, לא בכל בקשה...
+# זה לא state של משתמש, זה נתון קבוע." load_law() לא נוגע בזה בכלל -
+# נשאר תמיד טעינה טרייה. תא בזיכרון-תהליך בלבד: ב-Vercel כל cold
+# start מתחיל מטמון ריק מחדש - לא בעיה, רק אומר שהמטמון "עוזר" בעיקר
+# בתוך instance חם, לא ערובה גלובלית.
+_SUMMARIES_CACHE: dict = {"data": None, "fetched_at": 0.0}
+_SUMMARIES_CACHE_TTL_SECONDS = 15 * 60
+
+
 def law_summaries() -> list[dict]:
     """שני ה-fixtures תמיד מופיעים (dev/test offline). חוקי ה-DB
     מתווספים **רק אם Supabase מוגדר** - זה מצב תקין (למשל dev מקומי
@@ -295,6 +306,11 @@ def law_summaries() -> list[dict]:
     ב-DB. לעומת זאת load_law() על law_id ספציפי-ל-DB בלי env מוגדר
     כן נכשל ברעש (ראו _supabase_config) - שם יש כוונה מפורשת לגשת
     ל-DB, כאן זו רק שאלת-זמינות."""
+    now = time.monotonic()
+    cached = _SUMMARIES_CACHE["data"]
+    if cached is not None and (now - _SUMMARIES_CACHE["fetched_at"]) < _SUMMARIES_CACHE_TTL_SECONDS:
+        return cached
+
     summaries = [
         {
             "id": law_id,
@@ -308,6 +324,9 @@ def law_summaries() -> list[dict]:
         summaries.extend(_db_law_summaries())
     except RuntimeError:
         pass  # Supabase לא מוגדר - מצב תקין, ראו דוקסטרינג
+
+    _SUMMARIES_CACHE["data"] = summaries
+    _SUMMARIES_CACHE["fetched_at"] = now
     return summaries
 
 
@@ -315,6 +334,12 @@ def search_law_titles(query: str, limit: int = 20) -> list[dict]:
     """חיפוש שם-חוק (משימה A) - שכבה דקה מעל law_search.search_laws
     (הלוגיקה הטהורה, נבדקת בנפרד ב-tests/unit/test_law_search.py).
     מריץ על law_summaries() המלא (fixtures + DB אם מוגדר) - 1,093
-    כותרות קצרות זה חיפוש-טקסט-בזיכרון זניח, לא צוואר בקבוק."""
-    laws = [{"id": s["id"], "title": s["title"]} for s in law_summaries()]
+    כותרות קצרות זה חיפוש-טקסט-בזיכרון זניח, לא צוואר בקבוק.
+
+    **amendable מועבר הלאה (2026-09-16)** - חייב, כי ה-autocomplete
+    בצד הלקוח מציג/חוסם לפי השדה הזה על תוצאת החיפוש עצמה, בלי
+    לשלוף שוב את הרשימה המלאה. search_laws מחזירה בדיוק את ה-dict
+    שקיבלה (ראו law_search.py) - אם לא מעבירים amendable כאן, הוא
+    פשוט נעלם מהתשובה."""
+    laws = [{"id": s["id"], "title": s["title"], "amendable": s["amendable"]} for s in law_summaries()]
     return search_laws(query, laws, limit=limit)

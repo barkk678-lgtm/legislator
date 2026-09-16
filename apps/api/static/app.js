@@ -62,23 +62,108 @@ function insertionsPayload() {
   });
 }
 
-async function loadLawList() {
-  const laws = await (await fetch("/api/laws")).json();
-  const select = document.getElementById("law-select");
-  select.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.textContent = "— בחר/י חוק —";
-  placeholder.value = "";
-  select.appendChild(placeholder);
-  for (const law of laws) {
-    const opt = document.createElement("option");
-    opt.value = law.id;
-    opt.textContent = law.title + (law.amendable ? "" : " (לא נתמך לעריכה)");
-    if (!law.amendable) opt.disabled = true;
-    select.appendChild(opt);
+/* חיפוש חוק (autocomplete) - החליף <select> יחיד שהיה סביר לשני
+ * חוקי fixture אבל לא ל-1,093 חוקי הקורפוס האמיתי (ברק, 2026-09-16:
+ * "תפריט נגלל לא עובד... הבחירה היא הדבר הראשון שהמשתמש עושה").
+ * לא טוען מראש את כל 1,093 - שולח /api/laws/search עם debounce, כמו
+ * GitHub/Google. השרת כבר מדרג (התאמה מדויקת -> prefix -> substring ->
+ * ריבוי-טוקנים, ראו law_search.py) ומגביל ל-20 תוצאות.
+ */
+let lawSearchDebounceTimer = null;
+let lawSearchResults = [];
+let lawSearchHighlightIndex = -1;
+
+function debounceLawSearch(query) {
+  clearTimeout(lawSearchDebounceTimer);
+  lawSearchDebounceTimer = setTimeout(() => runLawSearch(query), 180);
+}
+
+async function runLawSearch(query) {
+  const resultsEl = document.getElementById("law-search-results");
+  const trimmed = query.trim();
+  if (!trimmed) {
+    lawSearchResults = [];
+    resultsEl.hidden = true;
+    resultsEl.innerHTML = "";
+    return;
   }
-  select.addEventListener("change", () => {
-    if (select.value) onLawChange(select.value);
+  const laws = await (await fetch(`/api/laws/search?q=${encodeURIComponent(trimmed)}`)).json();
+  lawSearchResults = laws;
+  lawSearchHighlightIndex = laws.length ? 0 : -1;
+  renderLawSearchResults();
+}
+
+function renderLawSearchResults() {
+  const resultsEl = document.getElementById("law-search-results");
+  resultsEl.innerHTML = "";
+  if (!lawSearchResults.length) {
+    const empty = document.createElement("div");
+    empty.className = "law-result-empty";
+    empty.textContent = "לא נמצאו חוקים תואמים.";
+    resultsEl.appendChild(empty);
+    resultsEl.hidden = false;
+    return;
+  }
+  lawSearchResults.forEach((law, idx) => {
+    const item = document.createElement("div");
+    item.className =
+      "law-result-item" +
+      (law.amendable ? "" : " unsupported") +
+      (idx === lawSearchHighlightIndex ? " highlighted" : "");
+    const title = document.createElement("span");
+    title.textContent = law.title;
+    item.appendChild(title);
+    if (!law.amendable) {
+      const note = document.createElement("span");
+      note.className = "law-result-note";
+      note.textContent = "(לא נתמך לעריכה)";
+      item.appendChild(note);
+    }
+    // mousedown לא click - כדי שהבחירה תתפוס לפני שה-blur של השדה
+    // סוגר את תיבת התוצאות (מרוץ אירועים סטנדרטי ב-autocomplete).
+    item.addEventListener("mousedown", (ev) => {
+      ev.preventDefault();
+      selectLaw(law);
+    });
+    resultsEl.appendChild(item);
+  });
+  resultsEl.hidden = false;
+}
+
+function selectLaw(law) {
+  if (!law.amendable) return;
+  document.getElementById("law-search-input").value = law.title;
+  document.getElementById("law-search-results").hidden = true;
+  onLawChange(law.id);
+}
+
+function initLawSearch() {
+  const input = document.getElementById("law-search-input");
+  const resultsEl = document.getElementById("law-search-results");
+  input.addEventListener("input", () => debounceLawSearch(input.value));
+  input.addEventListener("focus", () => {
+    if (lawSearchResults.length) renderLawSearchResults();
+  });
+  input.addEventListener("keydown", (ev) => {
+    if (resultsEl.hidden || !lawSearchResults.length) return;
+    if (ev.key === "ArrowDown") {
+      ev.preventDefault();
+      lawSearchHighlightIndex = Math.min(lawSearchHighlightIndex + 1, lawSearchResults.length - 1);
+      renderLawSearchResults();
+    } else if (ev.key === "ArrowUp") {
+      ev.preventDefault();
+      lawSearchHighlightIndex = Math.max(lawSearchHighlightIndex - 1, 0);
+      renderLawSearchResults();
+    } else if (ev.key === "Enter") {
+      ev.preventDefault();
+      const chosen = lawSearchResults[lawSearchHighlightIndex];
+      if (chosen) selectLaw(chosen);
+    } else if (ev.key === "Escape") {
+      resultsEl.hidden = true;
+    }
+  });
+  document.addEventListener("click", (ev) => {
+    if (!document.querySelector(".law-picker").contains(ev.target)) resultsEl.hidden = true;
   });
 }
 
@@ -89,29 +174,38 @@ function buildOriginalIndex(node) {
 }
 
 async function onLawChange(lawId) {
-  currentLawId = lawId;
-  edits = {};
-  insertions = [];
-  insertionClientIds = new Set();
-  everEditedFieldKeys = new Set();
-  fieldElements = {};
-  originalTextById = {};
-  originalMarginTitleById = {};
+  // חיווי טעינה (ברק, 2026-09-16): פתיחת חוק גדול מה-DB יכולה לקחת
+  // כמה שניות (נמדד: חוק העונשין ~2.8s) - בלי החיווי הזה זה נראה
+  // תקוע, לא רק "איטי".
+  const loadingEl = document.getElementById("law-loading");
+  loadingEl.hidden = false;
+  try {
+    currentLawId = lawId;
+    edits = {};
+    insertions = [];
+    insertionClientIds = new Set();
+    everEditedFieldKeys = new Set();
+    fieldElements = {};
+    originalTextById = {};
+    originalMarginTitleById = {};
 
-  const law = await (await fetch(`/api/laws/${lawId}`)).json();
-  buildOriginalIndex(law.tree);
+    const law = await (await fetch(`/api/laws/${lawId}`)).json();
+    buildOriginalIndex(law.tree);
 
-  document.getElementById("law-panels").hidden = false;
-  document.getElementById("as-of-note").textContent = law.as_of_display || "";
-  document.getElementById("source-ref-note").textContent = law.known_source_ref
-    ? `מראה מקום: ${law.known_source_ref}`
-    : "מראה מקום: לא ידוע לחוק זה - הוולידטור יתריע (בדיקה 2).";
+    document.getElementById("law-panels").hidden = false;
+    document.getElementById("as-of-note").textContent = law.as_of_display || "";
+    document.getElementById("source-ref-note").textContent = law.known_source_ref
+      ? `מראה מקום: ${law.known_source_ref}`
+      : "מראה מקום: לא ידוע לחוק זה - הוולידטור יתריע (בדיקה 2).";
 
-  const billTitleInput = document.getElementById("bill-title-input");
-  if (!billTitleInput.value) billTitleInput.value = "";
+    const billTitleInput = document.getElementById("bill-title-input");
+    if (!billTitleInput.value) billTitleInput.value = "";
 
-  rebuildTree(law.tree);
-  await refreshPreview();
+    rebuildTree(law.tree);
+    await refreshPreview();
+  } finally {
+    loadingEl.hidden = true;
+  }
 }
 
 function levelsForNodeType(nodeType) {
@@ -540,4 +634,4 @@ for (const inputId of ["bill-title-input", "bill-initiator-input"]) {
 }
 document.getElementById("explanatory-input").addEventListener("blur", refreshPreview);
 
-loadLawList();
+initLawSearch();
