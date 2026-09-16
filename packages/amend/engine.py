@@ -32,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
-from node import LegislativeNode, effective_as_of  # noqa: E402
+from node import LegislativeNode, effective_as_of, find_sections  # noqa: E402
 from numbering import sort_section_numbers  # noqa: E402
 from render_bill import Line  # noqa: E402
 from transform import Annotation, FootnoteAnnotation, ReplacementAnnotation  # noqa: E402
@@ -602,8 +602,11 @@ def amend(
     }
     footnotes_by_id = {a.node_id: a for a in annotations if isinstance(a, FootnoteAnnotation)}
 
-    before_sections = {c.number: c for c in before.children if c.node_type == "section"}
-    after_sections = {c.number: c for c in after.children if c.node_type == "section"}
+    # תוקן (2026-09-16): רקורסיבי בכל עומק, לא רק before.children/
+    # after.children - ראו find_sections (node.py) להסבר המלא. חוק
+    # עם מבנה חלק/פרק/סימן פשוט לא היה "נראה" כאן בכלל.
+    before_sections = find_sections(before)
+    after_sections = find_sections(after)
 
     # תוקן (פער, לא רק דפוס לא ממומש - ראו drafting-rules.md §8.5): עד
     # כאן הלולאה עברה רק על before_sections.keys(), כך שסעיף ראשי חדש

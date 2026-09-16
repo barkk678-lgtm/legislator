@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
-from node import LegislativeNode, effective_as_of  # noqa: E402
+from node import LegislativeNode, effective_as_of, find_sections  # noqa: E402
 
 TYPE_HE = {
     "law": "חוק",
@@ -59,8 +59,10 @@ def touched_section_numbers(before: LegislativeNode, after: LegislativeNode) -> 
     מחלקת טעות בדיוק כמו amend()'s before_sections.keys()-only loop
     שתוקנה קודם ב-engine.py - נתפס כאן על ידי בדיקת אינטגרציה אמיתית
     ב-tests/unit/test_api.py, לא רק עיון בקוד."""
-    before_sections = {c.number: c for c in before.children if c.node_type == "section"}
-    after_sections = {c.number: c for c in after.children if c.node_type == "section"}
+    # תוקן (2026-09-16): רקורסיבי בכל עומק, אותו באג בדיוק כמו
+    # engine.amend() - ראו find_sections (node.py).
+    before_sections = find_sections(before)
+    after_sections = find_sections(after)
     touched = set()
     for number, before_sec in before_sections.items():
         after_sec = after_sections.get(number)

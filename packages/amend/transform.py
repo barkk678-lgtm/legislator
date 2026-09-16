@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "corpus"))
-from node import LegislativeNode  # noqa: E402
+from node import LegislativeNode, find_parent, find_sections  # noqa: E402
 from numbering import next_appended_label, next_inserted_label, sort_section_numbers  # noqa: E402
 
 
@@ -231,34 +231,41 @@ def apply(
                     )
                 )
         elif isinstance(t, InsertSectionAfter):
-            siblings = after.children
-            idx = next(
-                (
-                    i
-                    for i, c in enumerate(siblings)
-                    if c.node_type == "section" and c.number == t.after_section_number
-                ),
-                None,
-            )
-            if idx is None:
+            # תוקן (2026-09-16): הסעיף העוגן עשוי לשבת בכל עומק (חלק/
+            # פרק/סימן), לא רק ילד ישיר של השורש - find_sections
+            # (node.py) מוצאת אותו בכל מקרה. אבל *ההכנסה בעץ* חייבת
+            # להיות אח בתוך אותו פרק/סימן שהעוגן נמצא בו (find_parent),
+            # לא root.children - אחרת הסעיף החדש "יברח" לפרק הלא נכון.
+            # המספור עצמו נשאר גלובלי (אומת בפועל: מספור סעיפים לא
+            # מתאפס בכל פרק/סימן) - "האם זה הסעיף האחרון" נבדק מול כל
+            # מספרי הסעיפים בחוק, לא רק אחים מקומיים.
+            existing_sections = find_sections(after)
+            anchor_section = existing_sections.get(t.after_section_number)
+            if anchor_section is None:
                 raise ValueError(f"סעיף {t.after_section_number} לא נמצא ב'לפני'")
             if t.new_section.number:
                 raise ValueError(
                     "InsertSectionAfter.new_section.number חייב להישאר ריק - "
                     "המספור מחושב אוטומטית (drafting-rules.md §8.1), לא נקבע מראש."
                 )
-            existing_numbers = [c.number for c in siblings if c.node_type == "section"]
-            following = next(
-                (c for c in siblings[idx + 1 :] if c.node_type == "section"), None
-            )
-            if following is None:
-                label = next_appended_label(sort_section_numbers(existing_numbers))
+            existing_numbers = list(existing_sections.keys())
+            sorted_numbers = sort_section_numbers(existing_numbers)
+            is_last = sorted_numbers[-1] == t.after_section_number
+            if is_last:
+                label = next_appended_label(sorted_numbers)
             else:
                 label = next_inserted_label(t.after_section_number, set(existing_numbers))
+            parent = find_parent(after, anchor_section.id)
+            if parent is None:
+                raise ValueError(
+                    f"לא נמצא הורה לסעיף {t.after_section_number} - לא אמור לקרות "
+                    "(סעיף הוא תמיד צומת עלה-ביניים, לא השורש עצמו)."
+                )
+            idx = next(i for i, c in enumerate(parent.children) if c.id == anchor_section.id)
             new_section = copy.deepcopy(t.new_section)
             new_section.number = label
             new_section.node_type = "section"
-            siblings.insert(idx + 1, new_section)
+            parent.children.insert(idx + 1, new_section)
             for anchor_substring, key in t.footnotes:
                 count = new_section.text.count(anchor_substring)
                 if count == 0:

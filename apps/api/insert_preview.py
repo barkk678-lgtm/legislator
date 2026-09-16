@@ -38,7 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
-from node import LegislativeNode  # noqa: E402
+from node import LegislativeNode, find_parent, find_sections  # noqa: E402
 from numbering import next_appended_label, next_inserted_label, sort_section_numbers  # noqa: E402
 from transform import AddFirstSubsection, InsertAfter, InsertSectionAfter  # noqa: E402
 
@@ -97,19 +97,12 @@ def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
     return None
 
 
-def _find_parent(root: LegislativeNode, node_id: str) -> LegislativeNode | None:
-    for child in root.children:
-        if child.id == node_id:
-            return root
-        found = _find_parent(child, node_id)
-        if found:
-            return found
-    return None
-
-
 def _ancestor_of_type(root: LegislativeNode, node_id: str, node_type: str) -> LegislativeNode | None:
     """מוצאת את האב מהסוג המבוקש (כולל הצומת עצמו אם הוא כבר מהסוג הזה) -
-    מטפסת מהצומת כלפי מעלה עד השורש."""
+    מטפסת מהצומת כלפי מעלה עד השורש. משתמשת ב-find_parent המשותפת
+    (node.py) - הועברה לשם (2026-09-16) כדי שלא תשוכפל גם ב-
+    packages/amend/transform.py, שזקוקה לאותה פונקציה בדיוק כדי
+    להכניס InsertSectionAfter לפרק/סימן הנכון."""
     node = _find_by_id(root, node_id)
     if node is None:
         return None
@@ -117,7 +110,7 @@ def _ancestor_of_type(root: LegislativeNode, node_id: str, node_type: str) -> Le
         return node
     current_id = node.id
     while True:
-        parent = _find_parent(root, current_id)
+        parent = find_parent(root, current_id)
         if parent is None:
             return None
         if parent.node_type == node_type:
@@ -133,11 +126,14 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
         anchor_section = _ancestor_of_type(root, node_id, "section")
         if anchor_section is None:
             return _Resolution(supported=False, reason="לא נמצא סעיף אב להוספה אחריו")
-        siblings = [c for c in root.children if c.node_type == "section"]
-        existing_numbers = [c.number for c in siblings]
-        idx = next(i for i, c in enumerate(siblings) if c.id == anchor_section.id)
-        if idx == len(siblings) - 1:
-            label = next_appended_label(sort_section_numbers(existing_numbers))
+        # תוקן (2026-09-16): רשימה גלובלית של כל מספרי הסעיפים בחוק
+        # (find_sections, לא רק root.children) - "האם זה הסעיף האחרון"
+        # נבדק מול מספור גלובלי, בדיוק כמו transform.InsertSectionAfter
+        # (אותו נימוק - ראו שם).
+        existing_numbers = list(find_sections(root).keys())
+        sorted_numbers = sort_section_numbers(existing_numbers)
+        if sorted_numbers[-1] == anchor_section.number:
+            label = next_appended_label(sorted_numbers)
         else:
             label = next_inserted_label(anchor_section.number, set(existing_numbers))
         return _Resolution(
@@ -174,7 +170,7 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
 
     if level == "paragraph":
         current_node = _find_by_id(root, node_id)
-        parent = _find_parent(root, node_id)
+        parent = find_parent(root, node_id)
         if current_node.node_type != "paragraph" or parent is None or parent.node_type != "section":
             return _Resolution(
                 supported=False,

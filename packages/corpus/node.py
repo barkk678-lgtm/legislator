@@ -74,6 +74,8 @@ extract_revision_timestamp) - **לא** "מעודכן ליום X" (ראו ההב�
 from dataclasses import dataclass, field
 from typing import Literal
 
+from numbering import parse_section_number
+
 
 @dataclass
 class LegislativeNode:
@@ -153,3 +155,59 @@ def effective_as_of(root: LegislativeNode, target: LegislativeNode) -> str | Non
         for child in node.children:
             stack.append((child, current))
     raise ValueError("target אינו צומת בעץ שמשורשו root")
+
+
+def find_sections(root: LegislativeNode, *, numbering_space: str = "law") -> dict[str, "LegislativeNode"]:
+    """אוספת את כל צמתי node_type=="section" בעץ, **בכל עומק** - לא רק
+    ילדים ישירים של השורש. תוקן (2026-09-16, ברק: "42.3% מהקורפוס לא
+    ניתן לעריכה... זה חור בלב המוצר"): עד כה כל קוד ה-amend חיפש רק
+    ב-root.children - חוק עם מבנה חלק/פרק/סימן (20 החוקים הגדולים
+    בקורפוס, בלי יוצא מן הכלל) לא היה "נראה" בכלל, `lines=[]` בשקט.
+
+    numbering_space="law" (ברירת המחדל) מסננת בכוונה סעיפי תוספת/לוח-
+    השוואה (numbering_space שונה) - אלה משתמשים במרחב מספור נפרד
+    (לפעמים מתחיל מחדש מ-1) ועלולים להתנגש עם מספרי הסעיפים הרגילים
+    אם היו נכללים כאן. אומת בפועל (לא הונח): מספור סעיפים ב-numbering_
+    space="law" רץ ברצף גלובלי לאורך כל החוק בלי איפוס בכל חלק/פרק/
+    סימן - "סעיף 47" מזהה סעיף יחיד בחוק כולו, בלי תלות במיקומו בעץ.
+
+    **הגנה נוספת שנמצאה תוך כדי (2026-09-16), לא רק תיאוריה:** "לוח
+    השוואה" בחוק העונשין מתויג בפועל numbering_space="law" בנתוני
+    ה-ingest הקיימים (לא "comparison-table" כפי שהתיעוד למעלה מניח -
+    פער תיוג אמיתי ב-ingest, מחוץ להיקף התיקון הזה) - ומספר הסעיף שלו
+    שם הוא אות בודדת ("ו"), פורמט שלא קיים בכלל בסעיפי חוק רגילים
+    (numbering.parse_section_number דורש ספרה מובילה). בלי ההגנה כאן,
+    זה קרס את /render (ValueError לא-מטופל) על כל חוק עם לוח השוואה -
+    נתפס רק בבדיקה אמיתית בדפדפן על חוק העונשין, לא בטסטים. תוכן כזה
+    מדולג בשקט (לא חלק מהמספור הרגיל, בדיוק כמו הכוונה המקורית של
+    numbering_space) - לא זורק, כי זו עובדה ידועה על מקור, לא קלט פגום."""
+    result: dict[str, LegislativeNode] = {}
+
+    def _walk(node: LegislativeNode) -> None:
+        if node.node_type == "section" and node.numbering_space == numbering_space:
+            try:
+                parse_section_number(node.number)
+            except ValueError:
+                pass  # ראו התיעוד למעלה - "לוח השוואה" וכדומה, לא מספור-סעיף רגיל
+            else:
+                result[node.number] = node
+        for child in node.children:
+            _walk(child)
+
+    _walk(root)
+    return result
+
+
+def find_parent(root: LegislativeNode, node_id: str) -> "LegislativeNode | None":
+    """מוצאת את ההורה הישיר של צומת לפי id, בכל עומק - None אם node_id
+    הוא השורש עצמו או לא נמצא. נדרשת (בניגוד ל-effective_source_ref/
+    effective_as_of, שרק *קוראות* את העץ) כדי לדעת לאיזו רשימת-ילדים
+    בפועל להכניס צומת חדש (InsertSectionAfter) - חייבת להיות אותו
+    פרק/סימן שהעוגן נמצא בו, לא root.children."""
+    for child in root.children:
+        if child.id == node_id:
+            return root
+        found = find_parent(child, node_id)
+        if found:
+            return found
+    return None

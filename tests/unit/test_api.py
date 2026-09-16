@@ -37,8 +37,12 @@ def main():
     checks.append(("קייטנות מסומן amendable", by_id.get("kaytanot-1990", {}).get("amendable") is True))
     checks.append(
         (
-            "מאבק בארגוני פשיעה מסומן לא-amendable (מבנה פרקים, לא באג שקט)",
-            by_id.get("maavak-2003", {}).get("amendable") is False,
+            # תוקן (2026-09-16): amend()/transform.py/insert_preview.py
+            # עכשיו מוצאים סעיפים רקורסיבית בכל עומק (node.find_sections) -
+            # מאבק (מבנה פרקים) הופך ל-amendable, כצפוי מהתיקון עצמו,
+            # לא רגרסיה. ראו TASKS.md ותיעוד law_registry.py._is_amendable.
+            "מאבק בארגוני פשיעה מסומן amendable (מבנה פרקים - נמצא רקורסיבית)",
+            by_id.get("maavak-2003", {}).get("amendable") is True,
         )
     )
 

@@ -28,22 +28,24 @@ wikitext_parser.py). שני הנתיבים לא חולקים קוד, ולכן ט
 
 **amendable מחושב בזול, לא בבניית-עץ-מלא לכל חוק:** law_summaries()
 צריך amendable ל-1,093 חוקים בלי לשלוף nodes.text של כולם (יקר
-מיותר - השדה הזה משמש רק לדגל בוליאני). שאילתה אחת שמביאה
-parent_id בלבד של כל צמתי node_type=section (לא את הטקסט) - אם
-law_id (=מזהה השורש) מופיע בין ה-parent_id-ים, יש לחוק סעיף שהוא
-ילד ישיר של השורש = amendable, לפי אותה הגדרה צרה שכבר הייתה
-קיימת (ראו _is_amendable המקורית: amend() מחפש סעיפים רק ב-
-before.children הישירים, לא רקורסיבית - זו מגבלה ידועה, לא תוקנה
-כאן, ראו ההערה המקורית על מאבק בארגוני פשיעה).
+מיותר - השדה הזה משמש רק לדגל בוליאני). שאילתה אחת נגד ה-view
+`amendable_law_ids` ב-DB (לא בונה עץ) - **תוקן (2026-09-16, ברק:
+"42.3% מהקורפוס לא ניתן לעריכה... זה חור בלב המוצר"):** עד אז ה-view
+בדק רק `parent_id = שורש החוק` (ילד ישיר), אותה מגבלה צרה בדיוק כמו
+`_is_amendable`/`amend()` - חוק עם מבנה חלק/פרק/סימן (20 החוקים
+הגדולים בקורפוס, בלי יוצא מן הכלל - תכנון ובניה, ביטוח לאומי,
+העונשין...) יצא "לא amendable" בטעות. ה-view עודכן (migration
+`20260916140000_amendable_law_ids_recursive.sql`) לבדוק "יש לחוק
+לפחות צומת section אחד עם numbering_space='law', בכל עומק" - תואם
+בדיוק את `node.find_sections`/`_is_amendable` החדשים.
 
-amendable מחושב, לא מוצהר: amend() (packages/amend/engine.py) מחפש
-סעיפים רק ב-before.children הישירים (node_type=="section") - לא יורד
-רקורסיבית לתוך פרק/סימן. חוק מאבק בארגוני פשיעה בנוי בפרקים (כל
-הסעיפים מקוננים תחת chapter) - amend() לא היה זורק שגיאה, רק מחזיר
-lines=[] בשקט (אין אף סעיף ב-before.children). זה בדיוק סוג הכשל
-השקט שהפרויקט נמנע ממנו בכל מקום אחר, אז זה נבדק כאן במפורש כדי
-שה-UI יחסום את זרימת התיקון בהודעה ברורה - לא יתקן את amend() (זה
-שינוי היקף אמיתי שדורש מקרה זהב משלו, לא חלק ממשימה 10).
+amendable מחושב, לא מוצהר: `_is_amendable` למטה משתמשת ב-
+`node.find_sections` (רקורסיבי, בכל עומק, מסונן ל-numbering_
+space="law" - כדי לא לספור סעיפי תוספת/לוח-השוואה) - אותה שאלה
+בדיוק ש-`amend()`/`transform.py`/`insert_preview.py` עונות עליה
+עכשיו. חוק בלי אף סעיף בכלל (למשל חוק התקשורת (שידורים) - קפוא
+בצו ארעי של בג"ץ, ראו TASKS.md משימה 7) עדיין לא-amendable, בצדק -
+זה מצב אמיתי, לא פער בקוד.
 """
 
 import json
@@ -58,7 +60,7 @@ import httpx
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "corpus"))
 from law_search import search_laws  # noqa: E402
-from node import LegislativeNode  # noqa: E402
+from node import LegislativeNode, find_sections  # noqa: E402
 from wikitext_parser import parse_wikitext  # noqa: E402
 
 FIXTURES = ROOT / "tests" / "fixtures" / "wikitext"
@@ -98,7 +100,7 @@ FIXTURE_LAWS: dict[str, LawConfig] = {
 
 
 def _is_amendable(root: LegislativeNode) -> bool:
-    return any(c.node_type == "section" for c in root.children)
+    return bool(find_sections(root))
 
 
 def _load_fixture_law(law_id: str) -> LegislativeNode:
