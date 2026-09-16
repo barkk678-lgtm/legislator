@@ -86,3 +86,12 @@ class InsertPreviewRequestIn(BaseModel):
     insertions: list[InsertionIn] = []
     anchor_node_id: str
     level: Literal["section", "subsection", "paragraph", "subparagraph", "definition"]
+
+
+class DraftRequestIn(BaseModel):
+    """בקשה לטיוטת LLM (משימה ה, 2026-09-16) - אותם edits/insertions
+    כמו RenderRequest, בלי bill: זה בדיוק מה שה-endpoint הזה מייצר
+    (title/explanatory), לא קלט לו."""
+
+    edits: list[TextEditIn] = []
+    insertions: list[InsertionIn] = []

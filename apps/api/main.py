@@ -34,9 +34,10 @@ from validator import validate  # noqa: E402
 from apply_changes import apply_pending_changes  # noqa: E402
 from explanatory_draft import draft_explanatory_notes  # noqa: E402
 from insert_preview import preview_insertion_label  # noqa: E402
+from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
-from schemas import BillMetaIn, InsertPreviewRequestIn, RenderRequest  # noqa: E402
+from schemas import BillMetaIn, DraftRequestIn, InsertPreviewRequestIn, RenderRequest  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
@@ -141,6 +142,27 @@ def api_render(law_id: str, req: RenderRequest) -> dict:
         # קטנים/פסקאות שהוספו כרגע יופיעו כצמתים אמיתיים לעריכה, לא
         # רק כתקציר סטטי (ראו TASKS.md משימה 10ב, משוב המשתמש).
         "tree": node_view(result.after),
+    }
+
+
+@app.post("/api/laws/{law_id}/draft")
+def api_draft(law_id: str, req: DraftRequestIn) -> dict:
+    """טיוטת LLM לשם ההצעה ולדברי ההסבר (משימה ה, 2026-09-16) -
+    **לא** נקרא מ-/render (ראו llm_draft.py) - endpoint נפרד שהלקוח
+    מפעיל במפורש (כפתור "הצע טיוטה"), כדי לא להוסיף latency/LLM לכל
+    preview חי. המשתמש עדיין עורך את התוצאה בטופס לפני שליחה - זו
+    התנהגות בכוונה (CLAUDE.md חוק ברזל 4), לא קיצור-דרך זמני."""
+    try:
+        before = load_law(law_id)
+    except LawNotFoundError:
+        raise HTTPException(404, f"חוק לא מוכר: {law_id}")
+    cfg = get_law_config(law_id, before)
+    result = apply_pending_changes(before, req.edits, req.insertions)
+    lines = amend(before, result.after, result.annotations, law_footnote_key=cfg.footnote_key)
+    touched = touched_section_numbers(before, result.after)
+    return {
+        "title": draft_bill_title_llm(before.full_title or "", lines),
+        "explanatory": draft_explanatory_llm(lines, before, result.after, touched),
     }
 
 
