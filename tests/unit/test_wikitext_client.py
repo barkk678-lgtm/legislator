@@ -101,14 +101,18 @@ def main():
     except ValueError:
         checks.append(("אין text ב-revision -> שגיאה", True))
 
-    # is_primary_legislation_title: רק חוק/חוק-יסוד - לא תקנות/צווים/
-    # כללים/פקודות (הוכרע במפורש 2026-09-13 - ראו decisions.md).
+    # is_primary_legislation_title: חוק/חוק-יסוד/פקודה/דבר המלך - לא
+    # תקנות/צווים/כללים (חקיקת משנה). פקודות/דברי המלך נכנסו ב-2026-09-16
+    # אחרי שההחלטה המקורית להוציא אותן (2026-09-13, לפי צורת שם) התבררה
+    # כשגויה - ראו decisions.md ל-post-mortem המלא.
     checks.append(("חוק רגיל -> True", is_primary_legislation_title("חוק המחשבים")))
     checks.append(("חוק-יסוד -> True", is_primary_legislation_title("חוק-יסוד: הכנסת")))
     checks.append(("תקנות -> False", not is_primary_legislation_title("תקנות שמאי מקרקעין (אגרות)")))
     checks.append(("צו -> False", not is_primary_legislation_title("צו המועצות המקומיות")))
     checks.append(("כללי -> False", not is_primary_legislation_title("כללי הרשות השנייה")))
-    checks.append(("פקודת -> False (הוצאה במפורש)", not is_primary_legislation_title("פקודת המסים (גביה)")))
+    checks.append(("פקודת -> True (תוקן 2026-09-16)", is_primary_legislation_title("פקודת המסים (גביה)")))
+    checks.append(("פקודה (בלי ת') -> True", is_primary_legislation_title("פקודה לפרשנות [נוסח חדש]")))
+    checks.append(("דבר המלך -> True", is_primary_legislation_title("דבר המלך על הטיס במושבות (הטלת חוקים), 1937")))
     checks.append(("'חוקת' (בלי רווח) -> False, לא false positive", not is_primary_legislation_title("חוקת העבודה")))
 
     ok = all(passed for _, passed in checks)
