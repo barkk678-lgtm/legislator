@@ -72,6 +72,10 @@ function insertionsPayload() {
 let lawSearchDebounceTimer = null;
 let lawSearchResults = [];
 let lawSearchHighlightIndex = -1;
+let lawSearchGeneration = 0; // מונע תשובה-מאוחרת-שהגיעה-מוקדם מלדרוס תוצאה
+// טרייה יותר (ברק, 2026-09-16: "ע" לבד - בקשה ראשונה, איטית - דרס
+// את "עבודת נשים" שהגיע אחריה ומהר יותר). אותו דפוס בדיוק כמו
+// renderGeneration ב-refreshPreview.
 
 function debounceLawSearch(query) {
   clearTimeout(lawSearchDebounceTimer);
@@ -82,12 +86,15 @@ async function runLawSearch(query) {
   const resultsEl = document.getElementById("law-search-results");
   const trimmed = query.trim();
   if (!trimmed) {
+    lawSearchGeneration += 1; // מבטל גם תשובות-בדרך קודמות, לא רק את הבאה
     lawSearchResults = [];
     resultsEl.hidden = true;
     resultsEl.innerHTML = "";
     return;
   }
+  const myGeneration = ++lawSearchGeneration;
   const laws = await (await fetch(`/api/laws/search?q=${encodeURIComponent(trimmed)}`)).json();
+  if (myGeneration !== lawSearchGeneration) return; // תשובה ישנה - נדחית, לא נוגעים ב-DOM
   lawSearchResults = laws;
   lawSearchHighlightIndex = laws.length ? 0 : -1;
   renderLawSearchResults();
