@@ -14,12 +14,19 @@
   <nav class="rail">
     <div class="brand"><b>Legislator AI</b><span>ארגז הכלים הפרלמנטרי</span></div>
     <div class="nav">
-      <button class="on"><span class="ico">§</span>הצעות חוק</button>
+      <button class="on" data-t="bills"><span class="ico">§</span>הצעות חוק</button>
+      <button data-t="merge"><span class="ico">⇄</span>נוסח משולב</button>
+      <div class="nav-sep"></div>
+      <button data-t="query"><span class="ico">?</span>שאילתות</button>
+      <button data-t="agenda"><span class="ico">!</span>הצעות לסדר</button>
+      <button data-t="rules"><span class="ico">✦</span>מומחה התקנון</button>
+      <button data-t="proto"><span class="ico">≡</span>סיכומי פרוטוקולים</button>
+      <button data-t="research"><span class="ico">◎</span>מחקר</button>
     </div>
   </nav>
 
   <div class="main">
-    <div class="topbar">
+    <div class="topbar" data-bar="bills">
       <div class="law-picker">
         <input id="law-search-input" class="inp" type="text"
                placeholder="חיפוש חוק לפי שם… (למשל: עונשין, פקודת הנזיקין)"
@@ -32,6 +39,28 @@
       <div class="asof" id="as-of-note"></div>
       <div class="grow"></div>
       <button id="download-btn" class="primary">הורדת docx</button>
+    </div>
+    <div class="topbar" data-bar="merge" hidden>
+      <h1>נוסח משולב</h1><span class="sub">בקרוב</span>
+    </div>
+    <div class="topbar" data-bar="query" hidden>
+      <h1>שאילתות</h1><span class="sub">ניסוח שאילתה לשר לפי הפורמט המקובל</span>
+      <div class="grow"></div>
+      <button id="query-export-btn" class="primary" disabled>ייצוא לוורד</button>
+    </div>
+    <div class="topbar" data-bar="agenda" hidden>
+      <h1>הצעות לסדר</h1><span class="sub">נושא, נימוק, ובקשה לדיון</span>
+      <div class="grow"></div>
+      <button id="agenda-copy-btn" class="primary" disabled>העתקה</button>
+    </div>
+    <div class="topbar" data-bar="rules" hidden>
+      <h1>מומחה התקנון</h1><span class="sub">בקרוב</span>
+    </div>
+    <div class="topbar" data-bar="proto" hidden>
+      <h1>סיכומי פרוטוקולים</h1><span class="sub">בקרוב</span>
+    </div>
+    <div class="topbar" data-bar="research" hidden>
+      <h1>מחקר</h1><span class="sub">בקרוב</span>
     </div>
 
     <div class="stage">
@@ -77,6 +106,66 @@
             </section>
           </div>
         </div>
+      </div>
+
+      <div class="tab" id="merge">
+        <section class="card coming-soon"><div class="body">בקרוב.</div></section>
+      </div>
+
+      <div class="tab" id="query">
+        <div class="cols" style="grid-template-columns:1.4fr 1fr">
+          <section class="card">
+            <header><h2>ניסוח השאילתה</h2></header>
+            <div class="chat-form">
+              <div class="fld"><label>אל השר/ה</label>
+                <input id="query-minister-input" class="inp" type="text" placeholder="למשל: לביטחון הפנים" /></div>
+              <div class="fld"><label>מאת (שם חבר/ת הכנסת)</label>
+                <input id="query-mk-input" class="inp" type="text" /></div>
+              <div class="fld"><label>סוג</label>
+                <select id="query-kind-input">
+                  <option value="רגילה" selected>רגילה (עד 50 מילים)</option>
+                  <option value="דחופה">דחופה (עד 40 מילים)</option>
+                  <option value="ישירה">ישירה (בלי הגבלת מילים)</option>
+                </select></div>
+            </div>
+            <div class="chat" id="query-chat"></div>
+            <div class="composer">
+              <input id="query-composer-input" class="inp" type="text" placeholder="על מה תרצו לשאול? (או: בקשו לקצר/לשנות ניסוח)" />
+              <button id="query-send-btn" class="primary">שליחה</button>
+            </div>
+          </section>
+          <section class="card">
+            <header><h2>שאילתות קודמות בנושא</h2><span>בקרוב (1.4)</span></header>
+            <div class="body coming-soon">יידרש חיבור למאגר השאילתות של הכנסת.</div>
+          </section>
+        </div>
+      </div>
+
+      <div class="tab" id="agenda">
+        <div class="cols" style="grid-template-columns:1fr">
+          <section class="card" style="max-width:880px;margin:0 auto;width:100%">
+            <header><h2>ניסוח הצעה לסדר</h2><span>נושא, נימוק, ובקשה לדיון</span></header>
+            <div class="chat-form">
+              <div class="fld"><label>מאת (שם חבר/ת הכנסת)</label>
+                <input id="agenda-mk-input" class="inp" type="text" /></div>
+            </div>
+            <div class="chat" id="agenda-chat"></div>
+            <div class="composer">
+              <input id="agenda-composer-input" class="inp" type="text" placeholder="על מה תרצו להציע לסדר? (או: בקשו לשנות ניסוח)" />
+              <button id="agenda-send-btn" class="primary">שליחה</button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="tab" id="rules">
+        <section class="card coming-soon"><div class="body">בקרוב.</div></section>
+      </div>
+      <div class="tab" id="proto">
+        <section class="card coming-soon"><div class="body">בקרוב.</div></section>
+      </div>
+      <div class="tab" id="research">
+        <section class="card coming-soon"><div class="body">בקרוב.</div></section>
       </div>
     </div>
   </div>

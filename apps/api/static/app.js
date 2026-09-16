@@ -642,3 +642,187 @@ for (const inputId of ["bill-title-input", "bill-initiator-input"]) {
 document.getElementById("explanatory-input").addEventListener("blur", refreshPreview);
 
 initLawSearch();
+
+/* ═══ ניווט לשוניות (משימה ח, 2026-09-16) - בלי state בשרת, כל
+ * לשונית מסתירה/מציגה DOM בלבד. bills נשארת ברירת המחדל. ═══ */
+function switchTab(tabName) {
+  for (const btn of document.querySelectorAll(".nav button[data-t]")) {
+    btn.classList.toggle("on", btn.dataset.t === tabName);
+  }
+  for (const bar of document.querySelectorAll(".topbar[data-bar]")) {
+    bar.hidden = bar.dataset.bar !== tabName;
+  }
+  for (const tab of document.querySelectorAll(".tab[id]")) {
+    tab.classList.toggle("on", tab.id === tabName);
+  }
+}
+
+for (const btn of document.querySelectorAll(".nav button[data-t]")) {
+  btn.addEventListener("click", () => switchTab(btn.dataset.t));
+}
+
+/* ═══ כלי שאילתא/הצעה לסדר - קומפוננטת צ'אט אחת ═══ (משימה ח)
+ * כל הודעת משתמש נוספת ל-topicHistory ונשלחת מחדש כמכלול (השרת אינו
+ * שומר state, ראו 10ב) - כך ש"קצר את זה"/"שנה ניסוח" עובדים כהמשך
+ * שיחה טבעי, לא רק כפנייה ראשונה. */
+function appendMsg(container, cls, html) {
+  const div = document.createElement("div");
+  div.className = `msg ${cls}`;
+  div.innerHTML = html;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function wordCountHtml(wordCount, wordLimit) {
+  if (wordLimit == null) return `<div class="word-count">${wordCount} מילים (בלי הגבלה)</div>`;
+  const over = wordCount > wordLimit;
+  return `<div class="word-count${over ? " over" : ""}">${wordCount}/${wordLimit} מילים${over ? " - חורג מהמגבלה!" : ""}</div>`;
+}
+
+// --- שאילתות ---
+let queryTopicHistory = [];
+let currentQueryDraft = null;
+
+async function sendQueryMessage() {
+  const input = document.getElementById("query-composer-input");
+  const text = input.value.trim();
+  if (!text) return;
+  const minister = document.getElementById("query-minister-input").value.trim();
+  const mkName = document.getElementById("query-mk-input").value.trim();
+  const kind = document.getElementById("query-kind-input").value;
+  const chat = document.getElementById("query-chat");
+
+  if (!minister || !mkName) {
+    appendMsg(chat, "err", "יש למלא \"אל השר/ה\" ו\"מאת\" לפני ניסוח השאילתה.");
+    return;
+  }
+
+  appendMsg(chat, "u", escapeHtml(text));
+  queryTopicHistory.push(text);
+  input.value = "";
+  input.disabled = true;
+
+  try {
+    const resp = await fetch("/api/query/draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic_description: queryTopicHistory.join("\n"),
+        kind,
+        minister,
+        mk_name: mkName,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      appendMsg(chat, "err", escapeHtml(err.detail || "שגיאה בניסוח השאילתה."));
+      return;
+    }
+    currentQueryDraft = await resp.json();
+    document.getElementById("query-export-btn").disabled = false;
+    appendMsg(
+      chat,
+      "a",
+      `ניסחתי טיוטה לפי הפורמט המקובל.` +
+        `<div class="draft"><div class="to">שאילתה ${escapeHtml(currentQueryDraft.kind)} ${escapeHtml(minister)}</div>` +
+        `${escapeHtml(currentQueryDraft.body)}${wordCountHtml(currentQueryDraft.word_count, currentQueryDraft.word_limit)}</div>`
+    );
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById("query-send-btn").addEventListener("click", sendQueryMessage);
+document.getElementById("query-composer-input").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") sendQueryMessage();
+});
+
+document.getElementById("query-export-btn").addEventListener("click", async () => {
+  if (!currentQueryDraft) return;
+  const resp = await fetch("/api/query/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(currentQueryDraft),
+  });
+  if (!resp.ok) return;
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "שאילתה.docx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+// --- הצעות לסדר ---
+let agendaTopicHistory = [];
+let currentAgendaDraft = null;
+
+async function sendAgendaMessage() {
+  const input = document.getElementById("agenda-composer-input");
+  const text = input.value.trim();
+  if (!text) return;
+  const mkName = document.getElementById("agenda-mk-input").value.trim();
+  const chat = document.getElementById("agenda-chat");
+
+  if (!mkName) {
+    appendMsg(chat, "err", "יש למלא \"מאת\" לפני ניסוח ההצעה.");
+    return;
+  }
+
+  appendMsg(chat, "u", escapeHtml(text));
+  agendaTopicHistory.push(text);
+  input.value = "";
+  input.disabled = true;
+
+  try {
+    const resp = await fetch("/api/agenda/draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic_description: agendaTopicHistory.join("\n"), mk_name: mkName }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      appendMsg(chat, "err", escapeHtml(err.detail || "שגיאה בניסוח ההצעה."));
+      return;
+    }
+    currentAgendaDraft = await resp.json();
+    document.getElementById("agenda-copy-btn").disabled = false;
+    appendMsg(
+      chat,
+      "a",
+      `הנה נוסח מוצע.` +
+        `<div class="draft"><div class="to">הצעה לסדר היום</div>` +
+        `<b>הנושא:</b> ${escapeHtml(currentAgendaDraft.subject)}<br><br>` +
+        `${escapeHtml(currentAgendaDraft.reasoning)}<br><br>${escapeHtml(currentAgendaDraft.request_text)}</div>`
+    );
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById("agenda-send-btn").addEventListener("click", sendAgendaMessage);
+document.getElementById("agenda-composer-input").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") sendAgendaMessage();
+});
+
+document.getElementById("agenda-copy-btn").addEventListener("click", async () => {
+  if (!currentAgendaDraft) return;
+  const text =
+    `הצעה לסדר היום - ${currentAgendaDraft.subject}\n\n` +
+    `${currentAgendaDraft.reasoning}\n\n${currentAgendaDraft.request_text}\n\n${currentAgendaDraft.mk_name}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById("agenda-copy-btn");
+    const original = btn.textContent;
+    btn.textContent = "הועתק!";
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch (e) {
+    appendMsg(document.getElementById("agenda-chat"), "err", "ההעתקה נכשלה - יש להעתיק ידנית.");
+  }
+});

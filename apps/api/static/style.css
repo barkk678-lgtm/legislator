@@ -279,3 +279,34 @@ select { font-weight: 600; max-width: 420px; }
 /* ולידציה: אינה מוצגת למשתמש (docs/design/README.md #4) - 15 הבדיקות
    ממשיכות לרוץ בשרת כרגיל, פנימית בלבד. חיווי על שדה חסר מוצג בטופס
    עצמו (source-ref-note למעלה), לא כפאנל נפרד. */
+
+/* ═══ מעטפת צ'אט (משימה ח, 2026-09-16) - שאילתות + הצעות לסדר.
+   ערכי הצבע/מידה מועתקים במדויק מ-docs/design/legislator-mockup.html
+   (חלק "צ'אט") - README.md §"מה לוקחים ממנו": עיצוב, לא HTML. ═══ */
+.nav-sep { height: 1px; background: rgba(255,255,255,.12); margin: 11px; }
+
+.chat-form {
+  display: flex; gap: 14px; padding: 14px 24px 0; flex-wrap: wrap;
+}
+.chat-form .fld { flex: 1 1 160px; min-width: 140px; }
+
+.chat { flex: 1; overflow: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.msg { max-width: 78%; padding: 11px 15px; border-radius: 12px; font-size: 14.5px; line-height: 1.65; white-space: pre-wrap; }
+.msg.u { align-self: flex-start; background: var(--flag); color: #fff; border-end-start-radius: 3px; }
+.msg.a { align-self: flex-end; background: var(--tint-2); border: 1px solid var(--rule); border-end-end-radius: 3px; }
+.msg.err { align-self: flex-end; background: var(--del-bg); border: 1px solid var(--del); color: var(--del); }
+.composer {
+  border-top: 1px solid var(--rule); padding: 12px 16px; display: flex; gap: 10px;
+  background: var(--tint-2); flex: 0 0 auto;
+}
+.composer .inp { flex: 1; font-size: 14.5px; }
+.draft {
+  font-family: "Frank Ruhl Libre", serif; font-size: 15px; line-height: 1.85;
+  background: var(--page); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 16px 18px; margin-top: 10px;
+}
+.draft .to { font-weight: 700; margin-bottom: 8px; }
+.draft .word-count { font-family: "Assistant", sans-serif; font-size: 12px; color: var(--soft); margin-top: 10px; }
+.draft .word-count.over { color: var(--del); font-weight: 600; }
+
+.coming-soon { display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 14.5px; height: 100%; }
