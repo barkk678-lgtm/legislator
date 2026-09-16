@@ -1,5 +1,5 @@
 fastapi
 uvicorn
 jinja2
-httpx  # רק לצורך tests/unit/test_api.py (FastAPI TestClient) - לא נדרש בהרצה
+httpx  # law_registry.py (חיבור Supabase REST) + tests/unit/test_api.py (TestClient)
 pyluach  # המרת תאריך גרגוריאני-עברי, לצורך שנת הצעת חוק ברירת מחדל (bill_title.py)

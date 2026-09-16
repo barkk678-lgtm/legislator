@@ -34,7 +34,7 @@ from validator import validate  # noqa: E402
 from apply_changes import apply_pending_changes  # noqa: E402
 from explanatory_draft import draft_explanatory_notes  # noqa: E402
 from insert_preview import preview_insertion_label  # noqa: E402
-from law_registry import LAWS, load_law, law_summaries, search_law_titles  # noqa: E402
+from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
 from schemas import BillMetaIn, InsertPreviewRequestIn, RenderRequest  # noqa: E402
 
@@ -69,10 +69,11 @@ def api_search_laws(q: str = "") -> list[dict]:
 
 @app.get("/api/laws/{law_id}")
 def api_law(law_id: str) -> dict:
-    if law_id not in LAWS:
+    try:
+        root = load_law(law_id)
+    except LawNotFoundError:
         raise HTTPException(404, f"חוק לא מוכר: {law_id}")
-    cfg = LAWS[law_id]
-    root = load_law(law_id)
+    cfg = get_law_config(law_id, root)
     amendable = any(c.node_type == "section" for c in root.children)
     return {
         "id": law_id,
@@ -110,10 +111,11 @@ def _render(law_id: str, req: RenderRequest):
     """הליבה המשותפת ל-preview ול-docx: apply_pending_changes() ->
     amend() -> validate(). מחזירה dict מוכן ל-JSON (preview) - docx
     בונה Bill בעצמו מתוך אותו lines."""
-    if law_id not in LAWS:
+    try:
+        before = load_law(law_id)
+    except LawNotFoundError:
         raise HTTPException(404, f"חוק לא מוכר: {law_id}")
-    cfg = LAWS[law_id]
-    before = load_law(law_id)
+    cfg = get_law_config(law_id, before)
     result = apply_pending_changes(before, req.edits, req.insertions)
     lines = amend(before, result.after, result.annotations, law_footnote_key=cfg.footnote_key)
     bill = _bill_from_meta(req.bill, lines, before)
@@ -144,9 +146,10 @@ def api_render(law_id: str, req: RenderRequest) -> dict:
 
 @app.post("/api/laws/{law_id}/insert-preview")
 def api_insert_preview(law_id: str, req: InsertPreviewRequestIn) -> dict:
-    if law_id not in LAWS:
+    try:
+        before = load_law(law_id)
+    except LawNotFoundError:
         raise HTTPException(404, f"חוק לא מוכר: {law_id}")
-    before = load_law(law_id)
     result = apply_pending_changes(before, req.edits, req.insertions)
     preview = preview_insertion_label(result.after, req.anchor_node_id, req.level)
     return dataclasses.asdict(preview)
@@ -155,7 +158,7 @@ def api_insert_preview(law_id: str, req: InsertPreviewRequestIn) -> dict:
 @app.post("/api/laws/{law_id}/docx")
 def api_docx(law_id: str, req: RenderRequest):
     before, result, lines, bill, findings = _render(law_id, req)
-    cfg = LAWS[law_id]
+    cfg = get_law_config(law_id, before)
     refs = {cfg.footnote_key: cfg.known_source_ref or ""}
 
     out_path = Path(tempfile.mkstemp(suffix=".docx")[1])
