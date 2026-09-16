@@ -120,13 +120,9 @@ class QueryExportRequestIn(BaseModel):
 class AgendaDraftRequestIn(BaseModel):
     """בקשה לניסוח הצעה לסדר היום (משימה ז, 2026-09-16) - ראו
     agenda_tool.py. זהה מבנית ל-QueryDraftRequestIn בלי kind (הצעה
-    לסדר אינה מסווגת רגילה/דחופה/ישירה כמו שאילתה)."""
+    לסדר אינה מסווגת רגילה/דחופה/ישירה כמו שאילתה). **בלי ייצוא**
+    (ברק, במפורש: "זהה ל-ו' בלי ייצוא") - אין AgendaExportRequestIn
+    בכוונה, לא השמטה."""
 
     topic_description: str
-
-
-class AgendaExportRequestIn(BaseModel):
-    subject: str
-    reasoning: str
-    request_text: str
     mk_name: str

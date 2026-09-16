@@ -34,11 +34,13 @@ from validator import validate  # noqa: E402
 from apply_changes import apply_pending_changes  # noqa: E402
 from explanatory_draft import draft_explanatory_notes  # noqa: E402
 from insert_preview import preview_insertion_label  # noqa: E402
+from agenda_tool import AgendaDraftError, draft_agenda  # noqa: E402
 from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
 from query_tool import QueryDraftError, draft_query, write_query_docx  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
 from schemas import (  # noqa: E402
+    AgendaDraftRequestIn,
     BillMetaIn,
     DraftRequestIn,
     InsertPreviewRequestIn,
@@ -232,3 +234,16 @@ def api_query_export(req: QueryExportRequestIn):
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename="שאילתה.docx",
     )
+
+
+# ── כלי הצעה לסדר היום (משימה ז, 2026-09-16) ────────────────────────────
+# זהה ל-/api/query/draft במבנה, בלי /export (ברק, במפורש) - ראו
+# agenda_tool.py.
+
+
+@app.post("/api/agenda/draft")
+def api_agenda_draft(req: AgendaDraftRequestIn) -> dict:
+    try:
+        return draft_agenda(topic_description=req.topic_description, mk_name=req.mk_name)
+    except AgendaDraftError as e:
+        raise HTTPException(422, str(e))
