@@ -36,8 +36,16 @@ from explanatory_draft import draft_explanatory_notes  # noqa: E402
 from insert_preview import preview_insertion_label  # noqa: E402
 from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
+from query_tool import QueryDraftError, draft_query, write_query_docx  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
-from schemas import BillMetaIn, DraftRequestIn, InsertPreviewRequestIn, RenderRequest  # noqa: E402
+from schemas import (  # noqa: E402
+    BillMetaIn,
+    DraftRequestIn,
+    InsertPreviewRequestIn,
+    QueryDraftRequestIn,
+    QueryExportRequestIn,
+    RenderRequest,
+)
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
@@ -189,4 +197,38 @@ def api_docx(law_id: str, req: RenderRequest):
         out_path,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=f"{law_id}-הצעת-חוק.docx",
+    )
+
+
+# ── כלי שאילתא (משימה ו, 2026-09-16) ────────────────────────────────────
+# לא נוגע בנוסח חוק בכלל - לא כפוף לחוקי ברזל 1-2 (CLAUDE.md). "בלי
+# state בשרת" (10ב) חל גם כאן: /export מקבל את הטיוטה המלאה מהלקוח
+# (אחרי עריכת המשתמש), לא רק מזהה - כמו /docx לעיל.
+
+
+@app.post("/api/query/draft")
+def api_query_draft(req: QueryDraftRequestIn) -> dict:
+    try:
+        return draft_query(
+            topic_description=req.topic_description, kind=req.kind, minister=req.minister, mk_name=req.mk_name
+        )
+    except QueryDraftError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.post("/api/query/export")
+def api_query_export(req: QueryExportRequestIn):
+    query = {
+        "kind": req.kind,
+        "minister": req.minister,
+        "mk_name": req.mk_name,
+        "subject": req.subject,
+        "body": req.body,
+    }
+    out_path = Path(tempfile.mkstemp(suffix=".docx")[1])
+    write_query_docx(query, skeleton=SKELETON, out=out_path)
+    return FileResponse(
+        out_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename="שאילתה.docx",
     )

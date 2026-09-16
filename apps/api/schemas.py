@@ -95,3 +95,38 @@ class DraftRequestIn(BaseModel):
 
     edits: list[TextEditIn] = []
     insertions: list[InsertionIn] = []
+
+
+class QueryDraftRequestIn(BaseModel):
+    """בקשה לניסוח שאילתה (משימה ו, 2026-09-16) - ראו query_tool.py."""
+
+    topic_description: str
+    kind: Literal["רגילה", "דחופה", "ישירה"] = "רגילה"
+    minister: str
+    mk_name: str
+
+
+class QueryExportRequestIn(BaseModel):
+    """ייצוא לוורד - בלי state בשרת (10ב): הלקוח שולח את הטיוטה
+    המלאה, כולל עריכות שהמשתמש עשה אחרי draft_query - לא רק מזהה."""
+
+    kind: Literal["רגילה", "דחופה", "ישירה"]
+    minister: str
+    mk_name: str
+    subject: str
+    body: str
+
+
+class AgendaDraftRequestIn(BaseModel):
+    """בקשה לניסוח הצעה לסדר היום (משימה ז, 2026-09-16) - ראו
+    agenda_tool.py. זהה מבנית ל-QueryDraftRequestIn בלי kind (הצעה
+    לסדר אינה מסווגת רגילה/דחופה/ישירה כמו שאילתה)."""
+
+    topic_description: str
+
+
+class AgendaExportRequestIn(BaseModel):
+    subject: str
+    reasoning: str
+    request_text: str
+    mk_name: str
