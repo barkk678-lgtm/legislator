@@ -46,6 +46,9 @@ from admin_ingest import (  # noqa: E402
     IngestStorageLimitError,
     run_ingest_batch,
 )
+from knesset_bills import similar_bills  # noqa: E402
+from knesset_citations import OdataError, citations_for_law  # noqa: E402
+from knesset_queries import search_queries  # noqa: E402
 from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
 from semantic_search import (  # noqa: E402
     SemanticSearchConfigError,
@@ -195,6 +198,42 @@ def api_admin_ingest_chunks(
         raise HTTPException(429, str(e))
     except IngestStorageLimitError as e:
         raise HTTPException(507, str(e))
+
+
+# --- OData של הכנסת (משימה 1.4) ---------------------------------
+# שלושת הנתיבים קוראים חי מהפיד של הכנסת, בלי להעתיק אותו ל-DB:
+# שאילתה ממוקדת נמדדה ב-~0.6 שניות, ושלוש הטבלאות היו תופסות ~30MB
+# מתוך 52MB שנותרו ב-Free tier. 502 = הפיד לא זמין, לא באג אצלנו.
+
+
+@app.get("/api/laws/{law_id}/citations")
+def api_law_citations(law_id: str) -> dict:
+    """מראי מקום לחוק: הפרסום המקורי וכל תיקון, בפורמט המוכן
+    להערת שוליים. נבדק: 1,077 מתוך 1,094 חוקי הקורפוס (98.4%)
+    מקבלים מראי מקום."""
+    try:
+        return citations_for_law(law_id)
+    except OdataError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.get("/api/bills/similar")
+def api_similar_bills(title: str = "", knesset: int | None = None, limit: int = 10) -> dict:
+    """הצעות חוק קיימות שדומות בשמן - הבדיקה שהחוברת הסגולה מחייבת
+    ושעוזר פרלמנטרי עושה היום ידנית."""
+    try:
+        return similar_bills(title, knesset_num=knesset, limit=limit)
+    except OdataError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.get("/api/queries/search")
+def api_queries_search(q: str = "", limit: int = 12) -> dict:
+    """שאילתות קודמות באותו נושא, לחיבור לכלי ניסוח השאילתא."""
+    try:
+        return search_queries(q, limit=limit)
+    except OdataError as e:
+        raise HTTPException(502, str(e))
 
 
 @app.get("/api/laws/{law_id}")

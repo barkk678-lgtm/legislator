@@ -329,3 +329,13 @@ select { font-weight: 600; max-width: 420px; }
 .result:last-child { border-bottom: 0; }
 .result-head { font-weight: 600; margin-bottom: 4px; color: var(--navy); }
 .result-body { font-size: 14px; line-height: 1.75; color: var(--ink); }
+
+/* --- OData של הכנסת (1.4) --- */
+.citation-row { padding: 8px 2px; border-bottom: 1px solid var(--rule); font-size: 13.5px; }
+.citation-row:last-child { border-bottom: 0; }
+.citation-ref { color: var(--navy); font-weight: 600; margin-inline-start: 6px; }
+.citation-date { color: var(--soft); font-size: 12.5px; margin-inline-start: 6px; }
+.citation-title { color: var(--ink); margin-top: 2px; }
+#citations-box { margin-top: 12px; font-size: 13.5px; }
+#citations-box summary { cursor: pointer; color: var(--navy); font-weight: 600; }
+#similar-bills-notice:not(:empty) { margin-bottom: 14px; }

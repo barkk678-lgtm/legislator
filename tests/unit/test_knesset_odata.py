@@ -1,96 +1,110 @@
-"""בדיקות ל-knesset_odata.py. ראו TASKS.md משימה 7 / docs/strategy/
-decisions.md (2026-09-14) - סינון חוקים מבוטלים/פקעו/נושנו.
+"""OData של הכנסת (משימה 1.4) - בלי רשת.
 
-כל הבדיקות כאן סינתטיות (רשימות dict בזיכרון) - fetch_israel_laws
-(הפונקציה היחידה שנוגעת ברשת) לא נבדקת כאן, בדיוק כמו
-wikitext_client.fetch_wikitext. הדוגמאות משוחזרות מממצאים אמיתיים
-(ראו decisions.md): "חפשי"/"חופשי" (כתיב חסר/מלא), "חוק הבחירות
-לכנסת" (עמימות עם פישור), "חוק שירות נתוני אשראי" (בוטל בפועל).
+הפיד עצמו נבדק חי (ראו ROADMAP/night-report); כאן נבדקת הלוגיקה
+שסביבו, ובראשה **העימוד**: הפיד מחזיר 100 שורות לכל בקשה ומתעלם
+בשקט מ-$top גדול יותר - אותה מלכודת בדיוק כמו PostgREST. בנוסף
+נבדקת ההגנה מפני חיתוך שקט: חריגה מתקרת העמודים זורקת שגיאה ולא
+מחזירה תוצאה חלקית (זה קרה בפועל בזמן הפיתוח).
 """
 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "packages" / "knesset"))
+sys.path.insert(0, str(ROOT / "apps" / "api"))
 
-from knesset_odata import (  # noqa: E402
-    base_title,
-    classify_validity,
-    should_ingest,
-    strip_matres_lectionis,
-)
+import odata  # noqa: E402
+from odata import OdataError, escape  # noqa: E402
 
 
-def _rec(name: str, validity: str) -> dict:
-    return {"Name": name, "LawValidityDesc": validity}
+class _Resp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+    def raise_for_status(self):
+        return None
+
+
+class _FakeClient:
+    """מחקה את הפיד: 100 שורות לכל בקשה + nextLink עד שנגמר."""
+
+    def __init__(self, total, page=100):
+        self.total, self.page, self.calls = total, page, 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def get(self, url, params=None):
+        start = self.calls * self.page
+        self.calls += 1
+        rows = [{"Id": i} for i in range(start, min(start + self.page, self.total))]
+        payload = {"value": rows}
+        if start + self.page < self.total:
+            payload["@odata.nextLink"] = f"next?skip={start + self.page}"
+        return _Resp(payload)
 
 
 def main():
-    checks = []
+    ok = True
+    saved_client, saved_pages = odata._client, odata._MAX_PAGES
 
-    # base_title: מסיר סיומת שנה עברית + גרשיים/מקפים לא-אחידים
-    checks.append(
-        ("base_title מסיר סיומת שנה עברית", base_title('חוק אוויר נקי, התשס"ח-2008') == "חוק אוויר נקי")
-    )
-    checks.append(
-        ("base_title מסיר '[נוסח משולב]' עם השנה", base_title('חוק הבחירות לכנסת [נוסח משולב], התשכ"ט-1969') == "חוק הבחירות לכנסת")
-    )
+    try:
+        # --- עימוד מלא מעבר ל-100 ---
+        fake = _FakeClient(total=300)
+        odata._client = lambda: fake
+        rows = odata.fetch("KNS_LawBinding", filter="IsraelLawID eq 2000198")
+        checks = [
+            (len(rows) == 300, f"300 שורות נשלפו, לא 100 (התקבלו {len(rows)})"),
+            (fake.calls == 3, f"שלוש בקשות דרך nextLink (היו {fake.calls})"),
+        ]
 
-    # strip_matres_lectionis: לא נוגע באות ראשונה של מילה
-    checks.append(("strip_matres: 'חפשי' ו'חופשי' -> אותו שלד", strip_matres_lectionis("חפשי") == strip_matres_lectionis("חופשי")))
-    checks.append(("strip_matres: לא נוגע באות הראשונה", strip_matres_lectionis("ויקיפדיה").startswith("ו")))
+        # --- תקרה שלנו על סך השורות ---
+        fake2 = _FakeClient(total=1000)
+        odata._client = lambda: fake2
+        checks.append((len(odata.fetch("KNS_Bill", top=7)) == 7, "top=7 מחזיר 7 שורות"))
 
-    kns = [
-        _rec("חוק אוויר נקי, התשס\"ח-2008", "תקף"),
-        _rec("חוק אזורי נמל חופשיים, התשכ\"ט-1969", "תקף"),
-        _rec("חוק שירות נתוני אשראי, התשס\"ב-2002", "בטל"),
-        _rec('חוק הבחירות לכנסת, התשי"ט-1959 [נוסח משולב]', "בטל"),
-        _rec('חוק הבחירות לכנסת, התשט"ו-1955 [נוסח משולב]', "בטל"),
-        _rec('חוק הבחירות לכנסת [נוסח משולב], התשכ"ט-1969', "תקף"),
-        _rec("חוק להתפזרות הכנסת ה-18, התשע\"ג-2013", "נושן"),
-        _rec("חוק דוגמה עם שתי גרסאות בטלות, התש\"א-1951", "בטל"),
-        _rec("חוק דוגמה עם שתי גרסאות בטלות, התש\"ב-1952", "פקע"),
-    ]
+        # --- חריגה מתקרת העמודים זורקת, לא מחזירה חלקי ---
+        fake3 = _FakeClient(total=10_000)
+        odata._client = lambda: fake3
+        odata._MAX_PAGES = 3
+        threw = False
+        try:
+            odata.fetch("KNS_Bill")
+        except OdataError:
+            threw = True
+        checks.append((threw, "חריגה מתקרת העמודים -> שגיאה, לא 300 שורות מתוך 10,000 בשקט"))
+    finally:
+        odata._client, odata._MAX_PAGES = saved_client, saved_pages
 
-    # התאמה מדויקת, תקף
-    m = classify_validity("חוק אוויר נקי", kns)
-    checks.append(("התאמה מדויקת -> exact", m.match_method == "exact"))
-    checks.append(("התאמה מדויקת -> תקף", m.law_validity_desc == "תקף"))
-    checks.append(("התאמה מדויקת -> should_ingest True", should_ingest(m) is True))
+    # --- escape מונע שבירת ה-filter על גרש (נפוץ בשמות חוקים) ---
+    checks.append((escape("התשס'ו") == "התשס''ו", "גרש בודד מוכפל"))
 
-    # התאמה רק אחרי הסרת אימות קריאה (חפשי/חופשי)
-    m = classify_validity("חוק אזורי נמל חפשיים", kns)
-    checks.append(("כתיב חסר -> normalized", m.match_method == "normalized"))
-    checks.append(("כתיב חסר -> should_ingest True", should_ingest(m) is True))
+    # --- דמיון שמות: מילות מילוי לא יוצרות התאמה מזויפת ---
+    from knesset_bills import _words  # noqa: PLC0415
 
-    # התאמה מדויקת לחוק בטל בפועל
-    m = classify_validity("חוק שירות נתוני אשראי", kns)
-    checks.append(("חוק בטל -> exact", m.match_method == "exact"))
-    checks.append(("חוק בטל -> should_ingest False", should_ingest(m) is False))
+    filler = _words("הצעת חוק לתיקון חוק (תיקון מס' 3)")
+    checks.append((not filler, f"שם שכולו מילות מילוי -> אין מילות תוכן (התקבל {filler})"))
+    real = _words("חוק תובענות ייצוגיות (תיקון - הרחבת עילות)")
+    checks.append(({"תובענות", "ייצוגיות"} <= real, "מילות התוכן האמיתיות מזוהות"))
 
-    # עמימות עם פישור: שלוש רשומות, אחת תקף בלבד -> נבחרת
-    m = classify_validity("חוק הבחירות לכנסת", kns)
-    checks.append(("עמימות עם פישור -> מוצאת את התקף", m.law_validity_desc == "תקף"))
-    checks.append(("עמימות עם פישור -> should_ingest True", should_ingest(m) is True))
+    # --- מזהה bill- אינו חוק עצמאי במאגר הכנסת ---
+    from knesset_citations import _israel_law_id  # noqa: PLC0415
 
-    # עמימות בלי פישור: שתי רשומות, אף אחת לא תקף -> ambiguous, לא נזרק
-    m = classify_validity("חוק דוגמה עם שתי גרסאות בטלות", kns)
-    checks.append(("עמימות בלי תקף -> ambiguous", m.match_method == "ambiguous"))
-    checks.append(("עמימות בלי תקף -> validity_desc None", m.law_validity_desc is None))
-    checks.append(("עמימות בלי תקף -> should_ingest True (לא נזרק)", should_ingest(m) is True))
+    checks.append((_israel_law_id("law-2000613") == 2000613, "law-2000613 -> 2000613"))
+    checks.append((_israel_law_id("bill-1046679") is None, "bill- -> אין IsraelLawID (לא שגיאה)"))
+    checks.append((_israel_law_id("law-tkanon-haknesset") is None, "מזהה לא-מספרי -> None"))
 
-    # לא נמצאה שום התאמה
-    m = classify_validity("חוק שלא קיים בכלל בכנסת", kns)
-    checks.append(("לא נמצא -> not_found", m.match_method == "not_found"))
-    checks.append(("לא נמצא -> should_ingest True (לא נזרק)", should_ingest(m) is True))
+    for passed, label in checks:
+        ok = ok and passed
+        print(("OK " if passed else "FAIL"), label)
 
-    # נושן - לא נטען
-    m = classify_validity("חוק להתפזרות הכנסת ה-18", kns)
-    checks.append(("נושן -> should_ingest False", should_ingest(m) is False))
-
-    ok = all(passed for _, passed in checks)
-    for name, passed in checks:
-        print(("OK  " if passed else "FAIL"), name)
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1
 

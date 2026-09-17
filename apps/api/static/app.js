@@ -198,6 +198,7 @@ async function onLawChange(lawId) {
 
     const law = await (await fetch(`/api/laws/${lawId}`)).json();
     buildOriginalIndex(law.tree);
+    loadCitations(lawId);  // לא await: הפיד חיצוני, אסור שיעכב את הצגת החוק
 
     document.getElementById("law-panels").hidden = false;
     document.getElementById("as-of-note").textContent = law.as_of_display || "";
@@ -945,3 +946,100 @@ document.getElementById("research-send-btn").addEventListener("click", runResear
 document.getElementById("research-input").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter") runResearchSearch();
 });
+
+/* ═══ OData של הכנסת ═══ (משימה 1.4)
+ * שלושה חיבורים לפיד של הכנסת, כל אחד במקום שבו הוא באמת נחוץ:
+ * מראי מקום ליד תצוגת הוורד, אזהרת הצעות דומות מעל עורך החוק,
+ * ומאגר השאילתות בתוך כלי השאילתא. כולם "נכשלים רכות" - הפיד
+ * חיצוני, ואם הוא לא זמין הכלי עצמו חייב להמשיך לעבוד. */
+
+async function loadCitations(lawId) {
+  const box = document.getElementById("citations-box");
+  const body = document.getElementById("citations-body");
+  if (!box || !lawId) return;
+  box.hidden = false;
+  body.innerHTML = `<div class="hint">טוען מראי מקום…</div>`;
+  try {
+    const resp = await fetch(`/api/laws/${encodeURIComponent(lawId)}/citations`);
+    if (!resp.ok) throw new Error("feed");
+    const data = await resp.json();
+    if (!data.in_knesset_db) {
+      // ההבחנה בין "אין תיקונים" ל"לא קיים במאגר" - לא מסך ריק.
+      body.innerHTML = `<div class="hint">${escapeHtml(data.note || "אין רשומה במאגר הכנסת.")}</div>`;
+      return;
+    }
+    const rows = data.citations
+      .map((c) => `<div class="citation-row">
+          <b>${c.is_original ? "הפרסום המקורי" : escapeHtml(c.kind || "תיקון")}</b>
+          <span class="citation-ref">${escapeHtml(c.reference)}</span>
+          <span class="citation-date">${escapeHtml(c.published_at || "")}</span>
+          <div class="citation-title">${escapeHtml(c.title || "")}</div>
+        </div>`)
+      .join("");
+    body.innerHTML = rows || `<div class="hint">לא נמצאו מראי מקום.</div>`;
+  } catch {
+    body.innerHTML = `<div class="hint">מאגר הכנסת אינו זמין כרגע.</div>`;
+  }
+}
+
+async function checkSimilarBills(title) {
+  const el = document.getElementById("similar-bills-notice");
+  if (!el) return;
+  if (!title || title.trim().length < 6) {
+    el.innerHTML = "";
+    return;
+  }
+  try {
+    const resp = await fetch(`/api/bills/similar?title=${encodeURIComponent(title)}&limit=5`);
+    if (!resp.ok) throw new Error("feed");
+    const data = await resp.json();
+    if (!data.results.length) {
+      el.innerHTML = "";
+      return;
+    }
+    const items = data.results
+      .map((b) => `<li>${escapeHtml(b.title)}
+          <span class="citation-date">כנסת ${b.knesset}${b.became_law ? " · התקבל כחוק" : ""}</span></li>`)
+      .join("");
+    el.innerHTML = `<div class="notice notice-coverage">
+        <b>נמצאו הצעות דומות בשמן (${data.results.length}).</b>
+        החוברת הסגולה מחייבת לבדוק הצעות זהות או דומות לפני הנחה.
+        <ul>${items}</ul>
+        <span class="citation-date">${escapeHtml(data.note)}</span>
+      </div>`;
+  } catch {
+    el.innerHTML = "";  // הפיד לא זמין - לא מציקים למשתמש, הכלי ממשיך לעבוד
+  }
+}
+
+async function searchPastQueries() {
+  const input = document.getElementById("past-queries-input");
+  const out = document.getElementById("past-queries-results");
+  const q = input.value.trim();
+  if (!q) return;
+  out.innerHTML = `<div class="hint">מחפש…</div>`;
+  try {
+    const resp = await fetch(`/api/queries/search?q=${encodeURIComponent(q)}&limit=12`);
+    if (!resp.ok) throw new Error("feed");
+    const data = await resp.json();
+    if (!data.results.length) {
+      out.innerHTML = `<div class="hint">לא נמצאו שאילתות קודמות בנושא הזה.</div>`;
+      return;
+    }
+    out.innerHTML = data.results
+      .map((r) => `<div class="citation-row">
+          <div class="citation-title">${escapeHtml(r.title)}</div>
+          <span class="citation-date">${escapeHtml(r.kind || "")} · כנסת ${r.knesset} ·
+            ${escapeHtml(r.submitted_at || "")} · ${escapeHtml(r.asked_by || "לא ידוע")}</span>
+        </div>`)
+      .join("");
+  } catch {
+    out.innerHTML = `<div class="hint">מאגר הכנסת אינו זמין כרגע.</div>`;
+  }
+}
+
+document.getElementById("past-queries-btn").addEventListener("click", searchPastQueries);
+document.getElementById("past-queries-input").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") searchPastQueries();
+});
+document.getElementById("bill-title-input").addEventListener("blur", (ev) => checkSimilarBills(ev.target.value));

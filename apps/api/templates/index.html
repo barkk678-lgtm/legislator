@@ -69,6 +69,7 @@
       <div class="tab on" id="bills">
         <div id="law-panels" hidden>
           <div class="source-ref-note" id="source-ref-note"></div>
+          <div id="similar-bills-notice"></div>
 
           <div class="meta">
             <div class="fld">
@@ -103,6 +104,10 @@
                       placeholder="אם נשאר ריק - תיבנה טיוטה אוטומטית לפי סעיפים שנגעתם בהם."></textarea>
                   </div>
                   <div class="hint" id="download-hint"></div>
+                  <details id="citations-box" hidden>
+                    <summary>מראי מקום מהכנסת</summary>
+                    <div id="citations-body"></div>
+                  </details>
                 </div>
               </div>
             </section>
@@ -137,8 +142,12 @@
             </div>
           </section>
           <section class="card">
-            <header><h2>שאילתות קודמות בנושא</h2><span>בקרוב (1.4)</span></header>
-            <div class="body coming-soon">יידרש חיבור למאגר השאילתות של הכנסת.</div>
+            <header><h2>שאילתות קודמות בנושא</h2><span>מתוך מאגר הכנסת</span></header>
+            <div class="composer">
+              <input id="past-queries-input" class="inp" type="text" placeholder="נושא לחיפוש…" />
+              <button id="past-queries-btn" class="primary">חיפוש</button>
+            </div>
+            <div class="body" id="past-queries-results"></div>
           </section>
         </div>
       </div>
