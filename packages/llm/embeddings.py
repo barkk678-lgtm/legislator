@@ -21,7 +21,18 @@ import httpx
 
 _API_URL = "https://api.openai.com/v1/embeddings"
 EMBEDDING_MODEL = "text-embedding-3-large"
-EMBEDDING_DIM = 3072  # ממד ברירת המחדל של text-embedding-3-large - אומת בפועל
+
+# ממד מוקטן (Matryoshka - פרמטר `dimensions` הרשמי של OpenAI), לא
+# ברירת המחדל של המודל (3072) - נמצא תוך כדי בניית סכמת ה-DB
+# (2026-09-17): אינדקס HNSW/IVFFlat של pgvector תומך עד 2,000 מימדים
+# בלבד (מגבלה מתועדת של pgvector עצמו, לא של Supabase) - 3072 היה
+# נכשל ב-CREATE INDEX (`column cannot have more than 2000 dimensions
+# for hnsw index`, נתפס בפועל מול ה-DB האמיתי). 1024 נשאר הרבה מתחת
+# למגבלה, ולפי בנצ'מרק OpenAI עצמו על text-embedding-3-large האובדן
+# באיכות בהקטנה הזו קטן. לא נבדק בפועל מול ה-API (api.openai.com
+# חסום בסביבה הזו, ראו night-report) - החלטה תיעודית-מונחית, לא
+# מדידה אמפירית.
+EMBEDDING_DIM = 1024
 
 
 class EmbeddingConfigError(Exception):
@@ -47,15 +58,22 @@ def _api_key() -> str:
     return key
 
 
-def embed_batch(texts: list[str], *, model: str = EMBEDDING_MODEL) -> list[list[float]]:
+def embed_batch(
+    texts: list[str], *, model: str = EMBEDDING_MODEL, dimensions: int = EMBEDDING_DIM
+) -> list[list[float]]:
     """מחזירה embedding אחד לכל טקסט ב-texts, באותו סדר. batch יחיד -
     ה-API של OpenAI תומך בכמה מחרוזות קלט באותה בקשה (מוזיל עלות
     תקורה), אבל **אם input בודד בתוך ה-batch חורג מהמגבלה, כל הבקשה
     נכשלת** - לכן קוד ה-ingest קורא כאן רק אחרי שכבר סינן/פיצל לפי
-    chunking.py, לא שולח batch גדול בלי בקרה."""
+    chunking.py, לא שולח batch גדול בלי בקרה.
+
+    dimensions: פרמטר רשמי של OpenAI (`text-embedding-3-large` תומך
+    בהקטנת ממד) - ברירת המחדל כאן (1024) *חייבת* להתאים בדיוק ל-
+    `vector(1024)` בסכמת `search_chunks` (supabase/migrations/
+    20260917000000_search_chunks_hybrid_search.sql) - לא עצמאיים."""
     key = _api_key()
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-    body = {"model": model, "input": texts}
+    body = {"model": model, "input": texts, "dimensions": dimensions}
 
     last_exc: Exception | None = None
     for attempt in range(3):
@@ -87,5 +105,5 @@ def embed_batch(texts: list[str], *, model: str = EMBEDDING_MODEL) -> list[list[
     return [row["embedding"] for row in ordered]
 
 
-def embed_one(text: str, *, model: str = EMBEDDING_MODEL) -> list[float]:
-    return embed_batch([text], model=model)[0]
+def embed_one(text: str, *, model: str = EMBEDDING_MODEL, dimensions: int = EMBEDDING_DIM) -> list[float]:
+    return embed_batch([text], model=model, dimensions=dimensions)[0]
