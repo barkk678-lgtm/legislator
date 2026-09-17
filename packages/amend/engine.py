@@ -302,38 +302,60 @@ def _wrap_closing_quote_only(
     בתחילת תא התוכן עצמו - ראו _render_new_section. offset של footnote
     לא זז ב-1 כאן (בניגוד ל-_wrap_new_content) כי לא נוסף תו לפני
     הטקסט."""
-    wrapped = f'{text}"{terminator}'
+    return _split_at_footnote(f'{text}"{terminator}', footnote)
+
+
+def _split_at_footnote(
+    wrapped: str, footnote: FootnoteAnnotation | None
+) -> tuple[str, str, list[str]]:
+    """מפצלת טקסט לשני חלקים בנקודה שבה יושב סימן הערת השוליים
+    (render_bill.render_line מוסיף את הסימן בדיוק בין text ל-text_after).
+    בלי הערת שוליים - הטקסט כולו ב-text."""
     if footnote is None:
         return wrapped, "", []
-    split_at = footnote.offset
-    before_marker = wrapped[:split_at]
-    after_marker = wrapped[split_at:]
-    return before_marker, after_marker, [footnote.key]
+    return wrapped[: footnote.offset], wrapped[footnote.offset :], [footnote.key]
 
 
-def _render_new_section(
+def _new_sections_side_heading(numbers: list[str]) -> str:
+    """כותרת השוליים להוספת סעיף חדש אחד או כמה רצופים.
+
+    הצורה לכמה סעיפים ("הוספת סעיפים 2ג ו־2ד") נצפתה בהצעה אמיתית
+    שהונחה בכנסת - tests/fixtures/real-bills/13948392.docx, הוראת
+    תיקון 1 - עם מקף עברי (U+05BE) ב-"ו־", לא מקף רגיל ולא en-dash.
+    לשלושה ומעלה נגזרת הצורה הרגילה בעברית ("א, ב ו־ג"); **זו הכללה
+    ולא ציטוט** - בין 40 ההצעות שנבדקו לא נצפתה הוראה אחת שמוסיפה
+    שלושה סעיפים רצופים."""
+    if len(numbers) == 1:
+        return f"הוספת סעיף {numbers[0]}"
+    head = ", ".join(numbers[:-1])
+    return f"הוספת סעיפים {head} ו\u05be{numbers[-1]}"
+
+
+def _render_new_sections(
     anchor_number: str,
-    new_section: LegislativeNode,
-    footnote: FootnoteAnnotation | None,
+    new_sections: list[LegislativeNode],
+    footnotes: dict[str, FootnoteAnnotation],
     *,
     full_title: str | None = None,
     law_footnote_key: str | None = None,
 ) -> list[Line]:
-    """מנסחת הוספת סעיף ראשי חדש - ha-hoveret-ha-sgula.pdf §7.12, עמ' 31
-    [PDF 60]: "בחוק [שם החוק], אחרי סעיף [מספר הסעיף] לחוק העיקרי יבוא:
-    'כותרת שוליים [מספר הסעיף החדש] [תוכן הסעיף].'" full_title/
-    law_footnote_key: אותה משמעות כמו ב-_render_mutation/
+    """מנסחת הוספת סעיף ראשי חדש אחד או כמה רצופים - ha-hoveret-ha-sgula.pdf
+    §7.12, עמ' 31 [PDF 60]: "בחוק [שם החוק], אחרי סעיף [מספר הסעיף]
+    לחוק העיקרי יבוא: 'כותרת שוליים [מספר הסעיף החדש] [תוכן הסעיף].'"
+    full_title/law_footnote_key: אותה משמעות כמו ב-_render_mutation/
     _render_relabel_and_insert - מועברים רק כשזו הפעם הראשונה שהחוק
     מוזכר בהצעה (touched_count==1).
 
     **מרכאות (השאלה הפתוחה ב-drafting-rules.md §8.5, הוכרעה 2026-09-12
     מול reference/skeleton-pshia.docx - הצעה פרטית טרומית אמיתית,
-    פ/6158/25, הכנסת 25, לא ניחוש):** כן נושא מרכאות, כמו כל דפוסי
-    ההוספה האחרים - אבל מרכאה אחת בודדת שעוטפת את כל הבלוק המצוטט
-    כיחידה (מהתו הראשון של כותרת השוליים ועד התו האחרון של תוכן
-    הסעיף), לא מרכאות נפרדות בכל תא. לכן הפותחת מוטבעת כאן כתו הראשון
-    של inner_heading, והסוגרת (דרך _wrap_closing_quote_only) כתו
-    האחרון של תא התוכן."""
+    פ/6158/25, הכנסת 25, לא ניחוש):** כן נושא מרכאות, אבל מרכאה אחת
+    בודדת שעוטפת את כל הבלוק המצוטט כיחידה (מהתו הראשון של כותרת
+    השוליים ועד התו האחרון של תוכן הסעיף), לא מרכאות נפרדות בכל תא.
+    לכן הפותחת מוטבעת כתו הראשון של inner_heading **של הסעיף הראשון
+    בלבד**, והסוגרת כתו האחרון של תא התוכן **של האחרון בלבד**: כמה
+    סעיפים שנוספים באותה הוראה הם בלוק מצוטט אחד, לא כמה ציטוטים -
+    אומת מול tests/fixtures/real-bills/13948392.docx (2ג ו-2ד: מרכאה
+    פותחת רק לפני "איסור עיסוק ברבייה...", סוגרת רק בסוף סעיף 2ד)."""
     phrase = f"אחרי סעיף {anchor_number} לחוק העיקרי יבוא:"
     if full_title is not None:
         # מראה המקום (הערת השוליים למקור) חייב לשבת מיד אחרי שם החוק,
@@ -349,24 +371,53 @@ def _render_new_section(
     else:
         phrase_line = Line(text=phrase, depth=0)
 
-    # terminator ריק, בניגוד ל-_render_insertion/_render_relabel_and_insert:
-    # שם ה-"." החיצוני נחוץ כי התוכן המצוטט עצמו נגמר לפעמים ב-";"
-    # (פריט ברשימת הוספות בתוך סעיף קיים וזקוק לחותם משפטי חיצוני).
-    # כאן זו הוראה עצמאית ("אחרי סעיף X לחוק העיקרי יבוא:"), לא פריט
-    # ברשימה - אומת מול reference/skeleton-pshia.docx: המרכאה הסוגרת
-    # שם היא התו האחרון ממש בתא, בלי תו נוסף אחריה (התוכן המצוטט עצמו
-    # כבר מסתיים בנקודה משלו, כמשפט משפטי שלם).
-    body_text, body_after, footnotes = _wrap_closing_quote_only(new_section.text, "", footnote)
-    content_line = Line(
-        text=body_text,
-        text_after=body_after,
-        footnotes=footnotes,
-        style="TableBlock",
-        inner_heading=f'"{new_section.margin_title or ""}',
-        inner_number=f"{new_section.number}.",
-        depth=0,
+    lines = [phrase_line]
+    for position, section in enumerate(new_sections):
+        is_first = position == 0
+        is_last = position == len(new_sections) - 1
+        footnote = footnotes.get(section.id)
+        # terminator ריק, בניגוד ל-_render_insertion/_render_relabel_and_insert:
+        # שם ה-"." החיצוני נחוץ כי התוכן המצוטט עצמו נגמר לפעמים ב-";"
+        # (פריט ברשימת הוספות בתוך סעיף קיים וזקוק לחותם משפטי חיצוני).
+        # כאן זו הוראה עצמאית ("אחרי סעיף X לחוק העיקרי יבוא:"), לא פריט
+        # ברשימה - אומת מול reference/skeleton-pshia.docx: המרכאה הסוגרת
+        # שם היא התו האחרון ממש בתא, בלי תו נוסף אחריה (התוכן המצוטט עצמו
+        # כבר מסתיים בנקודה משלו, כמשפט משפטי שלם).
+        if is_last:
+            body_text, body_after, keys = _wrap_closing_quote_only(section.text, "", footnote)
+        else:
+            body_text, body_after, keys = _split_at_footnote(section.text, footnote)
+        margin = section.margin_title or ""
+        lines.append(
+            Line(
+                text=body_text,
+                text_after=body_after,
+                footnotes=keys,
+                style="TableBlock",
+                inner_heading=f'"{margin}' if is_first else margin,
+                inner_number=f"{section.number}.",
+                depth=0,
+            )
+        )
+    return lines
+
+
+def _render_new_section(
+    anchor_number: str,
+    new_section: LegislativeNode,
+    footnote: FootnoteAnnotation | None,
+    *,
+    full_title: str | None = None,
+    law_footnote_key: str | None = None,
+) -> list[Line]:
+    """עטיפה לסעיף חדש בודד - ראו _render_new_sections."""
+    return _render_new_sections(
+        anchor_number,
+        [new_section],
+        {new_section.id: footnote} if footnote else {},
+        full_title=full_title,
+        law_footnote_key=law_footnote_key,
     )
-    return [phrase_line, content_line]
 
 
 def _render_insertion(
@@ -614,14 +665,36 @@ def amend(
     # בלתי-נראה למנוע - מפיק אפס פלט בשקט, לא שגיאה. all_numbers כולל
     # גם מספרי סעיפים חדשים; sort_section_numbers כבר יודע למיין "8א"
     # מיד אחרי "8" (packages/corpus/numbering.py), כך שהשכן הקודם של
-    # סעיף חדש ב-all_numbers הוא תמיד העוגן הסמנטי הנכון - *אלא אם* גם
-    # הוא עצמו חדש (הוספה רצופה של יותר מסעיף אחד), שנחסמת במפורש למטה
-    # (עדיין לא ממומש - §8.5 מציינת זאת מפורשות כהיקף שלא נכלל).
+    # סעיף חדש ב-all_numbers הוא תמיד העוגן הסמנטי הנכון.
     all_numbers = sort_section_numbers(list(set(before_sections) | set(after_sections)))
+
+    # קיבוץ סעיפים חדשים רצופים להוראת תיקון אחת (2026-09-17). עד כאן
+    # שני סעיפים חדשים זה אחרי זה נחסמו ב-NotImplementedError מפורש -
+    # "היקף שלא נכלל" לפי §8.5. הביקורת מול 40 ההצעות האמיתיות מצאה
+    # שזהו הפער הנפוץ ביותר: הצעה אמיתית מוסיפה שני סעיפים רצופים
+    # בהוראה אחת עם כותרת "הוספת סעיפים 2ג ו־2ד"
+    # (tests/fixtures/real-bills/13948392.docx). המפתח הוא המספר הראשון
+    # ברצף, הערך הוא כל הרצף; שאר חברי הרצף נדלגים בלולאה כי כבר טופלו.
+    new_runs: dict[str, list[str]] = {}
+    covered_by_run: set[str] = set()
+    position = 0
+    while position < len(all_numbers):
+        if all_numbers[position] in before_sections:
+            position += 1
+            continue
+        end = position
+        while end < len(all_numbers) and all_numbers[end] not in before_sections:
+            end += 1
+        run = all_numbers[position:end]
+        new_runs[run[0]] = run
+        covered_by_run.update(run[1:])
+        position = end
 
     lines: list[Line] = []
     touched_count = 0
     for idx, number in enumerate(all_numbers):
+        if number in covered_by_run:
+            continue  # טופל כבר כחלק מקבוצת ההוספה שנפתחה בסעיף קודם
         if number not in before_sections:
             if idx == 0:
                 raise NotImplementedError(
@@ -629,25 +702,21 @@ def amend(
                     "נתמך - אין עוגן קיים להוראת 'אחרי סעיף X לחוק העיקרי "
                     "יבוא'."
                 )
+            # number הוא ראש רצף, ולכן קודמו ב-all_numbers אינו חדש -
+            # העוגן קיים תמיד ב'לפני'. אין כאן הנחה שקטה: הבנייה של
+            # new_runs היא שמבטיחה את זה.
             anchor_number = all_numbers[idx - 1]
-            if anchor_number not in before_sections:
-                raise NotImplementedError(
-                    "הוספה רצופה של יותר מסעיף ראשי חדש אחד (שני סעיפים "
-                    "חדשים זה אחרי זה, או פרק שלם) אינה נתמכת עדיין - "
-                    "drafting-rules.md §8.5 מציינת זאת במפורש כהיקף שלא "
-                    "נכלל, לא כניחוש."
-                )
+            run_numbers = new_runs[number]
             touched_count += 1
-            new_section = after_sections[number]
-            footnote = footnotes_by_id.get(new_section.id)
+            run_sections = [after_sections[n] for n in run_numbers]
             if touched_count == 1:
-                new_lines = _render_new_section(
-                    anchor_number, new_section, footnote,
+                new_lines = _render_new_sections(
+                    anchor_number, run_sections, footnotes_by_id,
                     full_title=before.full_title or "", law_footnote_key=law_footnote_key,
                 )
             else:
-                new_lines = _render_new_section(anchor_number, new_section, footnote)
-            new_lines[0].side_heading = f"הוספת סעיף {number}"
+                new_lines = _render_new_sections(anchor_number, run_sections, footnotes_by_id)
+            new_lines[0].side_heading = _new_sections_side_heading(run_numbers)
             # תוקן (באג אמיתי, לא מוסכמה): golden-kaytanot.docx משאיר את
             # הסעיף הראשון שנוגעים בו בלי מספר בכלל - הוכח שגוי מול
             # reference/skeleton-pshia.docx (הצעה אמיתית שאומתה מול ה-API

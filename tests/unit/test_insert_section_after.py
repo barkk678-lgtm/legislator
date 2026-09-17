@@ -139,14 +139,13 @@ def main():
     ok = ok and threw
     print(("OK  " if threw else "FAIL"), "number נקבע מראש -> שגיאה, לא ניחוש")
 
-    # מקרה שבור: הוספה רצופה של שני סעיפים חדשים זה אחרי זה -> אמור
-    # להיכשל בקול (NotImplementedError), לא לייצר עוגן שגוי - §8.5
-    # מציינת זאת במפורש כהיקף שלא נכלל. נבנה ידנית (בלי transform.apply())
-    # כי next_inserted_label הרקורסיבי (§8.1) על שרשור-הוספות-אמיתי
-    # מייצר "8א1". התווית הזו כבר נתמכת במיון מאז תיקון
-    # parse_section_number (2026-09-17, ראו test_numbering.py) - אבל
-    # הבדיקה כאן נשארת על תוויות פשוטות ("8א"/"8ב") כדי לבודד אותה
-    # ל-NotImplementedError של amend() בלבד, בלי לערב את המספור.
+    # עודכן במכוון ב-2026-09-17 (היה NotImplementedError): הוספה רצופה
+    # של שני סעיפים חדשים היא הפער הנפוץ ביותר שנמצא בביקורת מול 40
+    # הצעות אמיתיות - הצעה שהונחה בכנסת מוסיפה 2ג ו-2ד בהוראה אחת עם
+    # כותרת "הוספת סעיפים 2ג ו־2ד" (tests/fixtures/real-bills/
+    # 13948392.docx). §8.5 סימנה את זה כ"היקף שלא נכלל", וזה מומש -
+    # תיקון, לא רגרסיה. נבנה ידנית (בלי transform.apply()) כדי לבודד
+    # את התנהגות amend() מלוגיקת המספור.
     after3 = _law_with_sections_8_and_9()
     after3.children.insert(1, LegislativeNode(
         id="law/s8a-2", node_type="section", number="8א",
@@ -156,14 +155,28 @@ def main():
         id="law/s8b-2", node_type="section", number="8ב",
         margin_title="כותרת 8ב", text="תוכן 8ב.",
     ))
-    threw2 = False
-    try:
-        amend(before, after3, [], law_footnote_key="fake")
-    except NotImplementedError:
-        threw2 = True
-    ok = ok and threw2
-    print(("OK  " if threw2 else "FAIL"),
-          "הוספה רצופה של שני סעיפים חדשים -> NotImplementedError, לא ניחוש")
+    lines3 = amend(before, after3, [], law_footnote_key="fake")
+    headings3 = [ln.side_heading for ln in lines3 if ln.side_heading]
+    ok = ok and headings3 == ["הוספת סעיפים 8א ו\u05be8ב"]
+    print(("OK  " if headings3 == ["הוספת סעיפים 8א ו\u05be8ב"] else "FAIL"),
+          "שני סעיפים רצופים -> הוראה אחת, כותרת אחת ->", headings3)
+
+    numbers3 = [ln.number for ln in lines3 if ln.number]
+    ok = ok and numbers3 == ["1."]
+    print(("OK  " if numbers3 == ["1."] else "FAIL"),
+          "שני סעיפים רצופים -> הוראת תיקון אחת בלבד ->", numbers3)
+
+    inner3 = [(ln.inner_heading, ln.inner_number) for ln in lines3 if ln.inner_number]
+    expected3 = [('"כותרת 8א', "8א."), ("כותרת 8ב", "8ב.")]
+    ok = ok and inner3 == expected3
+    print(("OK  " if inner3 == expected3 else "FAIL"),
+          "מרכאה פותחת רק בסעיף הראשון ->", inner3)
+
+    closing3 = [ln.text for ln in lines3 if ln.inner_number]
+    closes_once = closing3 == ["תוכן 8א.", 'תוכן 8ב."']
+    ok = ok and closes_once
+    print(("OK  " if closes_once else "FAIL"),
+          "מרכאה סוגרת רק בסעיף האחרון ->", closing3)
 
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1
