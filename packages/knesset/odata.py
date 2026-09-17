@@ -89,3 +89,23 @@ def escape(value: str) -> str:
     גרש (נפוץ בעברית: "התשס\"ו") שובר את ה-filter או גרוע מזה -
     מאפשר הזרקה לביטוי."""
     return value.replace("'", "''")
+
+
+def fetch_raw_array(entity: str, *, filter: str | None = None) -> list[dict]:
+    """ישויות שמחזירות **מערך JSON חשוף** במקום המעטפת התקנית של
+    OData (`{"value": [...]}`), עם מפתחות ב-camelCase קטן במקום
+    PascalCase - למשל `KNS_DocumentQuery`. זו חריגה אמיתית בפיד,
+    לא טעות שלנו: אותו שרת, שתי צורות תשובה.
+
+    אין כאן `@odata.nextLink`, ולכן **אין דרך לדעת אם התשובה נחתכה**.
+    מיועד אך ורק לשליפות ממוקדות לפי מזהה (עשרות שורות לכל היותר),
+    לא לסריקה - ראו CLAUDE.md על ההנחה שכל תשובה מעומדת."""
+    params = {"$filter": filter} if filter else None
+    with _client() as client:
+        try:
+            resp = client.get(f"{BASE_URL}/{entity}", params=params)
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise OdataError(f"כשל בקריאה ל-{entity}: {e}") from None
+    payload = resp.json()
+    return payload if isinstance(payload, list) else payload.get("value", [])

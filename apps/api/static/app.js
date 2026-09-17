@@ -1033,11 +1033,18 @@ async function searchPastQueries() {
       return;
     }
     out.innerHTML = data.results
-      .map((r) => `<div class="citation-row">
-          <div class="citation-title">${escapeHtml(r.title)}</div>
-          <span class="citation-date">${escapeHtml(r.kind || "")} · כנסת ${r.knesset} ·
-            ${escapeHtml(r.submitted_at || "")} · ${escapeHtml(r.asked_by || "לא ידוע")}</span>
-        </div>`)
+      .map((r) => {
+        // קישור לקובץ המקורי באתר הכנסת; לא מושכים אותו - ראו
+        // knesset_queries.py. נפתח בלשונית חדשה כדי לא לאבד את הטיוטה.
+        const title = r.document_url
+          ? `<a href="${escapeHtml(r.document_url)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a>`
+          : escapeHtml(r.title);
+        return `<div class="citation-row">
+            <div class="citation-title">${title}</div>
+            <span class="citation-date">${escapeHtml(r.kind || "")} · כנסת ${r.knesset} ·
+              ${escapeHtml(r.submitted_at || "")} · ${escapeHtml(r.asked_by || "לא ידוע")}</span>
+          </div>`;
+      })
       .join("");
   } catch {
     out.innerHTML = `<div class="hint">מאגר הכנסת אינו זמין כרגע.</div>`;
