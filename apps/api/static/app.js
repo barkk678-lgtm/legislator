@@ -868,3 +868,80 @@ document.getElementById("rules-send-btn").addEventListener("click", sendRulesMes
 document.getElementById("rules-composer-input").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter") sendRulesMessage();
 });
+
+/* ═══ מחקר: חיפוש סמנטי בחקיקה ═══ (ברק, 2026-09-17)
+ * הדרישה המרכזית כאן היא לא החיפוש עצמו אלא **ההבחנה**: משתמש
+ * שמקבל מסך ריק חייב לדעת אם אין תוצאה, או שהחוק הרלוונטי פשוט לא
+ * מאונדקס (67 מתוך 1,094 - מגבלת Free tier, ראו
+ * docs/indexing-priority-250.md). השרת מחזיר coverage בכל תשובה
+ * ואנחנו מרנדרים את ההבדל במפורש, לא כהערת-שוליים. */
+function renderCoverageBadge(coverage) {
+  const badge = document.getElementById("coverage-badge");
+  badge.textContent = `מאונדקסים לחיפוש סמנטי: ${coverage.indexed_laws} מתוך ${coverage.total_laws} חוקים`;
+  badge.hidden = false;
+}
+
+function unindexedNoticeHtml(coverage) {
+  if (!coverage.unindexed_name_matches.length) return "";
+  const items = coverage.unindexed_name_matches
+    .map((m) => `<li>${escapeHtml(m.title)}</li>`)
+    .join("");
+  return `<div class="notice notice-coverage">
+      <b>שימו לב - מגבלת כיסוי, לא היעדר תוצאה.</b>
+      החוקים הבאים תואמים את החיפוש בשמם, אך אינם מאונדקסים לחיפוש סמנטי
+      (${coverage.indexed_laws} מתוך ${coverage.total_laws} חוקים מאונדקסים בשלב זה):
+      <ul>${items}</ul>
+      אפשר לפתוח אותם ישירות בלשונית "הצעות חוק" ולעבוד על הנוסח המלא.
+    </div>`;
+}
+
+async function runResearchSearch() {
+  const input = document.getElementById("research-input");
+  const out = document.getElementById("research-results");
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.disabled = true;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>מחפש…</div>`;
+  try {
+    const resp = await fetch(`/api/semantic-search?q=${encodeURIComponent(text)}&limit=10`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בחיפוש.")}</div>`;
+      return;
+    }
+    const { results, coverage } = await resp.json();
+    renderCoverageBadge(coverage);
+
+    if (!results.length) {
+      // שתי ההודעות השונות - זו כל הנקודה של הדרישה.
+      out.innerHTML = coverage.unindexed_name_matches.length
+        ? unindexedNoticeHtml(coverage)
+        : `<div class="notice">לא נמצאו סעיפים מתאימים בקרב ${coverage.indexed_laws} החוקים המאונדקסים.
+             לא נמצא גם חוק ששמו תואם את החיפוש - כלומר זו כנראה באמת היעדר תוצאה, לא מגבלת כיסוי.</div>`;
+      return;
+    }
+
+    const cards = results
+      .map(
+        (r) => `<div class="result">
+            <div class="result-head">${escapeHtml(r.context_prefix)}</div>
+            <div class="result-body">${escapeHtml(r.body.slice(0, 600))}${r.body.length > 600 ? "…" : ""}</div>
+            <div class="word-count">${escapeHtml(r.law_id)} · סעיף ${escapeHtml(r.section_number)} ·
+              דמיון סמנטי ${(r.semantic_similarity ?? 0).toFixed(3)}${
+                r.full_text_rank ? "" : " (התאמה לפי משמעות בלבד, בלי מילים משותפות)"
+              }</div>
+          </div>`
+      )
+      .join("");
+    out.innerHTML = unindexedNoticeHtml(coverage) + cards;
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById("research-send-btn").addEventListener("click", runResearchSearch);
+document.getElementById("research-input").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") runResearchSearch();
+});

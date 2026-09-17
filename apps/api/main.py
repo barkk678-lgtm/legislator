@@ -40,9 +40,19 @@ from agenda_tool import AgendaDraftError, draft_agenda  # noqa: E402
 from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
 from query_tool import QueryDraftError, draft_query, write_query_docx  # noqa: E402
-from admin_ingest import IngestAuthError, IngestRateLimitError, run_ingest_batch  # noqa: E402
+from admin_ingest import (  # noqa: E402
+    IngestAuthError,
+    IngestRateLimitError,
+    IngestStorageLimitError,
+    run_ingest_batch,
+)
 from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
-from semantic_search import SemanticSearchConfigError, SemanticSearchRequestError, search as semantic_search  # noqa: E402
+from semantic_search import (  # noqa: E402
+    SemanticSearchConfigError,
+    SemanticSearchRequestError,
+    indexed_law_ids,
+    search as semantic_search,
+)
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
 from schemas import (  # noqa: E402
     AgendaDraftRequestIn,
@@ -85,18 +95,39 @@ def api_search_laws(q: str = "") -> list[dict]:
 
 
 @app.get("/api/semantic-search")
-def api_semantic_search(q: str = "", limit: int = 10) -> list[dict]:
+def api_semantic_search(q: str = "", limit: int = 10) -> dict:
     """חיפוש סמנטי היברידי (משימה א, 1.3, 2026-09-16/17) - **שונה
     לגמרי** מ-/api/laws/search: זה חיפוש *שמות חוקים* (טקסט מדויק),
     זה חיפוש *תוכן סעיפים* (משמעות, לא רק מחרוזת) - ראו semantic_
-    search.py. לא נבדק בפועל מקצה לקצה (search_chunks ריקה - חסום
-    על embeddings, ראו night-report) - הנתיב עצמו קיים ומוכן."""
+    search.py.
+
+    מחזיר `coverage` בנוסף ל-`results`, תמיד (גם כשיש תוצאות), כי
+    רק 67 מתוך 1,094 החוקים מאונדקסים (ראו docs/indexing-priority-
+    250.md). `unindexed_name_matches` הוא הלב של דרישת ברק להבדיל
+    בין "לא נמצא" ל"לא מאונדקס": חוק ששמו תואם את השאילתה אבל אין
+    לו chunks - זו מגבלת כיסוי, לא היעדר תוצאה. ההרכבה כאן ולא
+    ב-semantic_search.py כי זו השכבה שכבר מכירה גם את חיפוש-השמות
+    (search_law_titles) וגם את החיפוש הסמנטי - אין צורך במימוש שני
+    של התאמת-שמות."""
     try:
-        return semantic_search(q, limit=limit)
+        results = semantic_search(q, limit=limit)
+        indexed = indexed_law_ids()
     except SemanticSearchConfigError as e:
         raise HTTPException(503, str(e))
     except SemanticSearchRequestError as e:
         raise HTTPException(502, str(e))
+
+    name_matches = search_law_titles(q, limit=5) if q.strip() else []
+    return {
+        "results": results,
+        "coverage": {
+            "indexed_laws": len(indexed),
+            "total_laws": len(law_summaries()),
+            "unindexed_name_matches": [
+                {"id": m["id"], "title": m["title"]} for m in name_matches if m["id"] not in indexed
+            ],
+        },
+    }
 
 
 @app.get("/api/admin/openai-check")
@@ -117,20 +148,38 @@ def api_openai_check() -> dict:
 
 
 @app.post("/api/admin/ingest-chunks")
-def api_admin_ingest_chunks(x_ingest_secret: str | None = Header(None), max_laws: int | None = None) -> dict:
+def api_admin_ingest_chunks(
+    x_ingest_secret: str | None = Header(None),
+    max_laws: int | None = None,
+    bypass_rate_limit: bool = False,
+    phase: int = 1,
+) -> dict:
     """מריץ מנה אחת (מוגבלת-תקציב) של ingest ל-search_chunks - ראו
     admin_ingest.py לפירוט מלא (טוקן/מגבלת-קצב/לוג/המשך-הרצה).
     מיועד להיקרא חוזר-ונשנה (לא בקשה אחת שממצה את כל הקורפוס) -
     כל קריאה ממשיכה מהחוק הבא שלא הושלם.
 
     max_laws (אופציונלי): תקרת-חוקים לריצות-בדיקה מבוקרות, ראו
-    admin_ingest.run_ingest_batch."""
+    admin_ingest.run_ingest_batch.
+
+    bypass_rate_limit: מסלול ההרצה היזומה (ברק, 2026-09-17) - עוקף
+    את מגבלת הקצב בלבד, **מוגן באותו טוקן בדיוק**. ברירת המחדל
+    (false) משאירה את המגבלה בתוקף לכל קריאה אחרת.
+
+    507 = שומר המרווח עצר: נותר פחות מ-50MB עד תקרת ה-Free tier."""
     try:
-        return run_ingest_batch(secret=x_ingest_secret, max_laws=max_laws)
+        return run_ingest_batch(
+            secret=x_ingest_secret,
+            max_laws=max_laws,
+            bypass_rate_limit=bypass_rate_limit,
+            phase=phase,
+        )
     except IngestAuthError as e:
         raise HTTPException(401, str(e))
     except IngestRateLimitError as e:
         raise HTTPException(429, str(e))
+    except IngestStorageLimitError as e:
+        raise HTTPException(507, str(e))
 
 
 @app.get("/api/laws/{law_id}")

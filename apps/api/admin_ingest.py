@@ -13,6 +13,20 @@ CLAUDE.md "גבולות רשת" ו-night-report.md 2026-09-17).
 3. לוג מלא לכל הפעלה - ingest_log (זמן, chunks, טוקנים, עלות
    מחושבת מ-usage.total_tokens האמיתי, לא הערכה).
 
+**מסלול הרצה יזומה (ברק, 2026-09-17):** `bypass_rate_limit=True`
+עוקף את מגבלת הקצב (ורק אותה) - מוגן באותו טוקן בדיוק, מסומן
+ב-`ingest_log.rate_limit_bypassed`. המגבלה נשארת כברירת המחדל לכל
+קריאה אחרת. תקציב ה-chunks לקריאה *לא* נעקף - הוא מה ששומר על
+הקריאה בתוך תקרת הזמן של פונקציית Vercel.
+
+**סדר העיבוד לפי `data/indexing_priority.json`** (לא לפי law_id
+עולה) - רשימת 250 החוקים המדורגת, שלב 1 = 67 החוקים שנכנסים
+ב-Free tier. חוק שאינו ברשימת השלב המבוקש לא נוגעים בו בכלל.
+
+**שומר המרווח:** לפני כל מנה נמדד גודל ה-DB האמיתי
+(`db_size_bytes()`); אם נותרו פחות מ-`MIN_FREE_MARGIN_MB` מתקרת
+ה-Free tier - עצירה קשיחה (507), לא המשך "עד שנתפוס".
+
 **הרצה-חוזרת (ברק, במפורש):** chunk שכבר קיים ב-search_chunks
 (עם embedding) לא מחושב מחדש - נבדק לפי (law_id, section_number,
 chunk_index) לפני שליחה ל-OpenAI. התקדמות ברמת-חוק ב-ingest_progress
@@ -23,6 +37,7 @@ chunk_index) לפני שליחה ל-OpenAI. התקדמות ברמת-חוק ב-in
 from __future__ import annotations
 
 import datetime
+import json
 import os
 import sys
 import time
@@ -47,6 +62,12 @@ _EMBED_API_BATCH_SIZE = 50  # כמה chunks בכל קריאת embeddings בוד�
 # נבדק מול תיעוד OpenAI (2026-09-17), לא הונח.
 _COST_PER_1M_TOKENS_USD = 0.13
 
+# תקרת ה-Free tier של Supabase והמרווח שברק דרש לשמור מתחתיה.
+FREE_TIER_LIMIT_MB = 500
+MIN_FREE_MARGIN_MB = 50
+
+_PRIORITY_PATH = Path(__file__).resolve().parents[2] / "data" / "indexing_priority.json"
+
 
 class IngestAuthError(Exception):
     """טוקן חסר/שגוי - 401."""
@@ -54,6 +75,10 @@ class IngestAuthError(Exception):
 
 class IngestRateLimitError(Exception):
     """יותר מ-MAX_CALLS_PER_HOUR קריאות בשעה האחרונה - 429."""
+
+
+class IngestStorageLimitError(Exception):
+    """נותר פחות מ-MIN_FREE_MARGIN_MB עד תקרת ה-Free tier - 507."""
 
 
 def _require_secret(provided: str | None) -> None:
@@ -110,13 +135,31 @@ def _ensure_progress_seeded(client: httpx.Client) -> None:
         )
 
 
-def _next_pending_law_ids(client: httpx.Client, limit: int) -> list[str]:
+def _priority_law_ids(phase: int) -> list[str]:
+    """מזהי החוקים של השלב המבוקש (וכל השלבים שלפניו), בסדר הדירוג.
+    ראו docs/indexing-priority-250.md לקריטריון ולרשימה עצמה."""
+    with open(_PRIORITY_PATH, encoding="utf-8") as f:
+        doc = json.load(f)
+    return [law["law_id"] for law in doc["laws"] if law["phase"] <= phase]
+
+
+def _next_pending_law_ids(client: httpx.Client, phase: int) -> list[str]:
+    """החוקים שטרם הושלמו מתוך רשימת העדיפות, **בסדר הדירוג**.
+    שולפים את כל ה-pending בקריאה אחת (payload קטן) וחותכים מולם
+    מקומית - במקום in.(...) עם מאות מזהים ב-URL."""
     resp = client.get(
         "/ingest_progress",
-        params={"select": "law_id", "status": "eq.pending", "order": "law_id.asc", "limit": limit},
+        params={"select": "law_id", "status": "eq.pending", "limit": "2000"},
     )
     resp.raise_for_status()
-    return [row["law_id"] for row in resp.json()]
+    pending = {row["law_id"] for row in resp.json()}
+    return [law_id for law_id in _priority_law_ids(phase) if law_id in pending]
+
+
+def _db_size_mb(client: httpx.Client) -> float:
+    resp = client.post("/rpc/db_size_bytes", json={})
+    resp.raise_for_status()
+    return resp.json() / 1024 / 1024
 
 
 def _existing_chunk_keys(client: httpx.Client, law_id: str) -> set[tuple[str, int]]:
@@ -160,21 +203,46 @@ def _mark_progress(client: httpx.Client, law_id: str, *, status: str, chunks_cou
     )
 
 
-def run_ingest_batch(*, secret: str | None, max_laws: int | None = None) -> dict:
+def run_ingest_batch(
+    *,
+    secret: str | None,
+    max_laws: int | None = None,
+    bypass_rate_limit: bool = False,
+    phase: int = 1,
+) -> dict:
     """הפעלה אחת, מוגבלת-תקציב. מחזירה סיכום JSON-friendly.
 
     max_laws: תקרה נוספת (לא חלק משלוש דרישות האבטחה של ברק, שכבר
     אוכפות MAX_CHUNKS_PER_CALL/MAX_CALLS_PER_HOUR) - לריצות-בדיקה
     מבוקרות ("הרץ על 50 חוקים בלבד") בלי לסמוך על גודל מקרי של
-    תקציב ה-chunks לחתוך בדיוק במספר החוקים הרצוי."""
+    תקציב ה-chunks לחתוך בדיוק במספר החוקים הרצוי.
+
+    bypass_rate_limit: מסלול ההרצה היזומה (ברק) - מדלג על מגבלת
+    הקצב בלבד. הטוקן עדיין נדרש, תקציב ה-chunks עדיין נאכף, שומר
+    המרווח עדיין נאכף, והקריאה מסומנת ככזו בלוג.
+
+    phase: איזה שלב מתוך data/indexing_priority.json לעבד (1 = 67
+    החוקים של ה-Free tier, 2 = כל 250 אחרי שדרוג ל-Pro)."""
     start = time.monotonic()
     _require_secret(secret)
 
     with _supabase_client() as client:
-        calls = _calls_in_last_hour(client)
-        if calls >= MAX_CALLS_PER_HOUR:
-            raise IngestRateLimitError(
-                f"מגבלת קצב: {calls} קריאות בשעה האחרונה (מקסימום {MAX_CALLS_PER_HOUR})."
+        if not bypass_rate_limit:
+            calls = _calls_in_last_hour(client)
+            if calls >= MAX_CALLS_PER_HOUR:
+                raise IngestRateLimitError(
+                    f"מגבלת קצב: {calls} קריאות בשעה האחרונה (מקסימום {MAX_CALLS_PER_HOUR})."
+                )
+        else:
+            calls = _calls_in_last_hour(client)
+
+        # שומר המרווח של ברק - מול גודל ה-DB האמיתי, לפני שמוציאים
+        # אגורה על embeddings של מנה שאין לה מקום להיכתב אליו.
+        free_mb = FREE_TIER_LIMIT_MB - _db_size_mb(client)
+        if free_mb < MIN_FREE_MARGIN_MB:
+            raise IngestStorageLimitError(
+                f"נותרו {free_mb:.0f}MB עד תקרת ה-Free tier ({FREE_TIER_LIMIT_MB}MB) - "
+                f"מתחת למרווח המינימלי ({MIN_FREE_MARGIN_MB}MB). ההרצה נעצרה."
             )
 
         _ensure_progress_seeded(client)
@@ -184,7 +252,7 @@ def run_ingest_batch(*, secret: str | None, max_laws: int | None = None) -> dict
         laws_errored: list[str] = []
         chunks_embedded = chunks_skipped_existing = chunks_skipped_too_long = total_tokens = 0
 
-        candidate_law_ids = _next_pending_law_ids(client, limit=max(50, max_laws or 0))
+        candidate_law_ids = _next_pending_law_ids(client, phase)
         for law_id in candidate_law_ids:
             if budget <= 0:
                 break
@@ -240,6 +308,7 @@ def run_ingest_batch(*, secret: str | None, max_laws: int | None = None) -> dict
                     "total_tokens": total_tokens,
                     "estimated_cost_usd": estimated_cost_usd,
                     "duration_ms": duration_ms,
+                    "rate_limit_bypassed": bypass_rate_limit,
                 }
             ],
             headers={"Prefer": "return=minimal"},
@@ -255,4 +324,8 @@ def run_ingest_batch(*, secret: str | None, max_laws: int | None = None) -> dict
         "estimated_cost_usd": estimated_cost_usd,
         "duration_ms": duration_ms,
         "calls_remaining_this_hour": MAX_CALLS_PER_HOUR - calls - 1,
+        "rate_limit_bypassed": bypass_rate_limit,
+        "phase": phase,
+        "laws_remaining_in_phase": max(0, len(candidate_law_ids) - len(laws_processed)),
+        "free_mb_before": round(free_mb),
     }

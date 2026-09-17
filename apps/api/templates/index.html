@@ -60,7 +60,9 @@
       <h1>סיכומי פרוטוקולים</h1><span class="sub">בקרוב</span>
     </div>
     <div class="topbar" data-bar="research" hidden>
-      <h1>מחקר</h1><span class="sub">בקרוב</span>
+      <h1>מחקר</h1><span class="sub">איתור סעיפים בשפה חופשית - לפי משמעות, לא לפי מילים</span>
+      <div class="grow"></div>
+      <span class="coverage-badge" id="coverage-badge" hidden></span>
     </div>
 
     <div class="stage">
@@ -174,7 +176,17 @@
         <section class="card coming-soon"><div class="body">בקרוב.</div></section>
       </div>
       <div class="tab" id="research">
-        <section class="card coming-soon"><div class="body">בקרוב.</div></section>
+        <div class="cols" style="grid-template-columns:1fr">
+          <section class="card" style="max-width:980px;margin:0 auto;width:100%">
+            <header><h2>חיפוש סמנטי בחקיקה</h2><span>תארו את הנושא במילים שלכם</span></header>
+            <div class="composer">
+              <input id="research-input" class="inp" type="text"
+                     placeholder="לדוגמה: מה קורה כשקבוצת אנשים תובעת יחד חברה על אותו נזק?" />
+              <button id="research-send-btn" class="primary">חיפוש</button>
+            </div>
+            <div class="body" id="research-results"></div>
+          </section>
+        </div>
       </div>
     </div>
   </div>

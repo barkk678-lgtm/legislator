@@ -310,3 +310,22 @@ select { font-weight: 600; max-width: 420px; }
 .draft .word-count.over { color: var(--del); font-weight: 600; }
 
 .coming-soon { display: flex; align-items: center; justify-content: center; color: var(--soft); font-size: 14.5px; height: 100%; }
+
+/* --- מחקר / חיפוש סמנטי (ברק, 2026-09-17) --- */
+.coverage-badge {
+  font-size: 12.5px; color: var(--soft); border: 1px solid var(--rule);
+  border-radius: 999px; padding: 4px 12px; white-space: nowrap; background: var(--tint-2);
+}
+.notice {
+  border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px;
+  font-size: 14px; line-height: 1.7; color: var(--ink); background: var(--tint-2);
+}
+.notice-coverage {
+  border-right: 3px solid var(--touched-accent); background: var(--warn-bg);
+}
+.notice-coverage b { color: var(--warn); }
+.notice ul { margin: 8px 0; padding-inline-start: 20px; }
+.result { border-bottom: 1px solid var(--rule); padding: 14px 2px; }
+.result:last-child { border-bottom: 0; }
+.result-head { font-weight: 600; margin-bottom: 4px; color: var(--navy); }
+.result-body { font-size: 14px; line-height: 1.75; color: var(--ink); }

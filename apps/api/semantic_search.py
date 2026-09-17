@@ -5,10 +5,15 @@ embedding לשאילתה (packages/llm/embeddings.embed_one) + קריאת RPC
 search_chunks_hybrid_search.sql) - כל החישוב (BM25-קירוב + דמיון
 וקטורי + שקלול) בצד ה-DB, לא כאן.
 
-**לא נבדק בפועל מקצה לקצה** - חסום כפול (SUPABASE_SERVICE_ROLE_KEY
-+ api.openai.com, ראו docs/night-report.md). קוד מוכן, בדפוס זהה
-ל-law_registry.py (אותה שכבת REST, אותה קריאת משתני סביבה בזמן
-קריאה בפועל - לא בייבוא המודול).
+נבדק חי מול production (2026-09-17): שאילתה מנוסחת מחדש לגמרי
+("קבוצת אנשים תובעת יחד חברה") אחזרה את חוק תובענות ייצוגיות עם
+full_text_rank=0 - התאמה וקטורית טהורה, לא מילות מפתח.
+
+**כיסוי חלקי במכוון:** רק 67 חוקים מאונדקסים (מגבלת Supabase Free
+tier - ראו docs/indexing-priority-250.md). `indexed_law_ids()` כאן
+היא מקור האמת לשאלה "מה מאונדקס", וה-API מרכיב ממנה את ההבחנה בין
+"לא נמצא" לבין "החוק הזה לא מאונדקס" (ברק: "בהדגמה אני לא רוצה
+להיתקע על שאלה שלא מחזירה כלום בלי שאדע למה").
 """
 
 from __future__ import annotations
@@ -46,6 +51,19 @@ def _supabase_client() -> httpx.Client:
         headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         timeout=30.0,
     )
+
+
+def indexed_law_ids() -> dict[str, int]:
+    """law_id -> כמות chunks מאונדקסים, מתוך ה-view indexed_laws
+    (נגזר מ-search_chunks עצמה, כך שחוק שאונדקס חלקית מדווח לפי מה
+    שקיים בפועל ולא לפי דגל סטטוס)."""
+    with _supabase_client() as client:
+        try:
+            resp = client.get("/indexed_laws", params={"select": "law_id,chunk_count", "limit": "2000"})
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise SemanticSearchRequestError(f"כשל בקריאת רשימת החוקים המאונדקסים: {e}") from None
+        return {row["law_id"]: row["chunk_count"] for row in resp.json()}
 
 
 def search(query: str, *, limit: int = 10, full_text_weight: float = 0.5, semantic_weight: float = 0.5) -> list[dict]:
