@@ -38,6 +38,7 @@ from agenda_tool import AgendaDraftError, draft_agenda  # noqa: E402
 from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
 from query_tool import QueryDraftError, draft_query, write_query_docx  # noqa: E402
+from semantic_search import SemanticSearchConfigError, SemanticSearchRequestError, search as semantic_search  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
 from schemas import (  # noqa: E402
     AgendaDraftRequestIn,
@@ -76,6 +77,21 @@ def api_search_laws(q: str = "") -> list[dict]:
     search_law_titles לפירוט מקור הנתונים הנוכחי (fixtures, לא
     הקורפוס המלא) ומה חסר לחיבור המלא."""
     return search_law_titles(q)
+
+
+@app.get("/api/semantic-search")
+def api_semantic_search(q: str = "", limit: int = 10) -> list[dict]:
+    """חיפוש סמנטי היברידי (משימה א, 1.3, 2026-09-16/17) - **שונה
+    לגמרי** מ-/api/laws/search: זה חיפוש *שמות חוקים* (טקסט מדויק),
+    זה חיפוש *תוכן סעיפים* (משמעות, לא רק מחרוזת) - ראו semantic_
+    search.py. לא נבדק בפועל מקצה לקצה (search_chunks ריקה - חסום
+    על embeddings, ראו night-report) - הנתיב עצמו קיים ומוכן."""
+    try:
+        return semantic_search(q, limit=limit)
+    except SemanticSearchConfigError as e:
+        raise HTTPException(503, str(e))
+    except SemanticSearchRequestError as e:
+        raise HTTPException(502, str(e))
 
 
 @app.get("/api/laws/{law_id}")

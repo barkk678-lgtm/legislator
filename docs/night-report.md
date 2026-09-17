@@ -234,3 +234,53 @@ corpus/chunking.py` (לוגיקה טהורה - נבדקת אופליין במל�
 **כדי להשלים בפועל: להריץ מסביבה עם גישת רשת ל-`api.openai.com`**
 (למשל production/Vercel, שם ה-egress כנראה לא חסום - לא אומת).
 
+## משימה א - חיפוש סמנטי היברידי: מה הושלם בפועל למרות שתי החסימות
+
+**סכמת DB - מוחלת בפועל, לא רק כתובה.** `supabase/migrations/
+20260917000000_search_chunks_hybrid_search.sql`: טבלת `search_chunks`
+(law_id, section_number, chunk_index, node_ids, context_prefix,
+body, contains_raw_block, embedding vector) + פונקציית RPC
+`hybrid_search_chunks` (ts_rank_cd + דמיון קוסינוס, משוקללים).
+**תיקון אמיתי שנתפס תוך כדי הרצה מול ה-DB (לא הונח מראש):** ניסיון
+ראשון עם `vector(3072)` (ברירת המחדל של text-embedding-3-large)
+נכשל - `"column cannot have more than 2000 dimensions for hnsw
+index"` (מגבלת pgvector עצמו). תוקן ל-`vector(1024)` דרך פרמטר
+`dimensions` הרשמי של OpenAI (`embeddings.py`) - **הוחל בהצלחה על
+ה-DB האמיתי, אומת** (`search_chunks` קיימת, 0 שורות, מוכנה ל-ingest).
+
+**קוד שנכתב ומוכן, אבל לא נבדק מקצה לקצה (חסום כפול):**
+- `packages/corpus/chunking.py` - היחיד שכן **נבדק במלואו אופליין**
+  (7 בדיקות, כולל fixture אמיתי ואי-חיתוך raw_block - ראו למעלה).
+- `packages/llm/embeddings.py` - נכתב, מגבלת האורך (8,192 טוקן)
+  מתועדת מתיעוד OpenAI, לא אומתה מול ה-API עצמו (חסום).
+- `tools/build_search_chunks.py` - סקריפט ה-ingest המלא (REST,
+  לא execute_sql - אותו דפוס בדיוק כמו `load_corpus_to_supabase_
+  rest.py`: progress log, idempotent, ממשיך אחרי כשל בחוק בודד).
+  מוכן לרוץ עם שלושת משתני הסביבה (`SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`).
+- `apps/api/semantic_search.py` + `GET /api/semantic-search` -
+  endpoint החיפוש עצמו (embedding לשאילתה + RPC יחיד).
+
+**באג אמיתי שהתפס ותוקן על ידי הבדיקה האופליין שכן אפשר היה לכתוב
+(לא הצלחה חלקית - זו בדיוק הנקודה של לבדוק גם כשלא הכל עובד):**
+`api_semantic_search` תפס במפורש רק `SemanticSearchConfigError`,
+אבל `search()` קרא ל-`embed_one()` (OpenAI) *לפני* בדיקת תצורת
+Supabase - כך ש-`EmbeddingConfigError` (סוג שגיאה שונה, מ-`packages/
+llm`) לא נתפס בכלל וגרם ל-500 גולמי עם traceback, לא 503 ברור.
+**תוקן:** בדיקת תצורת Supabase עוברת *לפני* קריאת embedding (חוסך
+גם קריאת API בתשלום כש-DB לא מוגדר ממילא), ושתי מקורות השגיאה
+(Supabase, OpenAI) מתכנסים לסוג אחד (`SemanticSearchConfigError`)
+כלפי `main.py`. 3 בדיקות אופליין (`test_semantic_search.py`) + כל
+36 קבצי הבדיקה הקיימים עדיין עוברים.
+
+**סיכום מצב משימה א':** תשתית מלאה (סכמה+קוד) קיימת ומוכנה; שום
+נתון לא נטען (0 embeddings) ושום חיפוש אמיתי לא בוצע - שתי החסימות
+(service_role, api.openai.com) חוסמות את זה לגמרי בסביבה הזו, לא
+חלקית. "מדוד עלות בפועל" ו"מדוד גידול ב-DB" **לא בוצעו בפועל** -
+אי אפשר בלי embeddings אמיתיים. הערכה גסה בלבד (לא מדידה): לפי
+תמחור OpenAI המתועד ל-text-embedding-3-large ומספר הסעיפים בקורפוס
+(~45,000, ראו TASKS.md) - סביר שבטווח של עשרות סנטים בודדות לכל
+הקורפוס, אבל **זו הערכה מהזיכרון, לא מדידה - אל תסתמך עליה כמספר
+סופי**, בדיוק הסוג של "בערך נכון" שהפרויקט הזה נמנע ממנו במפורש
+במקומות אחרים (חוק ברזל 1).
+
