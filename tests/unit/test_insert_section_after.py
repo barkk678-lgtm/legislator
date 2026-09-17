@@ -143,11 +143,10 @@ def main():
     # להיכשל בקול (NotImplementedError), לא לייצר עוגן שגוי - §8.5
     # מציינת זאת במפורש כהיקף שלא נכלל. נבנה ידנית (בלי transform.apply())
     # כי next_inserted_label הרקורסיבי (§8.1) על שרשור-הוספות-אמיתי
-    # מייצר "8א1" - תווית תקנית לגמרי, אבל parse_section_number
-    # (packages/corpus/numbering.py) עדיין לא תומך במיון תווית מורכבת
-    # ברמה שלישית (פער נפרד, לא קשור לשאלת §8.5 כאן) - כדי לבודד את
-    # הבדיקה הזו ל-NotImplementedError של amend() בלבד, שני הסעיפים
-    # החדשים כאן מקבלים תוויות תקינות פשוטות ("8א"/"8ב") ישירות.
+    # מייצר "8א1". התווית הזו כבר נתמכת במיון מאז תיקון
+    # parse_section_number (2026-09-17, ראו test_numbering.py) - אבל
+    # הבדיקה כאן נשארת על תוויות פשוטות ("8א"/"8ב") כדי לבודד אותה
+    # ל-NotImplementedError של amend() בלבד, בלי לערב את המספור.
     after3 = _law_with_sections_8_and_9()
     after3.children.insert(1, LegislativeNode(
         id="law/s8a-2", node_type="section", number="8א",

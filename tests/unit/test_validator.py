@@ -125,9 +125,14 @@ def main():
     broken7 = validate(_bill([_good_line()], title="חוק סתם"), before, refs)
     checks.append(("7: שם הצעה שגוי -> נכשל", _status(broken7, 7) == "נכשל"))
 
-    # 8: submitted_date חסר, ו-submitted_date עם שנה לא תואמת
+    # 8: submitted_date חסר, ו-submitted_date עם שנה לא תואמת.
+    # עודכן במכוון ב-2026-09-17 (היה "נכשל"): הבדיקה נכשלה על 40 מתוך
+    # 40 ההצעות האמיתיות ב-tests/fixtures/real-bills, כי היא דרשה שדה
+    # שלפי התיעוד שלנו עצמנו (render_bill.Bill) נכתב על ידי מזכירות
+    # הכנסת אחרי ההנחה ולא על ידי המנסח. "לא נבדק" הוא הסטטוס הנכון
+    # למידע שלא אמור להיות קיים בשלב הניסוח - תיקון, לא רגרסיה.
     broken8a = validate(_bill([_good_line()], submitted_date=""), before, refs)
-    checks.append(("8: submitted_date ריק -> נכשל", _status(broken8a, 8) == "נכשל"))
+    checks.append(("8: submitted_date ריק -> לא נבדק", _status(broken8a, 8) == "לא נבדק"))
     broken8b = validate(_bill([_good_line()], submitted_date="15.11.1999"), before, refs)
     checks.append(("8: שנת ההגשה לא תואמת את שם ההצעה -> נכשל", _status(broken8b, 8) == "נכשל"))
 

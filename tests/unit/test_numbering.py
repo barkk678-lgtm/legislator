@@ -11,7 +11,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 
-from numbering import next_appended_label, next_inserted_label, sort_section_numbers  # noqa: E402
+from numbering import (  # noqa: E402
+    next_appended_label,
+    next_inserted_label,
+    parse_section_number,
+    sort_section_numbers,
+)
 
 CASES = [
     (
@@ -28,6 +33,24 @@ CASES = [
         "מספור מעורב בתוך אותו חוק",
         ["10", "2א", "2", "10א", "1", "2יא"],
         ["1", "2", "2א", "2יא", "10", "10א"],
+    ),
+    (
+        # ספרה-אות-ספרה, מהכנסה חוזרת. כל המספרים כאן נדגמו מה-DB
+        # האמיתי (חוק העונשין law-2000479 ו-law-2000002), לא הומצאו -
+        # ראו docs/strategy/section-numbering-fix-plan-2026-09-16.md.
+        "ספרה-אות-ספרה: 4א1 בין 4א ל-4ב",
+        ["4ב", "4א1", "5", "4", "4א", "4א2"],
+        ["4", "4א", "4א1", "4א2", "4ב", "5"],
+    ),
+    (
+        "ספרה-אות-ספרה: 6ו1/6ו2 אחרי 6ו, וכולם אחרי 6ה4",
+        ["6ו2", "6ה4", "6ו", "6ו1"],
+        ["6ה4", "6ו", "6ו1", "6ו2"],
+    ),
+    (
+        "בסיס דו-ספרתי עם סיומת מורכבת (51ח1, 144ד1)",
+        ["144ד1", "51ח1", "51ח", "144ד", "144", "51"],
+        ["51", "51ח", "51ח1", "144", "144ד", "144ד1"],
     ),
 ]
 
@@ -101,11 +124,39 @@ def main():
             next_appended_label(["6"]),
             "7",
         ),
+        (
+            # עד לתיקון 2026-09-17 זה קרס: int("4א1") -> ValueError.
+            # הפונקציה פעלה על המחרוזת השלמה במקום על המקטע האחרון.
+            "תווית אחרונה מורכבת: 4א1 -> 4א2 (במקום לקרוס)",
+            next_appended_label(["4", "4א", "4א1"]),
+            "4א2",
+        ),
+        (
+            # עד לתיקון: _SUFFIX_INDEX["4א"] -> KeyError.
+            # ההכרעה "4ב" ולא "5" מתועדת ב-docstring וב-night-report.
+            "תווית אחרונה 4א -> 4ב (במקום לקרוס)",
+            next_appended_label(["4", "4א"]),
+            "4ב",
+        ),
     ]
     for name, got, expected in append_checks:
         passed = got == expected
         ok = ok and passed
         print(("OK " if passed else "FAIL"), name, "->", got if not passed else "")
+
+    # round-trip: כל תווית ש-next_inserted_label מייצרת חייבת להיות
+    # ניתנת לפירוק ולמיון. עד 2026-09-17 זה היה פער מתועד במפורש
+    # בשני קבצי טסט ("עדיין לא תומך במיון תווית מורכבת ברמה שלישית").
+    chain = ["6"]
+    for _ in range(4):
+        chain.append(next_inserted_label(chain[-1], set()))
+    try:
+        keys = [parse_section_number(label) for label in chain]
+        rt_ok = keys == sorted(keys) and sort_section_numbers(chain[::-1]) == chain
+    except ValueError as exc:
+        keys, rt_ok = exc, False
+    ok = ok and rt_ok
+    print(("OK " if rt_ok else "FAIL"), f"round-trip: {chain} -> {keys}")
 
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1

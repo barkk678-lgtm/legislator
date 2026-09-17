@@ -102,13 +102,104 @@ def _check_2(bill: Bill, refs: dict[str, str]) -> Finding:
 
 _PRINCIPAL_LAW_DEFINE_RE = re.compile(r"להלן\s*–\s*החוק העיקרי")
 _PRINCIPAL_LAW_MENTION_RE = re.compile(r"החוק העיקרי")
+# ניסוח "כמעט נכון" - מקף רגיל במקום en-dash, רווח חסר, או ה' ידיעה
+# חסרה ("להלן– החוק עיקרי", שנמצא בפועל בהצעה אמיתית). משמש רק כדי
+# להבחין בין "אין כינוי" לבין "יש כינוי בניסוח לא תקני" - שני ממצאים
+# שונים לגמרי למי שקורא את הדוח.
+_PRINCIPAL_LAW_LOOSE_RE = re.compile(r"להלן\s*[–\-]?\s*ה?חוק\s+ה?עיקרי")
+
+
+_ACTION = r"(?:תיקון|החלפת|ביטול|הוספת)"
+# כותרת שוליים שמצביעה על יחידה *בתוך* החוק העיקרי ("תיקון סעיף 24")
+_PRINCIPAL_HEADING_RE = re.compile(rf"^{_ACTION}\s+(?:סעיפים|סעיף|פרק|סימן|התוספת|תוספת)\b")
+# כותרת שוליים שנוקבת בשם חוק אחר ("תיקון חוק כביש אגרה") - הצעה
+# מתקנת-חקיקה שנוגעת בכמה חוקים שונים, שבה אין "חוק עיקרי" יחיד
+_OTHER_LAW_HEADING_RE = re.compile(rf"^{_ACTION}\s+(?:חוק|פקודת|פקודה|תקנות|צו)\b")
+
+
+def _instruction_counts(bill: Bill) -> tuple[int, int]:
+    """(הוראות לחוק העיקרי, הוראות לחוקים נקובים אחרים).
+
+    כותרת שוליים מופיעה בדיוק פעם אחת לכל הוראה (בשורה הראשונה שלה),
+    ולכן ספירת הכותרות היא ספירת ההוראות - נגזר מהפלט ולא מהמנוע, כדי
+    שהבדיקה תעבוד גם על הצעה שהגיעה מחילוץ docx.
+
+    ההבחנה בין שני הסוגים אינה קוסמטית: הכלל ב-§5.8 מדבר על יותר
+    מהוראת תיקון אחת **לאותו חוק**. בהצעה מסוג "תיקוני חקיקה" שכל
+    הוראה בה נוגעת בחוק אחר, כל חוק נקוב בשמו המלא פעם אחת ואין חוק
+    עיקרי לכנות - נמצא בפועל ב-4 מתוך 40 ההצעות האמיתיות."""
+    principal = other = 0
+    for ln in bill.lines:
+        heading = ln.side_heading or ""
+        if _PRINCIPAL_HEADING_RE.match(heading):
+            principal += 1
+        elif _OTHER_LAW_HEADING_RE.match(heading):
+            other += 1
+    return principal, other
 
 
 def _check_3(bill: Bill) -> Finding:
+    """הכינוי "(להלן – החוק העיקרי)" נדרש **רק כשיש יותר מהוראת תיקון
+    אחת לאותו חוק** - אחרת שם החוק המלא מופיע פעם אחת ואין למה לקצר.
+
+    תוקן 2026-09-17 אחרי ביקורת מול 40 הצעות חוק אמיתיות שהונחו בכנסת
+    (tests/fixtures/real-bills): הבדיקה דרשה את הכינוי ללא תנאי ונכשלה
+    על 30 מתוך 40 - כלומר היא סתרה את הפרקטיקה בפועל, וגם את התיקון
+    שנעשה ב-engine._drop_principal_law_alias_if_single באותו יום. ראו
+    docs/drafting-rules.md §5.8."""
     combined = [ln.text + ln.text_after for ln in bill.lines]
     defining_idxs = [i for i, t in enumerate(combined) if _PRINCIPAL_LAW_DEFINE_RE.search(t)]
+    loose_idxs = [i for i, t in enumerate(combined) if _PRINCIPAL_LAW_LOOSE_RE.search(t)]
+    principal, other = _instruction_counts(bill)
+
+    if principal == 0:
+        if other:
+            return _finding(
+                3,
+                "לא נבדק",
+                f"כל {other} הוראות התיקון בהצעה נוקבות בשם חוק אחר (הצעת "
+                "\"תיקוני חקיקה\") - אין בה חוק עיקרי יחיד, והכלל על "
+                "'(להלן – החוק העיקרי)' אינו חל",
+            )
+        return _finding(
+            3,
+            "לא נבדק",
+            "לא זוהתה אף הוראת תיקון בהצעה (כנראה הצעת חוק חדש ולא הצעה "
+            "מתקנת) - הכלל על '(להלן – החוק העיקרי)' אינו חל",
+        )
+
+    if loose_idxs and not defining_idxs:
+        return _finding(
+            3,
+            "נכשל",
+            f"הכינוי מופיע בשורה {loose_idxs[0]} אך לא בניסוח התקני "
+            "'(להלן – החוק העיקרי)' - בדקו רווחים, en-dash (–) וה' הידיעה: "
+            f"{combined[loose_idxs[0]][:90]!r}",
+        )
+
+    if principal == 1:
+        if defining_idxs:
+            return _finding(
+                3,
+                "נכשל",
+                "יש הוראת תיקון אחת בלבד לחוק העיקרי, ולכן הכינוי "
+                f"'(להלן – החוק העיקרי)' מיותר - הוא מופיע בשורה {defining_idxs[0]}. "
+                "שם החוק המלא מופיע פעם אחת, אין למה לקצר (drafting-rules.md §5.8)",
+            )
+        return _finding(
+            3,
+            "עבר",
+            "הוראת תיקון אחת בלבד, ואין כינוי '(להלן – החוק העיקרי)' - נכון "
+            "לפי §5.8 (הכינוי נדרש רק מהוראה שנייה ואילך)",
+        )
+
     if not defining_idxs:
-        return _finding(3, "נכשל", "אין שורה שמגדירה '(להלן – החוק העיקרי)'")
+        return _finding(
+            3,
+            "נכשל",
+            f"יש {principal} הוראות תיקון לחוק העיקרי אבל אין שורה שמגדירה "
+            "'(להלן – החוק העיקרי)' - מההוראה השנייה ואילך צריך כינוי",
+        )
     if len(defining_idxs) > 1:
         return _finding(3, "נכשל", f"ההגדרה מופיעה {len(defining_idxs)} פעמים, צריך פעם אחת בדיוק")
     define_at = defining_idxs[0]
@@ -117,7 +208,12 @@ def _check_3(bill: Bill) -> Finding:
     ]
     if used_before:
         return _finding(3, "נכשל", f"'החוק העיקרי' מוזכר בשורה {used_before[0]}, לפני שהוגדר בשורה {define_at}")
-    return _finding(3, "עבר", f"ההגדרה מופיעה פעם אחת (שורה {define_at}), וכל שימוש בא אחריה")
+    return _finding(
+        3,
+        "עבר",
+        f"{principal} הוראות תיקון לחוק העיקרי; ההגדרה מופיעה פעם אחת "
+        f"(שורה {define_at}), וכל שימוש בא אחריה",
+    )
 
 
 _SIDE_HEADING_RE = re.compile(r"^(תיקון|החלפת|ביטול|הוספת) סעיף [^()]+$")
@@ -201,13 +297,23 @@ _SUBMITTED_YEAR_RE = re.compile(r"(\d{4})")
 
 
 def _check_8(bill: Bill) -> Finding:
+    """משווה את שנת ההצעה בשם ההצעה לשנת ההגשה בפועל - **רק כאשר תאריך
+    ההגשה ידוע**.
+
+    תוקן 2026-09-17: הבדיקה דרשה submitted_date כקלט חובה ונכשלה על
+    40 מתוך 40 ההצעות האמיתיות שנבדקו. זו הייתה סתירה לתיעוד שלנו
+    עצמנו - render_bill.Bill קובע במפורש ש-submitted_date "לא מודפס
+    בכלל ב-docx... מזכירות הכנסת היא שכותבת את פסקת ההגשה, ורק אחרי
+    שההצעה אושרה והונחה בפועל", כלומר זה לא שדה שהמנסח ממלא. כשהשדה
+    ריק/placeholder הבדיקה מדווחת "לא נבדק" עם הסבר, לא "נכשל" -
+    כשל שקוף על מידע שלא אמור להיות קיים אינו ממצא."""
     if not bill.submitted_date or not _SUBMITTED_YEAR_RE.search(bill.submitted_date):
         return _finding(
             8,
-            "נכשל",
-            "Bill.submitted_date חסר או לא תקין - זה קלט חובה מהמשתמש (תאריך הגשת "
-            "ההצעה בפועל), לא placeholder. בלעדיו אי אפשר לוודא ששנת ההצעה בשם "
-            "ההצעה נכונה.",
+            "לא נבדק",
+            "תאריך ההגשה בפועל לא ידוע (submitted_date ריק או placeholder) - "
+            "פסקת ההגשה נכתבת על ידי מזכירות הכנסת אחרי ההנחה, לא על ידי "
+            "המנסח. אין מול מה להשוות את שנת ההצעה בשם.",
         )
     title_match = _TITLE_YEAR_RE.search(bill.title)
     if not title_match:

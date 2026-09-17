@@ -12,7 +12,8 @@ import re
 _ONES = "אבגדהוזחט"  # תשע האותיות המשמשות כספרת יחידות בתוך סיומת דו-אותית
 _TENS = "יכלמנסעפצ"  # תשע האותיות המשמשות כספרת עשרות בתוך סיומת דו-אותית
 
-_NUMBER_RE = re.compile(r"^(\d+)([א-ת]*)$")
+_SEGMENT_RE = re.compile(r"\d+|[א-ת]+")
+_LAST_SEGMENT_RE = re.compile(r"(\d+|[א-ת]+)$")
 
 
 def _build_suffix_sequence(limit: int = 200) -> dict[str, int]:
@@ -37,22 +38,41 @@ def _build_suffix_sequence(limit: int = 200) -> dict[str, int]:
 _SUFFIX_INDEX = _build_suffix_sequence()
 
 
-def parse_section_number(number: str) -> tuple[int, int]:
-    """מפרק מספר סעיף למפתח מיון (מספר_בסיס, מיקום_סיומת).
+def parse_section_number(number: str) -> tuple[int, ...]:
+    """מפרק מספר סעיף למפתח מיון: tuple באורך משתנה, מקטע אחר מקטע.
 
-    סעיף בלי סיומת מקבל מיקום -1 כדי שיקדם לכל סעיף עם אותו מספר
-    בסיס וסיומת (למשל "3" לפני "3א").
+    מספר סעיף הוא רצף מקטעים מתחלפים - ספרות, אותיות, ספרות, ... -
+    שמתחיל תמיד בספרות: "4" -> (4,), "4א" -> (4, 1), "4א1" -> (4, 1, 1),
+    "51ח1" -> (51, 8, 1). התחלופה אינה הנחה אלא תוצאה של הפירוק עצמו
+    (רצף ספרות או אותיות נבלע כולו למקטע אחד), ולכן זוגיות המיקום
+    ברשימה מספיקה כדי לדעת מה סוג המקטע - אין צורך לשמור אותו.
+
+    התבנית ספרה-אות-ספרה נוצרת מהכנסה חוזרת: סעיף שהוכנס אחרי סעיף
+    שהוכנס (ראו next_inserted_label, שכבר מייצרת אותה רקורסיבית).
+    988 סעיפים אמיתיים ב-135 חוקים בקורפוס נושאים מספר כזה, ועד
+    לתיקון הזה דולגו בשקט. ראו
+    docs/strategy/section-numbering-fix-plan-2026-09-16.md.
+
+    מיון: Python משווה tuples לקסיקוגרפית, וה-tuple הקצר קטן מזה
+    שהוא קידומת שלו - ולכן (4,) < (4, 1) < (4, 1, 1) < (4, 2) < (5,).
+    זו בדיוק ההתנהגות שהערך המלאכותי -1 לסיומת ריקה דימה קודם לרמה
+    אחת, מוכללת לכל עומק בלי קוד נוסף.
     """
-    match = _NUMBER_RE.match(number.strip())
-    if not match:
+    text = number.strip()
+    segments = _SEGMENT_RE.findall(text)
+    if not segments or "".join(segments) != text:
         raise ValueError(f"מספר סעיף לא תקין: {number!r}")
-    base = int(match.group(1))
-    suffix = match.group(2)
-    if not suffix:
-        return (base, -1)
-    if suffix not in _SUFFIX_INDEX:
-        raise ValueError(f"סיומת סעיף לא מוכרת: {suffix!r} (ב-{number!r})")
-    return (base, _SUFFIX_INDEX[suffix])
+    if not segments[0].isdigit():
+        raise ValueError(f"מספר סעיף חייב להתחיל בספרות: {number!r}")
+    key: list[int] = []
+    for position, segment in enumerate(segments):
+        if position % 2 == 0:
+            key.append(int(segment))
+        else:
+            if segment not in _SUFFIX_INDEX:
+                raise ValueError(f"סיומת סעיף לא מוכרת: {segment!r} (ב-{number!r})")
+            key.append(_SUFFIX_INDEX[segment])
+    return tuple(key)
 
 
 def sort_section_numbers(numbers: list[str]) -> list[str]:
@@ -107,16 +127,36 @@ def next_appended_label(existing_labels_in_order: list[str]) -> str:
     חייבת להיות ממוינת; מסתכלת רק על התווית האחרונה בה.
 
     לדוגמה: אחרי (ד) בא (ה) (לא "(ד1)"); אחרי סעיף 6 (בלי סעיף 7) בא
-    סעיף 7 (לא "6א"). ראה ha-hoveret-ha-sgula.pdf §7.10.6(ג)/§7.12."""
+    סעיף 7 (לא "6א"). ראה ha-hoveret-ha-sgula.pdf §7.10.6(ג)/§7.12.
+
+    **פועלת על המקטע האחרון בלבד, לא על המחרוזת השלמה.** עד לתיקון
+    2026-09-17 הקוד הניח ש-last הוא מקטע יחיד (ספרות טהורות או אותיות
+    טהורות) - הנחה שהייתה נכונה רק כל עוד parse_section_number לא
+    הכירה במספרים מורכבים. משהכירה, תווית כמו "4א1" יכולה להיות
+    האחרונה ברשימה, ואז int("4א1") היה זורק ValueError ו-
+    _SUFFIX_INDEX["4א"] היה זורק KeyError - קריסה ממשית בהוספת סעיף
+    בסוף חוק שסעיפו האחרון ממוספר מורכב. הפתרון: לקלף את המקטע
+    האחרון, לקדם אותו, ולהדביק בחזרה לקידומת ("4א1" -> "4א2").
+
+    **הכרעה פתוחה (רשומה ב-docs/night-report.md):** כשהתווית האחרונה
+    היא "4א" (בלי סעיף 5 אחריה), הכלל כאן מחזיר "4ב" - המשך המקטע
+    האחרון - ולא "5" (המשך הבסיס). שתי הקריאות נתמכות בטקסט של §7.12,
+    והכלל המקומי נבחר כי הוא עקבי עם רצף האותיות של §7.10.6(ג); דורש
+    אישור לפני שמסתמכים עליו בהוראת תיקון אמיתית.
+    """
     if not existing_labels_in_order:
         raise ValueError("אין תוויות קיימות לקבוע מהן את המשך הרצף")
     last = existing_labels_in_order[-1]
-    if _is_digit_unit(last):
-        return str(int(last) + 1)
-    if last not in _SUFFIX_INDEX:
+    match = _LAST_SEGMENT_RE.search(last)
+    if not match:
         raise ValueError(f"תווית לא מוכרת להמשך רצף: {last!r}")
-    next_pos = _SUFFIX_INDEX[last] + 1
+    prefix, segment = last[: match.start()], match.group(1)
+    if segment.isdigit():
+        return f"{prefix}{int(segment) + 1}"
+    if segment not in _SUFFIX_INDEX:
+        raise ValueError(f"תווית לא מוכרת להמשך רצף: {last!r}")
+    next_pos = _SUFFIX_INDEX[segment] + 1
     for suffix, pos in _SUFFIX_INDEX.items():
         if pos == next_pos:
-            return suffix
+            return f"{prefix}{suffix}"
     raise ValueError("נגמר רצף האותיות")
