@@ -143,13 +143,20 @@ def _priority_law_ids(phase: int) -> list[str]:
     return [law["law_id"] for law in doc["laws"] if law["phase"] <= phase]
 
 
-def _next_pending_law_ids(client: httpx.Client, phase: int) -> list[str]:
+def _next_pending_law_ids(client: httpx.Client, phase: int, *, include_errors: bool = False) -> list[str]:
     """החוקים שטרם הושלמו מתוך רשימת העדיפות, **בסדר הדירוג**.
     שולפים את כל ה-pending בקריאה אחת (payload קטן) וחותכים מולם
-    מקומית - במקום in.(...) עם מאות מזהים ב-URL."""
+    מקומית - במקום in.(...) עם מאות מזהים ב-URL.
+
+    include_errors: חוק שנכשל נשאר 'error' ולא נוגעים בו שוב במסלול
+    הרגיל - אחרת כשל קבוע יישרף בכסף בכל קריאה. במסלול ההרצה היזומה
+    כן מנסים שוב, כי זה בדיוק המצב שבו מריצים אחרי תיקון (קרה בפועל:
+    חוק התכנון והבניה נפל על סיווג שגוי של שגיאת אורך, ראו
+    packages/llm/embeddings.py)."""
+    statuses = "in.(pending,error)" if include_errors else "eq.pending"
     resp = client.get(
         "/ingest_progress",
-        params={"select": "law_id", "status": "eq.pending", "limit": "2000"},
+        params={"select": "law_id", "status": statuses, "limit": "2000"},
     )
     resp.raise_for_status()
     pending = {row["law_id"] for row in resp.json()}
@@ -252,7 +259,7 @@ def run_ingest_batch(
         laws_errored: list[str] = []
         chunks_embedded = chunks_skipped_existing = chunks_skipped_too_long = total_tokens = 0
 
-        candidate_law_ids = _next_pending_law_ids(client, phase)
+        candidate_law_ids = _next_pending_law_ids(client, phase, include_errors=bypass_rate_limit)
         for law_id in candidate_law_ids:
             if budget <= 0:
                 break

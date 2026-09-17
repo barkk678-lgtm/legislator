@@ -92,7 +92,17 @@ def embed_batch_with_usage(
                 resp = client.post(_API_URL, json=body, headers=headers)
             if resp.status_code == 400:
                 detail = resp.json().get("error", {}).get("message", resp.text[:300])
-                if "maximum context length" in detail or "too long" in detail.lower():
+                # הניסוח של OpenAI לא אחיד: "maximum context length"
+                # מול "maximum input length is 8192 tokens" (זה מה
+                # שחזר בפועל ב-2026-09-17 על raw_block ענק בחוק
+                # התכנון והבניה, והפיל את כל החוק במקום לדלג על
+                # ה-chunk הבודד). מזהים את שלושת הניסוחים.
+                lowered = detail.lower()
+                if (
+                    "maximum context length" in lowered
+                    or "maximum input length" in lowered
+                    or "too long" in lowered
+                ):
                     raise EmbeddingTooLongError(detail)
                 raise EmbeddingRequestError(f"HTTP 400 מ-OpenAI (לא-חולף): {detail}")
             if resp.status_code >= 500:
