@@ -84,11 +84,100 @@ class _Call(NamedTuple):
     end: int
 
 
+def _brace_depth(text: str) -> int:
+    """כמה קריאות תבנית נשארו פתוחות בסוף המחרוזת (0 = מאוזנת)."""
+    depth = i = 0
+    while i < len(text):
+        if text[i : i + 2] == "{{":
+            depth += 1
+            i += 2
+        elif text[i : i + 2] == "}}":
+            depth -= 1
+            i += 2
+        else:
+            i += 1
+    return depth
+
+
+def _is_zone_boundary(raw_line: str) -> bool:
+    """שורה שהלולאה הראשית חייבת לראות בפני עצמה: פותח/סוגר של אזור
+    דילוג או של בלוק תוכן העניינים. ראו ההסבר ב-_join_unclosed_templates."""
+    line = raw_line.strip()
+    if line == _TOC_DIV_CLOSE_LINE or _TOC_DIV_OPEN_RE.match(line):
+        return True
+    if not line.startswith("{{") or _brace_depth(line) != 0:
+        return False
+    name = _find_template(line, 0).name
+    return name in _SKIP_ZONE_OPENERS or name == _SKIP_ZONE_CLOSER
+
+
+def _join_unclosed_templates(lines: list[str]) -> list[str]:
+    """מאחדת שורה שנפתחת בה קריאת תבנית שאינה נסגרת באותה שורה עם
+    השורות שאחריה, עד לאיזון - כך שהלולאה הראשית תמיד מקבלת "שורה
+    לוגית" שלמה.
+
+    **למה זה כאן ולא בלולאה:** `_find_template` עצמה כבר עיוורת
+    לשורות (היא סופרת תווים, `\n` הוא תו כמו כל אחר). ההנחה היחידה
+    שנשברה הייתה של הלולאה הראשית - "כל קריאת תבנית שלמה בשורה אחת".
+    איחוד מוקדם פותר בדיוק את ההנחה הזו בלי לגעת באף ענף בלולאה,
+    ובלי לעבור למודל היסט-תו בכל הפרסר (הניתוח המקורי ב-TASKS.md
+    משימה 7 העריך שיידרש מעבר כזה - בפועל לא נדרש).
+
+    **15 חוקים בקורפוס קרסו בגלל זה ב-IndexError, ובהם פקודת מס
+    הכנסה, פקודת התעבורה ופקודת החברות** - החוק כולו לא נטען, לא
+    רק הבלוק. שלוש התבניות שנמצאו בפועל: `{{עמודות|2|...}}` (מילון
+    מונחים עברי-אנגלי, 8 חוקים), `{{דוכיווני שווה|...}}` (פקודת
+    הרוקחים, 221 מופעים) ו-`{{טורים שווים|...}}` (פקודת התעבורה).
+
+    בלוק שאינו נסגר עד סוף הדף מוחזר כפי שהוא, בלי איחוד - הוא ייפול
+    בהמשך על השגיאה המתוארת ב-`_find_template`, לא בשקט."""
+    out: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if not line.strip().startswith("{{") or _brace_depth(line) <= 0:
+            out.append(line)
+            index += 1
+            continue
+        block = [line]
+        depth = _brace_depth(line)
+        cursor = index + 1
+        while cursor < len(lines) and depth > 0:
+            if _is_zone_boundary(lines[cursor]):
+                # **הגנה, לא זהירות-יתר:** הלולאה הראשית מנהלת שני
+                # אזורי-דילוג לפי *שורות* שלמות (in_skip_zone מול
+                # {{ח:סוגר}}, in_toc_zone מול </div>). אם שורת הגבול
+                # הייתה נבלעת לתוך בלוק מאוחד, האזור לא היה נסגר לעולם
+                # והחוק כולו היה אובד בשקט - כישלון חמור בהרבה מזה
+                # שאנחנו מתקנים. במקרה כזה פשוט לא מאחדים.
+                depth = 1
+                break
+            block.append(lines[cursor])
+            depth += _brace_depth(lines[cursor])
+            cursor += 1
+        if depth > 0:  # לא נסגר עד סוף הדף, או נעצר בגבול אזור
+            out.append(line)
+            index += 1
+            continue
+        out.append("\n".join(block))
+        index = cursor
+    return out
+
+
 def _find_template(text: str, start: int) -> _Call:
     """מפרסר קריאת תבנית {{...}} יחידה החל מ-start, בכיבוד קינון.
     מחזיר את שם התבנית, רשימת הארגומנטים (מחרוזות גולמיות, קינון פנימי
     לא מפורק), ואת המיקום מיד אחרי ה-'}}' הסוגר."""
     assert text[start : start + 2] == "{{"
+    if _brace_depth(text[start:]) != 0:
+        # "תוכנה שקורסת על קלט פגום היא באג בתוכנה" (CLAUDE.md). עד
+        # 2026-09-17 המקרה הזה נתן IndexError עירום מתוך הלולאה למטה -
+        # שגיאה שלא אומרת דבר על מה קרה. עכשיו היא מתוארת. הקורא
+        # (_join_unclosed_templates) כבר מאחד שורות לפני שמגיעים לכאן,
+        # ולכן זה נותר רק למקרה שהתבנית באמת אינה נסגרת עד סוף הדף.
+        raise ValueError(
+            f"קריאת תבנית שאינה נסגרת: {text[start : start + 60]!r}"
+        )
     i = start + 2
     depth = 1
     parts: list[str] = []
@@ -317,7 +406,7 @@ def parse_wikitext(
     in_toc_zone = False  # בתוך <div class="law-toc">...</div> - תוכן
     # עניינים אוטומטי, עודף לגמרי מול העץ שכבר נבנה (ראו _TOC_DIV_OPEN_RE).
 
-    lines = text.splitlines()
+    lines = _join_unclosed_templates(text.splitlines())
     line_index = 0
     while line_index < len(lines):
         raw_line = lines[line_index]
