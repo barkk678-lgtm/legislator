@@ -118,14 +118,34 @@ def _calls_in_last_hour(client: httpx.Client) -> int:
     return len(resp.json())
 
 
+def _fetch_all(client: httpx.Client, path: str, params: dict, page_size: int = 1000) -> list[dict]:
+    """שליפה מעומדת. PostgREST מחזיר לכל היותר 1,000 שורות לבקשה
+    (db-max-rows) **בלי להתריע** - פרמטר limit גדול יותר פשוט נחתך.
+    זה הפיל 94 חוקים מהתור בשקט בהרצת שלב 1 (ביניהם פקודת העיריות,
+    אחד החוקים שברק דרש במפורש): הם לא נרשמו ל-ingest_progress ולכן
+    לא היו קיימים מבחינת ה-ingest."""
+    rows: list[dict] = []
+    offset = 0
+    while True:
+        resp = client.get(
+            path,
+            params=params,
+            headers={"Range-Unit": "items", "Range": f"{offset}-{offset + page_size - 1}"},
+        )
+        resp.raise_for_status()
+        page = resp.json()
+        rows.extend(page)
+        if len(page) < page_size:
+            return rows
+        offset += page_size
+
+
 def _ensure_progress_seeded(client: httpx.Client) -> None:
     """כל law_id שאין לו עדיין שורה ב-ingest_progress מקבל 'pending' -
     אידמפוטנטי (on_conflict do nothing), רץ בכל קריאה כדי לתפוס גם
     חוקים חדשים שנוספו לקורפוס אחרי הפעם הראשונה."""
-    resp = client.get("/laws", params={"select": "id", "current_version_id": "not.is.null"})
-    resp.raise_for_status()
-    law_ids = [row["id"] for row in resp.json()]
-    rows = [{"law_id": lid, "status": "pending"} for lid in law_ids]
+    law_rows = _fetch_all(client, "/laws", {"select": "id", "current_version_id": "not.is.null"})
+    rows = [{"law_id": row["id"], "status": "pending"} for row in law_rows]
     if rows:
         client.post(
             "/ingest_progress",
@@ -154,12 +174,8 @@ def _next_pending_law_ids(client: httpx.Client, phase: int, *, include_errors: b
     חוק התכנון והבניה נפל על סיווג שגוי של שגיאת אורך, ראו
     packages/llm/embeddings.py)."""
     statuses = "in.(pending,error)" if include_errors else "eq.pending"
-    resp = client.get(
-        "/ingest_progress",
-        params={"select": "law_id", "status": statuses, "limit": "2000"},
-    )
-    resp.raise_for_status()
-    pending = {row["law_id"] for row in resp.json()}
+    rows = _fetch_all(client, "/ingest_progress", {"select": "law_id", "status": statuses})
+    pending = {row["law_id"] for row in rows}
     return [law_id for law_id in _priority_law_ids(phase) if law_id in pending]
 
 
