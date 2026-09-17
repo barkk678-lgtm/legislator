@@ -210,6 +210,42 @@ def _mark_progress(client: httpx.Client, law_id: str, *, status: str, chunks_cou
     )
 
 
+def _embed_batch_skipping_too_long(client: httpx.Client, batch: list) -> tuple[int, int, int]:
+    """מטמיע מנה, ומדלג רק על ה-chunks שחורגים ממגבלת האורך של המודל
+    (raw_block ענק שלא ניתן לפצל - ראו chunking.py).
+
+    OpenAI מציינת בשגיאה איזה קלט חרג ("Invalid 'input[29]'"), ולכן
+    אפשר להוציא בדיוק אותו ולשלוח מחדש את השאר כמנה. בלי זה היינו
+    חוזרים על כל 50 ה-chunks אחד-אחד - 50 קריאות רשת במקום 1, ותשלום
+    חוזר על 49 טקסטים תקינים. (נמדד בפועל: זו הייתה הסיבה שקריאות
+    נתקעו מעבר לתקרת הזמן של Vercel בהרצת שלב 1.)
+
+    מחזירה (הוטמעו, טוקנים, דולגו)."""
+    remaining = list(batch)
+    embedded = tokens = skipped = 0
+    while remaining:
+        try:
+            result = embed_batch_with_usage([c.text for c in remaining])
+            _write_chunks(client, remaining, result.vectors)
+            return embedded + len(remaining), tokens + result.total_tokens, skipped
+        except EmbeddingTooLongError as e:
+            if e.input_index is None or not 0 <= e.input_index < len(remaining):
+                # אין מידע איזה chunk אשם - נופלים לבדיקה אחד-אחד,
+                # הנתיב האיטי אבל הבטוח.
+                for c in remaining:
+                    try:
+                        r = embed_batch_with_usage([c.text])
+                        _write_chunks(client, [c], r.vectors)
+                        embedded += 1
+                        tokens += r.total_tokens
+                    except EmbeddingTooLongError:
+                        skipped += 1
+                return embedded, tokens, skipped
+            remaining.pop(e.input_index)
+            skipped += 1
+    return embedded, tokens, skipped
+
+
 def run_ingest_batch(
     *,
     secret: str | None,
@@ -275,22 +311,11 @@ def run_ingest_batch(
                 to_process = new_chunks[:budget]
                 for i in range(0, len(to_process), _EMBED_API_BATCH_SIZE):
                     batch = to_process[i : i + _EMBED_API_BATCH_SIZE]
-                    try:
-                        result = embed_batch_with_usage([c.text for c in batch])
-                        _write_chunks(client, batch, result.vectors)
-                        chunks_embedded += len(batch)
-                        total_tokens += result.total_tokens
-                        budget -= len(batch)
-                    except EmbeddingTooLongError:
-                        for c in batch:
-                            try:
-                                r = embed_batch_with_usage([c.text])
-                                _write_chunks(client, [c], r.vectors)
-                                chunks_embedded += 1
-                                total_tokens += r.total_tokens
-                                budget -= 1
-                            except EmbeddingTooLongError:
-                                chunks_skipped_too_long += 1
+                    embedded, tokens, skipped = _embed_batch_skipping_too_long(client, batch)
+                    chunks_embedded += embedded
+                    total_tokens += tokens
+                    chunks_skipped_too_long += skipped
+                    budget -= embedded
 
                 if len(to_process) == len(new_chunks):
                     _mark_progress(client, law_id, status="done", chunks_count=len(all_chunks))

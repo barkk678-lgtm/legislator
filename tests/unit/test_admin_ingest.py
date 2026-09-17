@@ -106,6 +106,44 @@ def main():
         ok = ok and passed
         print(("OK " if passed else "FAIL"), label)
 
+    # --- דילוג ממוקד על chunk חורג-אורך (במקום 50 קריאות בודדות) ---
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
+    from embeddings import EmbeddingTooLongError  # noqa: PLC0415
+
+    class _Chunk:
+        def __init__(self, text):
+            self.text = text
+
+    network_calls = []
+
+    def _fake_embed(texts):
+        network_calls.append(list(texts))
+        if "ענק" in texts:
+            exc = EmbeddingTooLongError("Invalid 'input[%d]'" % texts.index("ענק"))
+            exc.input_index = texts.index("ענק")
+            raise exc
+        result = type("R", (), {})()
+        result.vectors = [[0.0] for _ in texts]
+        result.total_tokens = 10 * len(texts)
+        return result
+
+    saved_embed, saved_write = admin_ingest.embed_batch_with_usage, admin_ingest._write_chunks
+    try:
+        admin_ingest.embed_batch_with_usage = _fake_embed
+        admin_ingest._write_chunks = lambda client, chunks, vectors: None
+        embedded, tokens, skipped = admin_ingest._embed_batch_skipping_too_long(
+            None, [_Chunk("א"), _Chunk("ענק"), _Chunk("ב"), _Chunk("ג")]
+        )
+    finally:
+        admin_ingest.embed_batch_with_usage, admin_ingest._write_chunks = saved_embed, saved_write
+
+    for passed, label in [
+        ((embedded, skipped) == (3, 1), "chunk חורג מדולג, שלושת התקינים מוטמעים"),
+        (len(network_calls) == 2, f"2 קריאות רשת בלבד, לא אחת לכל chunk (היו {len(network_calls)})"),
+    ]:
+        ok = ok and passed
+        print(("OK " if passed else "FAIL"), label)
+
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1
 

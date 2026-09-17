@@ -15,6 +15,7 @@ error`). נבדק ישירות מול ה-API עם טקסט אמיתי מהקור
 """
 
 import os
+import re
 import time
 from dataclasses import dataclass
 
@@ -47,7 +48,12 @@ class EmbeddingRequestError(Exception):
 class EmbeddingTooLongError(EmbeddingRequestError):
     """הטקסט חורג ממגבלת האורך של המודל (400 מפורש על כך, לא כשל רשת
     סתמי) - מזוהה לפי הודעת השגיאה, לא ניחוש לפי אורך תווים מראש
-    (אורך-בתווים הוא רק אומדן גס למספר טוקנים בעברית)."""
+    (אורך-בתווים הוא רק אומדן גס למספר טוקנים בעברית).
+
+    input_index: איזה קלט בתוך ה-batch חרג, אם OpenAI ציינה
+    ("Invalid 'input[29]'"). None כשלא צוין."""
+
+    input_index: int | None = None
 
 
 def _api_key() -> str:
@@ -103,7 +109,15 @@ def embed_batch_with_usage(
                     or "maximum input length" in lowered
                     or "too long" in lowered
                 ):
-                    raise EmbeddingTooLongError(detail)
+                    # OpenAI מציינת איזה קלט בדיוק חרג
+                    # ("Invalid 'input[29]': ...") - שומרים את האינדקס
+                    # כדי שהקורא ידלג על ה-chunk הבודד וישלח מחדש רק
+                    # את השאר, במקום לשלוח 50 chunks אחד-אחד (בזבוז
+                    # של זמן וכסף על 49 טקסטים תקינים).
+                    exc = EmbeddingTooLongError(detail)
+                    match = re.search(r"input\[(\d+)\]", detail)
+                    exc.input_index = int(match.group(1)) if match else None
+                    raise exc
                 raise EmbeddingRequestError(f"HTTP 400 מ-OpenAI (לא-חולף): {detail}")
             if resp.status_code >= 500:
                 raise EmbeddingRequestError(f"HTTP {resp.status_code} מ-OpenAI: {resp.text[:300]}")
