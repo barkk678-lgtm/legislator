@@ -198,6 +198,21 @@
               <div id="summary-result" style="margin-top:16px"></div>
             </div>
           </section>
+
+          <section class="card" style="max-width:900px;margin:18px auto 0;width:100%">
+            <header><h2>ביקורת ניסוח</h2><span>בדיקה אוטומטית של כללי הניסוח</span></header>
+            <div class="body">
+              <div class="notice" style="margin-bottom:14px">
+                <b>הממצאים נקבעים בקוד, לא על ידי מודל.</b>
+                הבדיקות זהות בכל הרצה על אותו מסמך; המודל רק מנסח את ההסבר
+                לכל ממצא בשפה מובנת. בדיקה שאינה ניתנת להרצה על מסמך חיצוני
+                מוצגת כ"לא נבדקה" עם הסיבה — היא לא נעלמת מהרשימה.
+              </div>
+              <input type="file" id="critique-file" accept=".docx" class="inp" />
+              <button id="critique-btn" class="primary" style="margin-top:10px">בדיקת ניסוח</button>
+              <div id="critique-result" style="margin-top:16px"></div>
+            </div>
+          </section>
         </div>
       </div>
       <div class="tab" id="research">

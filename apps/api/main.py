@@ -359,6 +359,55 @@ async def api_summarize_document(file: UploadFile = File(...)) -> dict:
     }
 
 
+@app.post("/api/documents/critique")
+async def api_critique_document(file: UploadFile = File(...)) -> dict:
+    """ביקורת ניסוח על הצעת חוק שהועלתה (משימה 2.2).
+
+    **הממצאים נקבעים בקוד דטרמיניסטי (packages/validate), לא על ידי
+    מודל.** ה-LLM רק מנסח את ההסבר לכל ממצא. אם אין ממצאים - אין
+    קריאת מודל בכלל, ואם ההסבר נכשל - הממצאים עדיין מוחזרים במלואם
+    (explained=false). ראו packages/documents/critique.py."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "documents"))
+    from critique import critique_bill  # noqa: PLC0415
+    from extract_docx import DocumentExtractError, extract_bill  # noqa: PLC0415
+
+    name = (file.filename or "").lower()
+    if not name.endswith(".docx"):
+        raise HTTPException(
+            415,
+            "כרגע נתמכים קובצי Word (.docx) בלבד. קובץ .doc ישן או PDF - "
+            "יש לשמור מחדש כ-docx.",
+        )
+    try:
+        bill = extract_bill(io.BytesIO(await file.read()))
+    except DocumentExtractError as e:
+        raise HTTPException(422, str(e))
+
+    result = critique_bill(bill)
+    return {
+        "title": result.title,
+        "checks_run": list(result.checks_run),
+        "passed": result.passed,
+        "not_checked": result.not_checked,
+        "explained": result.explained,
+        "explain_error": result.explain_error,
+        "warnings": result.extraction_warnings,
+        "findings": [
+            {
+                "check": it.check_number,
+                "description": it.description,
+                "severity": it.severity,
+                "status": it.status,
+                "message": it.message,
+                "what": it.what,
+                "why": it.why,
+                "fix": it.fix,
+            }
+            for it in result.items
+        ],
+    }
+
+
 @app.post("/api/research/ask")
 def api_research_ask(req: ResearchAskRequestIn) -> dict:
     """שאלת מחקר בשפה חופשית -> תבנית שאילתה -> מספרים גולמיים.

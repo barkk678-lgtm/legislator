@@ -1178,3 +1178,76 @@ async function generateSummary() {
   }
 }
 document.getElementById("summary-btn").addEventListener("click", generateSummary);
+
+/* ═══ ביקורת ניסוח ═══ (משימה 2.2)
+ * אזור נפרד מהתקציר בכוונה: התקציר אומר *מה ההצעה עושה*, הביקורת
+ * אומרת *מה לא בסדר בניסוח*. ערבוב השניים היה קובר את הממצאים בתוך
+ * פסקה - וזה בדיוק מה שהפיצ'ר הזה נועד למנוע.
+ *
+ * הממצא הדטרמיניסטי (message) מוצג תמיד, גם כשההסבר של המודל נכשל
+ * או חסר. ליקוי אמיתי לא נעלם בגלל שהניסוח שלו לא חזר. */
+async function runCritique() {
+  const input = document.getElementById("critique-file");
+  const out = document.getElementById("critique-result");
+  const file = input.files && input.files[0];
+  if (!file) {
+    out.innerHTML = `<div class="hint">בחרו קובץ Word תחילה.</div>`;
+    return;
+  }
+  const btn = document.getElementById("critique-btn");
+  btn.disabled = true;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>בודק את הניסוח…</div>`;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await fetch("/api/documents/critique", { method: "POST", body: form });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בבדיקת הניסוח.")}</div>`;
+      return;
+    }
+    const d = await resp.json();
+    const head = `<div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
+      <div class="citation-date">${d.checks_run.length} בדיקות הורצו ·
+        ${d.passed.length} עברו · ${d.not_checked.length} לא נבדקו</div>`;
+
+    let body;
+    if (!d.findings.length) {
+      body = `<div class="msg ok" style="margin-top:12px">לא נמצאו ליקויים בבדיקות שהורצו
+        (${d.checks_run.join(", ")}). זו קביעה של הקוד, לא של מודל.</div>`;
+    } else {
+      body = d.findings.map((f) => `
+        <div class="critique-item critique-${f.status === "אזהרה" ? "warn" : "fail"}">
+          <div class="critique-head">
+            <span class="critique-badge">${escapeHtml(f.status)}</span>
+            <b>${escapeHtml(f.what || f.description)}</b>
+          </div>
+          ${f.why ? `<div class="critique-why">${escapeHtml(f.why)}</div>` : ""}
+          ${f.fix ? `<div class="critique-fix"><b>מה לעשות:</b> ${escapeHtml(f.fix)}</div>` : ""}
+          <div class="critique-raw">בדיקה ${f.check} — ${escapeHtml(f.message)}</div>
+        </div>`).join("");
+      if (!d.explained) {
+        body += `<div class="notice notice-coverage" style="margin-top:12px">
+          ההסבר בשפה חופשית לא נוצר${d.explain_error ? ` (${escapeHtml(d.explain_error)})` : ""} —
+          הממצאים עצמם מוצגים במלואם כפי שנקבעו בקוד.</div>`;
+      }
+    }
+
+    const skipped = d.not_checked.length
+      ? `<details class="critique-skipped"><summary>${d.not_checked.length} בדיקות לא הורצו על המסמך הזה</summary>
+           <div class="hint">בדיקות ${d.not_checked.join(", ")} דורשות מידע שאין במסמך חיצוני
+           (החוק המתוקן, הרפרנסים, ה-docx שהמערכת הפיקה) או שידוע שהן שגויות
+           על הצעות אמיתיות וממתינות לתיקון.</div></details>`
+      : "";
+
+    const warn = d.warnings.length
+      ? `<div class="notice notice-coverage" style="margin-top:12px"><b>אזהרות חילוץ:</b>
+           <ul>${d.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>`
+      : "";
+
+    out.innerHTML = head + body + skipped + warn;
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById("critique-btn").addEventListener("click", runCritique);
