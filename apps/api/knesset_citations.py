@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "kness
 from odata import OdataError, fetch  # noqa: E402
 
 _BILL_FIELDS = "Id,Name,PublicationSeriesDesc,MagazineNumber,PageNumber,PublicationDate"
+_BILL_ID_CHUNK = 150  # 200 עובר, 400 נשבר - 150 משאיר מרווח
 
 
 def _israel_law_id(law_id: str) -> int | None:
@@ -77,10 +78,13 @@ def citations_for_law(law_id: str) -> dict:
 
     bill_ids = sorted({b["LawID"] for b in bindings if b.get("LawID")})
     bills: dict[int, dict] = {}
-    # ה-filter מוגבל באורך; מושכים במנות ולא בביטוי ענק אחד.
-    for i in range(0, len(bill_ids), 40):
-        chunk = bill_ids[i : i + 40]
-        clause = " or ".join(f"Id eq {bid}" for bid in chunk)
+    # **`in (...)` ולא שרשרת `or`:** נמדד מול השרת - 25 תנאי `or`
+    # מוחזרים כ-400 (מגבלת מורכבות על עץ הביטוי), בעוד `in` עובר
+    # בנוחות עם 200 מזהים ונשבר רק סביב 400. חוק מתוקן כמו העונשין
+    # (169 קישורים) היה נכשל לגמרי בגרסת ה-or.
+    for i in range(0, len(bill_ids), _BILL_ID_CHUNK):
+        chunk = bill_ids[i : i + _BILL_ID_CHUNK]
+        clause = "Id in (" + ",".join(str(bid) for bid in chunk) + ")"
         for bill in fetch("KNS_Bill", filter=clause, select=_BILL_FIELDS):
             bills[bill["Id"]] = bill
 

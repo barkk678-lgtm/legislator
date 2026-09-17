@@ -165,6 +165,36 @@ def api_openai_check() -> dict:
     return {"ok": True, "dimensions": len(vector), "latency_ms": round((_time.monotonic() - start) * 1000)}
 
 
+@app.get("/api/admin/knesset-files-check")
+def api_knesset_files_check() -> dict:
+    """אבחון בלבד: האם `fs.knesset.gov.il` (שרת הקבצים של הכנסת)
+    נגיש מ-Vercel. הוא חסום מסביבת ה-agent, בדיוק כמו api.openai.com
+    היה - ולכן נבדק מכאן, מאותה סיבה ובאותו דפוס (ראו CLAUDE.md
+    "גבולות רשת").
+
+    שם יושבים הטקסטים המלאים של שאילתות והצעות חוק. **זה שיפור,
+    לא תנאי** - כלי השאילתא עובד על שם/מגיש/תאריך גם בלי זה."""
+    import time as _time
+
+    import httpx as _httpx
+
+    # קובץ אמיתי שהתקבל מ-KNS_DocumentQuery, לא כתובת מומצאת.
+    url = "https://fs.knesset.gov.il//19/parliamentquestion/19_pq_221299.doc"
+    start = _time.monotonic()
+    try:
+        with _httpx.Client(timeout=15.0, follow_redirects=True) as client:
+            resp = client.get(url)
+        return {
+            "reachable": resp.status_code == 200,
+            "status": resp.status_code,
+            "content_type": resp.headers.get("content-type"),
+            "bytes": len(resp.content),
+            "latency_ms": round((_time.monotonic() - start) * 1000),
+        }
+    except _httpx.HTTPError as e:
+        return {"reachable": False, "error": str(e)[:200], "error_type": type(e).__name__}
+
+
 @app.post("/api/admin/ingest-chunks")
 def api_admin_ingest_chunks(
     x_ingest_secret: str | None = Header(None),
