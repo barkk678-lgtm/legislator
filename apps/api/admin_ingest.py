@@ -51,6 +51,7 @@ from chunking import chunk_law  # noqa: E402
 from embeddings import EmbeddingConfigError, EmbeddingRequestError, EmbeddingTooLongError, embed_batch_with_usage  # noqa: E402
 
 from law_registry import LawNotFoundError, load_law  # noqa: E402
+from supabase_rest import count_rows, fetch_all  # noqa: E402
 
 # --- מגבלות קצב (ברק, 2026-09-17) - ראו night-report.md לחישוב
 # העלות המרבית התיאורטי לשעה/ליום מהמספרים האלה. ---
@@ -106,45 +107,14 @@ def _calls_in_last_hour(client: httpx.Client) -> int:
     מחשבים את חתך הזמן ב-Python ומשווים ישירות (פשוט וברור יותר
     מ-RPC ייעודי לצורך הזה בלבד)."""
     one_hour_ago = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)).isoformat()
-    resp = client.get(
-        "/ingest_log",
-        params={"select": "id", "called_at": f"gte.{one_hour_ago}"},
-        headers={"Prefer": "count=exact"},
-    )
-    resp.raise_for_status()
-    content_range = resp.headers.get("content-range", "")  # "0-4/5"
-    if "/" in content_range:
-        return int(content_range.split("/")[-1])
-    return len(resp.json())
-
-
-def _fetch_all(client: httpx.Client, path: str, params: dict, page_size: int = 1000) -> list[dict]:
-    """שליפה מעומדת. PostgREST מחזיר לכל היותר 1,000 שורות לבקשה
-    (db-max-rows) **בלי להתריע** - פרמטר limit גדול יותר פשוט נחתך.
-    זה הפיל 94 חוקים מהתור בשקט בהרצת שלב 1 (ביניהם פקודת העיריות,
-    אחד החוקים שברק דרש במפורש): הם לא נרשמו ל-ingest_progress ולכן
-    לא היו קיימים מבחינת ה-ingest."""
-    rows: list[dict] = []
-    offset = 0
-    while True:
-        resp = client.get(
-            path,
-            params=params,
-            headers={"Range-Unit": "items", "Range": f"{offset}-{offset + page_size - 1}"},
-        )
-        resp.raise_for_status()
-        page = resp.json()
-        rows.extend(page)
-        if len(page) < page_size:
-            return rows
-        offset += page_size
+    return count_rows(client, "/ingest_log", {"called_at": f"gte.{one_hour_ago}"})
 
 
 def _ensure_progress_seeded(client: httpx.Client) -> None:
     """כל law_id שאין לו עדיין שורה ב-ingest_progress מקבל 'pending' -
     אידמפוטנטי (on_conflict do nothing), רץ בכל קריאה כדי לתפוס גם
     חוקים חדשים שנוספו לקורפוס אחרי הפעם הראשונה."""
-    law_rows = _fetch_all(client, "/laws", {"select": "id", "current_version_id": "not.is.null"})
+    law_rows = fetch_all(client, "/laws", {"select": "id", "current_version_id": "not.is.null"})
     rows = [{"law_id": row["id"], "status": "pending"} for row in law_rows]
     if rows:
         client.post(
@@ -174,7 +144,7 @@ def _next_pending_law_ids(client: httpx.Client, phase: int, *, include_errors: b
     חוק התכנון והבניה נפל על סיווג שגוי של שגיאת אורך, ראו
     packages/llm/embeddings.py)."""
     statuses = "in.(pending,error)" if include_errors else "eq.pending"
-    rows = _fetch_all(client, "/ingest_progress", {"select": "law_id", "status": statuses})
+    rows = fetch_all(client, "/ingest_progress", {"select": "law_id", "status": statuses})
     pending = {row["law_id"] for row in rows}
     return [law_id for law_id in _priority_law_ids(phase) if law_id in pending]
 
@@ -186,12 +156,15 @@ def _db_size_mb(client: httpx.Client) -> float:
 
 
 def _existing_chunk_keys(client: httpx.Client, law_id: str) -> set[tuple[str, int]]:
-    resp = client.get(
+    """**חייב עימוד:** לחוק גדול יש יותר מ-1,000 chunks (לתכנון והבניה
+    כ-1,500). בלי עימוד היו חוזרים ומטמיעים - כלומר משלמים שוב - את
+    כל ה-chunks מעבר לאלף הראשון בכל הרצה חוזרת."""
+    rows = fetch_all(
+        client,
         "/search_chunks",
-        params={"select": "section_number,chunk_index", "law_id": f"eq.{law_id}", "embedding": "not.is.null"},
+        {"select": "section_number,chunk_index", "law_id": f"eq.{law_id}", "embedding": "not.is.null"},
     )
-    resp.raise_for_status()
-    return {(row["section_number"], row["chunk_index"]) for row in resp.json()}
+    return {(row["section_number"], row["chunk_index"]) for row in rows}
 
 
 def _write_chunks(client: httpx.Client, chunks, vectors) -> None:

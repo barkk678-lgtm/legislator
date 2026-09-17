@@ -27,6 +27,8 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
 from embeddings import EmbeddingConfigError, EmbeddingRequestError, embed_one  # noqa: E402
 
+from supabase_rest import fetch_all  # noqa: E402
+
 
 class SemanticSearchConfigError(Exception):
     """תצורה חסרה (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY *או*
@@ -59,11 +61,10 @@ def indexed_law_ids() -> dict[str, int]:
     שקיים בפועל ולא לפי דגל סטטוס)."""
     with _supabase_client() as client:
         try:
-            resp = client.get("/indexed_laws", params={"select": "law_id,chunk_count", "limit": "2000"})
-            resp.raise_for_status()
+            rows = fetch_all(client, "/indexed_laws", {"select": "law_id,chunk_count"})
         except httpx.HTTPError as e:
             raise SemanticSearchRequestError(f"כשל בקריאת רשימת החוקים המאונדקסים: {e}") from None
-        return {row["law_id"]: row["chunk_count"] for row in resp.json()}
+        return {row["law_id"]: row["chunk_count"] for row in rows}
 
 
 def search(query: str, *, limit: int = 10, full_text_weight: float = 0.5, semantic_weight: float = 0.5) -> list[dict]:

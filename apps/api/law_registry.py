@@ -23,7 +23,7 @@ wikitext_parser.py). שני הנתיבים לא חולקים קוד, ולכן ט
 **עימוד (pagination) - קריטי, לא אופציונלי:** PostgREST מגביל
 תוצאת ברירת מחדל ל-1,000 שורות. נבדק בפועל (2026-09-16): חוק
 העונשין (2,682 nodes) חוזר **חתוך ל-1,000 בלי שגיאה** בלי עימוד -
-כשל שקט שהיה מייצר עץ תקין-למראה אבל חסר 60% מהתוכן. `_fetch_all_pages`
+כשל שקט שהיה מייצר עץ תקין-למראה אבל חסר 60% מהתוכן. `supabase_rest.fetch_all`
 למטה מטפל בזה תמיד, לא רק ל"חוקים גדולים".
 
 **amendable מחושב בזול, לא בבניית-עץ-מלא לכל חוק:** law_summaries()
@@ -56,6 +56,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+
+from supabase_rest import fetch_all
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "corpus"))
@@ -139,26 +141,9 @@ def _supabase_client() -> httpx.Client:
     )
 
 
-def _fetch_all_pages(client: httpx.Client, path: str, params: dict, page_size: int = 1000) -> list[dict]:
-    """שליפה עם עימוד מלא - ראו הדוקסטרינג העליון: PostgREST חותך
-    ל-1,000 שורות בלי שגיאה בלי זה. ממשיכה עד שעמוד חוזר קטן מ-page_size
-    (כולל 0 - סוף)."""
-    rows: list[dict] = []
-    offset = 0
-    while True:
-        page_params = dict(params, limit=str(page_size), offset=str(offset))
-        resp = client.get(path, params=page_params)
-        resp.raise_for_status()
-        page = resp.json()
-        rows.extend(page)
-        if len(page) < page_size:
-            return rows
-        offset += page_size
-
-
 def _db_law_summaries() -> list[dict]:
     with _supabase_client() as client:
-        laws_rows = _fetch_all_pages(
+        laws_rows = fetch_all(
             client, "/laws",
             {"select": "id,full_title,law_versions!laws_current_version_fk(source_ref)",
              "current_version_id": "not.is.null"},
@@ -169,7 +154,7 @@ def _db_law_summaries() -> list[dict]:
         # מ-nodes נמדדה בפועל ב-30 שניות ל-GET /api/laws (2026-09-16) -
         # לא סביר לרשימת חוקים. ראו migration
         # 20260916130000_fix_amendable_law_ids_view_scope_to_roots.
-        amendable_rows = _fetch_all_pages(client, "/amendable_law_ids", {"select": "law_id"})
+        amendable_rows = fetch_all(client, "/amendable_law_ids", {"select": "law_id"})
     section_parents = {row["law_id"] for row in amendable_rows}
 
     summaries = []
@@ -190,11 +175,14 @@ def _fetch_db_law_id(law_id: str) -> int | None:
     """מחזירה current_version_id אם law_id קיים ב-DB עם גרסה נוכחית,
     אחרת None (לא קיים / עדיין לא הושלמה טעינתו - ראו replace_law_version)."""
     with _supabase_client() as client:
+        # שורה אחת לפי מפתח ראשי - היחיד שלא דורש עימוד, ו-limit=1
+        # מבהיר את זה במפורש כדי שלא ייראה כמו קריאה שנשכחה.
         resp = client.get(
             "/laws",
             params={
                 "id": f"eq.{law_id}",
                 "select": "full_title,law_versions!laws_current_version_fk(id,source_ref,as_of)",
+                "limit": "1",
             },
         )
         resp.raise_for_status()
@@ -251,7 +239,7 @@ def _load_db_law(law_id: str) -> LegislativeNode:
     version = law_row["law_versions"]
 
     with _supabase_client() as client:
-        node_rows = _fetch_all_pages(
+        node_rows = fetch_all(
             client, "/nodes",
             {"law_version_id": f"eq.{version['id']}",
              "select": "id,parent_id,raw_order,node_type,number,margin_title,margin_title_raw,"
