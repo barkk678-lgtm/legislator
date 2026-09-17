@@ -55,11 +55,14 @@ def citations_for_law(law_id: str) -> dict:
     הזה לא קיים במאגר הכנסת", בדיוק כמו הבחנת הכיסוי בחיפוש הסמנטי."""
     israel_law_id = _israel_law_id(law_id)
     if israel_law_id is None:
-        return {
-            "law_id": law_id, "in_knesset_db": False, "citations": [],
-            "note": "מזהה מסוג bill- אינו קיים כחוק עצמאי במאגר הכנסת "
-                    "(חוק שכל תוכנו תיקון לחוקים אחרים).",
-        }
+        note = (
+            "חוק שכל תוכנו תיקון לחוקים אחרים - אין לו רשומת חוק עצמאית "
+            "במאגר הכנסת, ולכן אין לו מראי מקום משלו."
+            if law_id.startswith("bill-")
+            else "למזהה הזה אין מקבילה במאגר הכנסת (למשל תקנון הכנסת, "
+                 "שאינו חוק, או חוק לדוגמה לבדיקות)."
+        )
+        return {"law_id": law_id, "in_knesset_db": False, "citations": [], "note": note}
 
     bindings = fetch(
         "KNS_LawBinding",

@@ -963,11 +963,17 @@ async function loadCitations(lawId) {
     const resp = await fetch(`/api/laws/${encodeURIComponent(lawId)}/citations`);
     if (!resp.ok) throw new Error("feed");
     const data = await resp.json();
+    const summary = box.querySelector("summary");
     if (!data.in_knesset_db) {
-      // ההבחנה בין "אין תיקונים" ל"לא קיים במאגר" - לא מסך ריק.
+      // ההבחנה בין "אין תיקונים" ל"לא קיים במאגר" - ופתוח כברירת
+      // מחדל, אחרת ההסבר חבוי מאחורי אקורדיון מקופל ונראה כמו כלום.
+      summary.textContent = "מראי מקום מהכנסת — אין רשומה";
+      box.open = true;
       body.innerHTML = `<div class="hint">${escapeHtml(data.note || "אין רשומה במאגר הכנסת.")}</div>`;
       return;
     }
+    summary.textContent = `מראי מקום מהכנסת (${data.citations.length})`;
+    box.open = false;
     const rows = data.citations
       .map((c) => `<div class="citation-row">
           <b>${c.is_original ? "הפרסום המקורי" : escapeHtml(c.kind || "תיקון")}</b>
