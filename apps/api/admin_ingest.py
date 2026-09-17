@@ -160,8 +160,13 @@ def _mark_progress(client: httpx.Client, law_id: str, *, status: str, chunks_cou
     )
 
 
-def run_ingest_batch(*, secret: str | None) -> dict:
-    """הפעלה אחת, מוגבלת-תקציב. מחזירה סיכום JSON-friendly."""
+def run_ingest_batch(*, secret: str | None, max_laws: int | None = None) -> dict:
+    """הפעלה אחת, מוגבלת-תקציב. מחזירה סיכום JSON-friendly.
+
+    max_laws: תקרה נוספת (לא חלק משלוש דרישות האבטחה של ברק, שכבר
+    אוכפות MAX_CHUNKS_PER_CALL/MAX_CALLS_PER_HOUR) - לריצות-בדיקה
+    מבוקרות ("הרץ על 50 חוקים בלבד") בלי לסמוך על גודל מקרי של
+    תקציב ה-chunks לחתוך בדיוק במספר החוקים הרצוי."""
     start = time.monotonic()
     _require_secret(secret)
 
@@ -179,9 +184,11 @@ def run_ingest_batch(*, secret: str | None) -> dict:
         laws_errored: list[str] = []
         chunks_embedded = chunks_skipped_existing = chunks_skipped_too_long = total_tokens = 0
 
-        candidate_law_ids = _next_pending_law_ids(client, limit=50)
+        candidate_law_ids = _next_pending_law_ids(client, limit=max(50, max_laws or 0))
         for law_id in candidate_law_ids:
             if budget <= 0:
+                break
+            if max_laws is not None and len(laws_processed) >= max_laws:
                 break
             try:
                 root = load_law(law_id)

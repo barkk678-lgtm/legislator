@@ -117,13 +117,16 @@ def api_openai_check() -> dict:
 
 
 @app.post("/api/admin/ingest-chunks")
-def api_admin_ingest_chunks(x_ingest_secret: str | None = Header(None)) -> dict:
+def api_admin_ingest_chunks(x_ingest_secret: str | None = Header(None), max_laws: int | None = None) -> dict:
     """מריץ מנה אחת (מוגבלת-תקציב) של ingest ל-search_chunks - ראו
     admin_ingest.py לפירוט מלא (טוקן/מגבלת-קצב/לוג/המשך-הרצה).
     מיועד להיקרא חוזר-ונשנה (לא בקשה אחת שממצה את כל הקורפוס) -
-    כל קריאה ממשיכה מהחוק הבא שלא הושלם."""
+    כל קריאה ממשיכה מהחוק הבא שלא הושלם.
+
+    max_laws (אופציונלי): תקרת-חוקים לריצות-בדיקה מבוקרות, ראו
+    admin_ingest.run_ingest_batch."""
     try:
-        return run_ingest_batch(secret=x_ingest_secret)
+        return run_ingest_batch(secret=x_ingest_secret, max_laws=max_laws)
     except IngestAuthError as e:
         raise HTTPException(401, str(e))
     except IngestRateLimitError as e:
