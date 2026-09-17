@@ -1,0 +1,959 @@
+{
+ "source": "KNS_DocumentBill (OData של הכנסת), GroupTypeDesc של הצעת חוק בלבד, docx מאומת-בייטים",
+ "collected_at": "2026-09-17",
+ "count": 40,
+ "bills": [
+  {
+   "doc_id": 13442798,
+   "bill_id": 2243158,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-08",
+   "bytes": 38126,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13442798.docx",
+   "title": "הצעת חוק הרשויות המקומיות (בחירות) (תיקון – הגבלת הזכות להיבחר בשל כתב אישום),  התשפ\"ו–2026",
+   "initiators": [
+    "אלון שוסטר"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6756/25",
+   "lines": 12,
+   "explanatory": 14,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    4
+   ],
+   "inner_sections": 1,
+   "warnings": []
+  },
+  {
+   "doc_id": 13442800,
+   "bill_id": 2243800,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-08",
+   "bytes": 31766,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13442800.docx",
+   "title": "הצעת חוק-יסוד: לימוד תורה",
+   "initiators": [
+    "אריה מכלוף דרעי"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6761/25",
+   "lines": 2,
+   "explanatory": 7,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13456029,
+   "bill_id": 2243493,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-09",
+   "bytes": 35750,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13456029.docx",
+   "title": "הצעת חוק משפחות חיילים שנספו במערכה (תגמולים ושיקום) (תיקון – הכרה במי ששלח יד בנפשו כחייל שנספה במערכה) (הוראת שעה – חרבות ברזל), התשפ\"ו–2026",
+   "initiators": [
+    "אלעזר שטרן"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6759/25",
+   "lines": 3,
+   "explanatory": 4,
+   "depth_source": "column",
+   "depths": [
+    0,
+    4
+   ],
+   "inner_sections": 1,
+   "warnings": []
+  },
+  {
+   "doc_id": 13569200,
+   "bill_id": 2243242,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-15",
+   "bytes": 75826,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13569200.docx",
+   "title": "הצעת חוק הרשות הארצית למדידה ולהערכה בחינוך, התשפ\"ו–2026",
+   "initiators": [
+    "מירב כהן"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6769/25",
+   "lines": 208,
+   "explanatory": 11,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    2
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13569214,
+   "bill_id": 2241185,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-15",
+   "bytes": 39573,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13569214.docx",
+   "title": "הצעת חוק הקמת תחנות נוחות בכבישים בין-עירוניים (תיקוני חקיקה), התשפ\"ו–2026",
+   "initiators": [
+    "סמיר בן סעיד"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6771/25",
+   "lines": 26,
+   "explanatory": 7,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    2,
+    4
+   ],
+   "inner_sections": 1,
+   "warnings": []
+  },
+  {
+   "doc_id": 13569216,
+   "bill_id": 2243813,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-15",
+   "bytes": 50104,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13569216.docx",
+   "title": "הצעת חוק המרכז להנצחת מורשתו של הנשיא יצחק נבון, התשפ\"ו–2026",
+   "initiators": [
+    "יצחק קרויזר"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6768/25",
+   "lines": 102,
+   "explanatory": 11,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13570380,
+   "bill_id": 2243905,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-15",
+   "bytes": 33032,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13570380.docx",
+   "title": "הצעת חוק חופש הנחת תפילין, התשפ\"ו–2026",
+   "initiators": [
+    "אבי מעוז"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6770/25",
+   "lines": 9,
+   "explanatory": 4,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13695179,
+   "bill_id": 2243319,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 35898,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695179.docx",
+   "title": "הצעת חוק חובת גילוי תוכן מטעה מבוסס בינה מלאכותית, התשפ״ו–2026",
+   "initiators": [
+    "יאסר חוג'יראת"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6780/25",
+   "lines": 18,
+   "explanatory": 3,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13695181,
+   "bill_id": 2243520,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 37331,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695181.docx",
+   "title": "הצעת חוק המאבק בחרמות ובנידוי חברתי בקרב ילדים ובני נוער, התשפ\"ו–2026",
+   "initiators": [
+    "דבי ביטון"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6781/25",
+   "lines": 25,
+   "explanatory": 4,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13695183,
+   "bill_id": 2243834,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 33956,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695183.docx",
+   "title": "הצעת חוק הבנקאות (שירות ללקוח) (תיקון – שמירה על הסדר הלוואה לאחר פיגור זמני בתשלום), התשפ\"ו–2026",
+   "initiators": [
+    "ואליד אלהואשלה"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6773/25",
+   "lines": 4,
+   "explanatory": 4,
+   "depth_source": "column",
+   "depths": [
+    0,
+    4
+   ],
+   "inner_sections": 1,
+   "warnings": []
+  },
+  {
+   "doc_id": 13695197,
+   "bill_id": 2244101,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 39872,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695197.docx",
+   "title": "הצעת חוק מעמד המשרת בשירות צבאי, התשפ\"ו–2026",
+   "initiators": [
+    "אלעזר שטרן"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6774/25",
+   "lines": 45,
+   "explanatory": 16,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    2
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13695200,
+   "bill_id": 2242240,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 52886,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695200.docx",
+   "title": "הצעת חוק הזכות לתקן, התשפ\"ו–2026",
+   "initiators": [
+    "אלון שוסטר"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6777/25",
+   "lines": 98,
+   "explanatory": 9,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13695211,
+   "bill_id": 2241746,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 53763,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695211.docx",
+   "title": "הצעת חוק מוזאון יד מרדכי והמכון להוראת השואה והגבורה, התשפ\"ו–2026",
+   "initiators": [
+    "מיכאל מרדכי ביטון"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6776/25",
+   "lines": 131,
+   "explanatory": 5,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13695213,
+   "bill_id": 2243525,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 34675,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695213.docx",
+   "title": "הצעת חוק התכנון והבנייה (תיקון – ערעור ברשות לחברי ועדה מחוזית), התשפ\"ו–2026",
+   "initiators": [
+    "יעקב טסלר"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6779/25",
+   "lines": 9,
+   "explanatory": 5,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    2
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13695215,
+   "bill_id": 2243769,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 32058,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695215.docx",
+   "title": "הצעת חוק הגנת הצרכן (תיקון – ביטול החרגת תאגידים בנקאיים וביטוחיים), התשפ\"ו–2026",
+   "initiators": [
+    "מיכאל מרדכי ביטון"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6772/25",
+   "lines": 1,
+   "explanatory": 7,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13695217,
+   "bill_id": 2243937,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 35079,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695217.docx",
+   "title": "הצעת חוק דמי מחלה (היעדרות בשל טיפול בהורה או בבן זוג החולה בדמנציה) (תיקוני חקיקה), התשפ\"ו–2026",
+   "initiators": [
+    "יונתן מישרקי"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6775/25",
+   "lines": 6,
+   "explanatory": 3,
+   "depth_source": "column",
+   "depths": [
+    0,
+    4
+   ],
+   "inner_sections": 2,
+   "warnings": []
+  },
+  {
+   "doc_id": 13695219,
+   "bill_id": 2244193,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-22",
+   "bytes": 34304,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13695219.docx",
+   "title": "הצעת חוק העונשין (תיקון – החמרת הענישה על תקיפת שופט), התשפ\"ו–2026",
+   "initiators": [
+    "עוז חיים"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6778/25",
+   "lines": 2,
+   "explanatory": 7,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13821853,
+   "bill_id": 2244378,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-29",
+   "bytes": 34908,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13821853.docx",
+   "title": "הצעת חוק הצבת מכשירי החייאה במקומות ציבוריים (תיקון – חובת הצבת מכשיר החייאה בבניין רב-קומות), התשפ\"ו–2026",
+   "initiators": [
+    "ארז מלול"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6782/25",
+   "lines": 10,
+   "explanatory": 4,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    3
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13821857,
+   "bill_id": 2243845,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-29",
+   "bytes": 40050,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13821857.docx",
+   "title": "הצעת חוק מערכת חינוך ממלכתית אחידה ושוויונית (תיקוני חקיקה), התשפ\"ו–2026",
+   "initiators": [
+    "מרב מיכאלי"
+   ],
+   "knesset": "הכנסת העשרים ושש",
+   "bill_number": "פ/6788/25",
+   "lines": 39,
+   "explanatory": 4,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    2
+   ],
+   "inner_sections": 1,
+   "warnings": []
+  },
+  {
+   "doc_id": 13821859,
+   "bill_id": 2244078,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-29",
+   "bytes": 37110,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13821859.docx",
+   "title": "הצעת חוק בינוי ופינוי של אזורי שיקום (כפר שלם), התשפ\"ו–2026",
+   "initiators": [
+    "עופר כסיף"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6786/25",
+   "lines": 42,
+   "explanatory": 11,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13821868,
+   "bill_id": 2243263,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-29",
+   "bytes": 36570,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13821868.docx",
+   "title": "הצעת חוק הוועדה המייעצת למינויים בכירים, התשפ״ו–2026",
+   "initiators": [
+    "אפרת רייטן מרום"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6789/25",
+   "lines": 37,
+   "explanatory": 3,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13821876,
+   "bill_id": 2242065,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-29",
+   "bytes": 32934,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13821876.docx",
+   "title": "הצעת חוק הגנת הצומח (תיקון – שקילת שיקולי שמירה על ביטחון המזון), התשפ\"ו–2026",
+   "initiators": [
+    "משה אבוטבול"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6783/25",
+   "lines": 1,
+   "explanatory": 5,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13821878,
+   "bill_id": 2244405,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-29",
+   "bytes": 34398,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13821878.docx",
+   "title": "הצעת חוק לתיקון פקודת בתי הסוהר (מניעת כניסתם של נציגי ארגון הצלב האדום הבין-לאומי והעברת מידע לארגון), התשפ\"ו–2026",
+   "initiators": [
+    "צביקה פוגל"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6784/25",
+   "lines": 5,
+   "explanatory": 4,
+   "depth_source": "column",
+   "depths": [
+    0,
+    4
+   ],
+   "inner_sections": 1,
+   "warnings": []
+  },
+  {
+   "doc_id": 13821884,
+   "bill_id": 2244447,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-29",
+   "bytes": 34481,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13821884.docx",
+   "title": "הצעת חוק אספקת החשמל, התשפ\"ו–2026",
+   "initiators": [
+    "______________________________________________"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6785/25",
+   "lines": 24,
+   "explanatory": 4,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13821886,
+   "bill_id": 2244563,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-06-29",
+   "bytes": 34386,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13821886.docx",
+   "title": "הצעת חוק הביטוח הלאומי (תיקון  – מניעת הטבות הנובעות מריבוי בני זוג), התשפ\"ו–2026",
+   "initiators": [
+    "מיכל מרים וולדיגר"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6787/25",
+   "lines": 5,
+   "explanatory": 4,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13948363,
+   "bill_id": 2241135,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 36253,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948363.docx",
+   "title": "הצעת חוק שיווי זכויות האישה (תיקון – הרחבת מטרות המאגר), התשפ\"ו–2026",
+   "initiators": [
+    "חברת הכנסת       עדי עזוז"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6794/25",
+   "lines": 12,
+   "explanatory": 5,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    2
+   ],
+   "inner_sections": 0,
+   "warnings": []
+  },
+  {
+   "doc_id": 13948365,
+   "bill_id": 2244167,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 43292,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948365.docx",
+   "title": "הצעת חוק משק החשמל (תיקון – תעריפים מדורגים ומונים חכמים), התשפ\"ו–2026",
+   "initiators": [
+    "נאור שירי"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6790/25",
+   "lines": 32,
+   "explanatory": 7,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    2,
+    4
+   ],
+   "inner_sections": 1,
+   "warnings": []
+  },
+  {
+   "doc_id": 13948370,
+   "bill_id": 2244243,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 38948,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948370.docx",
+   "title": "הצעת חוק הבחירות לכנסת (תיקון – הצבעת אנשי צוות אוויר), התשפ\"ו–2026",
+   "initiators": [
+    "מרב מיכאלי"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6796/25",
+   "lines": 26,
+   "explanatory": 10,
+   "depth_source": "column",
+   "depths": [
+    0,
+    4,
+    5
+   ],
+   "inner_sections": 4,
+   "warnings": []
+  },
+  {
+   "doc_id": 13948378,
+   "bill_id": 2243006,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 32553,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948378.docx",
+   "title": "הצעת חוק הקמת ועדת חקירה ממלכתית לאירועי 7 באוקטובר, התשפ\"ו–2026",
+   "initiators": [
+    "מרב מיכאלי"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6339/25",
+   "lines": 5,
+   "explanatory": 0,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13948380,
+   "bill_id": 2244624,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 35119,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948380.docx",
+   "title": "הצעת חוק דמי מחלה (היעדרות בשל מחלת בן זוג) (תיקון – זקיפת חלקי ימים והרחבת הזכאות), התשפ\"ו–2026",
+   "initiators": [
+    "מירב כהן"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6797/25",
+   "lines": 3,
+   "explanatory": 6,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13948382,
+   "bill_id": 2244742,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 33753,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948382.docx",
+   "title": "הצעת חוק יום ממלכתי לציון הסכמי השלום של מדינת ישראל, התשפ\"ו–2026",
+   "initiators": [
+    "נעמה לזימי"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6791/25",
+   "lines": 7,
+   "explanatory": 3,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13948386,
+   "bill_id": 2244522,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 73100,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948386.docx",
+   "title": "הצעת חוק אסדרת משק הפסולת בישראל והקמת הרשות הארצית לטיפול בפסולת, התשפ\"ו–2026",
+   "initiators": [
+    "יעל רון בן משה",
+    "מיכאל מרדכי ביטון"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6804/25",
+   "lines": 299,
+   "explanatory": 7,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    2
+   ],
+   "inner_sections": 1,
+   "warnings": []
+  },
+  {
+   "doc_id": 13948392,
+   "bill_id": 2242913,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 40618,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948392.docx",
+   "title": "הצעת חוק צער בעלי חיים (הגנה על בעלי חיים) (תיקון – איסור עיסוק ברבייה ובמכירה של כלבים ללא היתר), התשפ\"ו–2026",
+   "initiators": [
+    "יסמין פרידמן"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6792/25",
+   "lines": 31,
+   "explanatory": 6,
+   "depth_source": "column",
+   "depths": [
+    0,
+    1,
+    4,
+    5
+   ],
+   "inner_sections": 3,
+   "warnings": []
+  },
+  {
+   "doc_id": 13948394,
+   "bill_id": 2243346,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 36000,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948394.docx",
+   "title": "הצעת חוק הפיקוח על מעונות יום לפעוטות (תיקון – מיגון תקני כתנאי לרישיון והשתתפות במימון התאמת מיגון), התשפ\"ו–2026",
+   "initiators": [
+    "נעמה לזימי"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6798/25",
+   "lines": 14,
+   "explanatory": 7,
+   "depth_source": "column",
+   "depths": [
+    0,
+    4,
+    5
+   ],
+   "inner_sections": 2,
+   "warnings": []
+  },
+  {
+   "doc_id": 13948400,
+   "bill_id": 2244033,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 31482,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948400.docx",
+   "title": "הצעת חוק לתיקון פקודת מסי העירייה ומסי הממשלה (פטורין) (פטור מארנונה למכללה טכנולוגית מוכרת), התשפ\"ו–2026",
+   "initiators": [
+    "משה טור פז"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6795/25",
+   "lines": 2,
+   "explanatory": 7,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13948402,
+   "bill_id": 2244445,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 32766,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948402.docx",
+   "title": "הצעת חוק חסינות חברי הכנסת, זכויותיהם וחובותיהם (תיקון – הצבעה חשאית בעניין חסינות), התשפ\"ו–2026",
+   "initiators": [
+    "מיכאל מרדכי ביטון"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6793/25",
+   "lines": 1,
+   "explanatory": 3,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13948408,
+   "bill_id": 2243224,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 32959,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948408.docx",
+   "title": "הצעת חוק הגבלת שימוש במקום לשם מניעת ביצוע עבירות (תיקון – הארכת צו בהיעדר התקדמות החקירה), התשפ\"ו–2026",
+   "initiators": [
+    "מירב כהן"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6801/25",
+   "lines": 1,
+   "explanatory": 3,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13948410,
+   "bill_id": 2243541,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 34122,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948410.docx",
+   "title": "הצעת חוק ביטוח בריאות ממלכתי (תיקון – בדיקה וטיפול על ידי קלינאי תקשורת בגן ילדים), התשפ\"ו–2026",
+   "initiators": [
+    "נעמה לזימי"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6799/25",
+   "lines": 5,
+   "explanatory": 5,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13948412,
+   "bill_id": 2244611,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 33035,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948412.docx",
+   "title": "הצעת חוק שוויון ההזדמנויות בעבודה (תיקון – זכויות הוריות במקרה של מחלת בן זוג), התשפ\"ו–2026",
+   "initiators": [
+    "מיכל מרים וולדיגר"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6803/25",
+   "lines": 2,
+   "explanatory": 3,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  },
+  {
+   "doc_id": 13948414,
+   "bill_id": 2244737,
+   "doc_type": "הצעת חוק לדיון מוקדם",
+   "updated_at": "2026-07-06",
+   "bytes": 31799,
+   "url": "https://fs.knesset.gov.il/25/law/25_lst_13948414.docx",
+   "title": "הצעת חוק בית הדין לעבודה (תיקון – סמכותו של בית הדין האזורי לעבודה לדון בתובענות בין ארגוני עובדים או בתובענות בין ארגוני מעסיקים), התשפ\"ו–2026",
+   "initiators": [
+    "אביחי אברהם בוארון"
+   ],
+   "knesset": "הכנסת העשרים וחמש",
+   "bill_number": "פ/6802/25",
+   "lines": 3,
+   "explanatory": 3,
+   "depth_source": "marker",
+   "depths": [
+    0
+   ],
+   "inner_sections": 0,
+   "warnings": [
+    "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+   ]
+  }
+ ]
+}
