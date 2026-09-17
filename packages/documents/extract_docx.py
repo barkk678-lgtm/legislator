@@ -38,7 +38,10 @@ _MAX_DEPTH = 5
 
 _INTERNAL_RE = re.compile(r"מספר\s+פנימי:\s*(\S+)")
 _BILL_NUMBER_RE = re.compile(r"(פ/\S+)")
-_INITIATOR_RE = re.compile(r"יוזם:\s*(.*)")
+# "יוזם:" / "יוזמת:" / "יוזמים:" - כל שלוש הצורות מופיעות בפועל
+# בקבצים אמיתיים, ולהצעה יכולים להיות כמה מגישים בפסקאות עוקבות.
+_INITIATOR_RE = re.compile(r"יוז(?:ם|מת|מים|מות)\s*:\s*(.*)")
+_MK_TITLE_RE = re.compile(r"חבר[יות]?\s+הכנסת")
 _MARKER_RE = re.compile(r"^(\([^)]{1,4}\))\s*\t?\s*")
 
 
@@ -61,12 +64,17 @@ class ExtractedLine:
 class ExtractedBill:
     title: str = ""
     knesset: str = ""
-    initiator: str = ""
+    initiator: str = ""          # המגיש הראשון, לתאימות
+    initiators: list[str] = field(default_factory=list)
     internal_number: str = ""
     bill_number: str = ""
     lines: list[ExtractedLine] = field(default_factory=list)
     explanatory: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # "column" = ההזחה מקודדת בעמודות הטבלה ולכן העומק אמין.
+    # "marker" = הטבלה שטוחה (3 עמודות) והקינון מבוטא רק בסימן
+    # שבתוך הטקסט - depth יהיה 0 לכל השורות, וזו מגבלת המקור.
+    depth_source: str = "column"
 
 
 def _row_cells(row) -> list:
@@ -175,6 +183,7 @@ def extract_bill(path_or_stream) -> ExtractedBill:
     bill = ExtractedBill()
     heads: list[str] = []
     in_explanatory = False
+    collecting_initiators = False
 
     for p in document.paragraphs:
         text = p.text.strip()
@@ -185,7 +194,13 @@ def extract_bill(path_or_stream) -> ExtractedBill:
         if style == _STYLE_EXPLANATORY_HEAD:
             in_explanatory = True
             continue
-        if style == _STYLE_EXPLANATORY or (in_explanatory and style.startswith("Hesber")):
+        # חלק מהמסמכים כותבים את דברי ההסבר בסגנון Normal ולא Hesber;
+        # מה שקובע הוא המיקום אחרי הכותרת "דברי הסבר". שורת הסיום
+        # ("--------") מסמנת את פסקת ההגשה של מזכירות הכנסת.
+        if in_explanatory and (style == _STYLE_EXPLANATORY or style.startswith("Hesber") or style == "Normal"):
+            if text.startswith("---") or text.startswith("הוגשה ליו"):
+                in_explanatory = False
+                continue
             bill.explanatory.append(text)
             continue
         if style == _STYLE_TITLE:
@@ -200,19 +215,43 @@ def extract_bill(path_or_stream) -> ExtractedBill:
             # "יוזם:  חבר הכנסת   צביקה פוגל" - השם הוא מה שאחרי
             # התואר, והפרדה היא טאבים בתבנית של הכנסת.
             rest = [x.strip() for x in m.group(1).split("\t") if x.strip()]
-            bill.initiator = rest[-1] if rest else ""
+            rest = [x for x in rest if not _MK_TITLE_RE.fullmatch(x)]
+            if rest:
+                bill.initiators.append(rest[-1])
+            collecting_initiators = True
+            continue
+        if collecting_initiators:
+            # מגישים נוספים מופיעים בפסקאות עוקבות בלי "יוזמים:" חוזר.
+            extra = [x.strip() for x in text.split("\t") if x.strip()]
+            extra = [x for x in extra if not _MK_TITLE_RE.fullmatch(x) and not x.startswith("__")]
+            if extra and not _BILL_NUMBER_RE.search(text) and len(extra) == 1 and len(extra[0]) < 40:
+                bill.initiators.append(extra[0])
+            else:
+                collecting_initiators = False
 
     # שתי כותרות בסגנון הזה: הראשונה הכנסת, השנייה שם ההצעה.
+    # שם ההצעה מפוצל לעיתים לכמה פסקאות באותו סגנון (השם בראשונה,
+    # "התשפ\"ו-2026" בשנייה) - מחברים את כולן אחרי שורת הכנסת.
     if heads:
         bill.knesset = heads[0]
-        bill.title = heads[-1] if len(heads) > 1 else ""
+        bill.title = " ".join(h.strip() for h in heads[1:]).strip()
+    bill.initiator = bill.initiators[0] if bill.initiators else ""
     if not bill.title:
         bill.warnings.append("לא זוהה שם הצעת חוק (סגנון 'Head HatzaotHok').")
+    if not bill.initiators:
+        bill.warnings.append("לא זוהה מגיש.")
 
     if not document.tables:
         bill.warnings.append("לא נמצאה טבלת נוסח - המסמך אינו בתבנית הצעת חוק של הכנסת.")
     else:
-        bill.lines = _parse_table(document.tables[0], bill.warnings)
+        table = document.tables[0]
+        if len(table.columns) <= _FIRST_DEPTH_COL + 1:
+            bill.depth_source = "marker"
+            bill.warnings.append(
+                "טבלה שטוחה (בלי עמודות הזחה) - הקינון מבוטא בסימני הפסקה "
+                "שבתוך הטקסט בלבד, ולכן depth אינו מהימן במסמך הזה."
+            )
+        bill.lines = _parse_table(table, bill.warnings)
         if len(document.tables) > 1:
             bill.warnings.append(f"נמצאו {len(document.tables)} טבלאות; חולצה הראשונה בלבד.")
     if not bill.lines and not bill.explanatory:

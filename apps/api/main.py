@@ -417,12 +417,16 @@ def _render(law_id: str, req: RenderRequest):
         raise HTTPException(404, f"חוק לא מוכר: {law_id}")
     cfg = get_law_config(law_id, before)
     result = apply_pending_changes(before, req.edits, req.insertions)
-    lines = amend(before, result.after, result.annotations, law_footnote_key=cfg.footnote_key)
+    # כיבוי הערות השוליים מתבצע כאן, בשכבת ההרכבה, ולא בתוך amend():
+    # המנוע ממשיך לייצר את המפתחות, והבחירה אם להציג אותם היא של
+    # המשתמש (ברק, 2026-09-17 - ראו drafting-rules.md §4).
+    lines = amend(before, result.after, result.annotations,
+                  law_footnote_key=cfg.footnote_key if req.include_footnotes else None)
     bill = _bill_from_meta(req.bill, lines, before)
     # מראה המקום (ס"ח) ידוע מראש לכל חוק ב-law_registry - לא שדה קלט
     # מהמשתמש (10ב). אם לא ידוע (known_source_ref=None), נשאר ריק -
     # הוולידטור (בדיקה 2) יתריע במפורש, לא ננחש ערך.
-    refs = {cfg.footnote_key: cfg.known_source_ref or ""}
+    refs = {cfg.footnote_key: cfg.known_source_ref or ""} if req.include_footnotes else {}
     findings = validate(bill, before, refs)
     return before, result, lines, bill, findings
 
@@ -480,7 +484,7 @@ def api_insert_preview(law_id: str, req: InsertPreviewRequestIn) -> dict:
 def api_docx(law_id: str, req: RenderRequest):
     before, result, lines, bill, findings = _render(law_id, req)
     cfg = get_law_config(law_id, before)
-    refs = {cfg.footnote_key: cfg.known_source_ref or ""}
+    refs = {cfg.footnote_key: cfg.known_source_ref or ""} if req.include_footnotes else {}
 
     out_path = Path(tempfile.mkstemp(suffix=".docx")[1])
     write_docx(bill, refs, SKELETON, out_path)

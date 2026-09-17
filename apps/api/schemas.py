@@ -79,6 +79,11 @@ class RenderRequest(BaseModel):
     edits: list[TextEditIn] = []
     insertions: list[InsertionIn] = []
     bill: BillMetaIn
+    # הערות שוליים למראי מקום. ברירת מחדל פעילה, כי הכלל נכון
+    # לנוסח מוגמר - אבל ניתנת לכיבוי: ביקורת מול 40 הצעות אמיתיות
+    # מצאה שרק 3 מהן כוללות מראה מקום בשלב ההנחה (ראו
+    # drafting-rules.md §4). ברק, 2026-09-17.
+    include_footnotes: bool = True
 
 
 class InsertPreviewRequestIn(BaseModel):

@@ -46,7 +46,7 @@ def main():
     # מראה המקום מפוצל ל-text/text_after (יושב מיד אחרי השנה, לפני
     # "(להלן..." - ראו engine._render_margin_title_mutation).
     want = (
-        'בחוק לדוגמה, התש"ף–2020 (להלן – החוק העיקרי), בסעיף 5, '
+        'בחוק לדוגמה, התש"ף–2020, בסעיף 5, '
         'בכותרת השוליים, במקום "עונשין" יבוא "עונשין וקנסות".'
     )
     passed_line = len(lines) == 1 and lines[0].text + lines[0].text_after == want

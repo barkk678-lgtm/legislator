@@ -75,7 +75,7 @@ def main():
     got_texts = [line.text + line.text_after for line in lines]
 
     want_phrase = (
-        'בחוק לדוגמה, התש"ף–2020 (להלן – החוק העיקרי), אחרי סעיף 8 '
+        'בחוק לדוגמה, התש"ף–2020, אחרי סעיף 8 '
         "לחוק העיקרי יבוא:"
     )
     passed_phrase = len(got_texts) == 2 and got_texts[0] == want_phrase

@@ -808,4 +808,31 @@ def amend(
                 _stamp_provenance(mutation_line, instruction.before_node, before)
                 lines.append(mutation_line)
 
+    _drop_principal_law_alias_if_single(lines, touched_count)
     return lines
+
+
+_PRINCIPAL_ALIAS = " (להלן – החוק העיקרי)"
+
+
+def _drop_principal_law_alias_if_single(lines: list[Line], touched_count: int) -> None:
+    """מסירה את "(להלן – החוק העיקרי)" כשיש הוראת תיקון אחת בלבד.
+
+    **ממצא מ-40 הצעות חוק אמיתיות שהונחו בכנסת ה-25** (ראו
+    drafting-rules.md §5.8): מתוך 22 ההצעות המתקנות, רק 10 מגדירות
+    את הקיצור - ו-12 פותחות ישירות בשם החוק המלא. ההבדל אינו
+    שרירותי: הקיצור נועד לחסוך חזרה על שם החוק, ולכן הוא מופיע רק
+    כשיש **יותר מהוראת תיקון אחת** לאותו חוק. בתיקון יחיד אין למה
+    לקצר, והניסוח המקובל הוא "בחוק X, התשנ\"ט–1999, בסעיף N –".
+
+    עד לתיקון הזה המערכת ייצרה את הקיצור תמיד, כלומר **ניסוח שגוי
+    דווקא במקרה הנפוץ ביותר** - הצעה פרטית שמתקנת סעיף אחד.
+
+    המימוש הוא מעבר אחרי הלולאה ולא תנאי בתוכה, כדי שלא יוכל
+    להתנתק מהלוגיקה שקובעת מה נספר כהוראת תיקון."""
+    if touched_count > 1:
+        return
+    for line in lines:
+        if _PRINCIPAL_ALIAS in line.text_after:
+            line.text_after = line.text_after.replace(_PRINCIPAL_ALIAS, "", 1)
+            return
