@@ -126,3 +126,9 @@ class AgendaDraftRequestIn(BaseModel):
 
     topic_description: str
     mk_name: str
+
+
+class RulesAskRequestIn(BaseModel):
+    """בקשת שאלה למומחה התקנון (ברק, 2026-09-17) - ראו rules_expert.py."""
+
+    question: str

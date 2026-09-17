@@ -54,7 +54,7 @@
       <button id="agenda-copy-btn" class="primary" disabled>העתקה</button>
     </div>
     <div class="topbar" data-bar="rules" hidden>
-      <h1>מומחה התקנון</h1><span class="sub">בקרוב</span>
+      <h1>מומחה התקנון</h1><span class="sub">תשובות מתוך תקנון הכנסת, חוק הכנסת וחוק-יסוד: הכנסת בלבד</span>
     </div>
     <div class="topbar" data-bar="proto" hidden>
       <h1>סיכומי פרוטוקולים</h1><span class="sub">בקרוב</span>
@@ -159,7 +159,16 @@
       </div>
 
       <div class="tab" id="rules">
-        <section class="card coming-soon"><div class="body">בקרוב.</div></section>
+        <div class="cols" style="grid-template-columns:1fr">
+          <section class="card" style="max-width:880px;margin:0 auto;width:100%">
+            <header><h2>מומחה התקנון</h2><span>שאלו על סדרי עבודת הכנסת</span></header>
+            <div class="chat" id="rules-chat"></div>
+            <div class="composer">
+              <input id="rules-composer-input" class="inp" type="text" placeholder="לדוגמה: כמה חתימות נדרשות להצעת אי-אמון?" />
+              <button id="rules-send-btn" class="primary">שליחה</button>
+            </div>
+          </section>
+        </div>
       </div>
       <div class="tab" id="proto">
         <section class="card coming-soon"><div class="body">בקרוב.</div></section>

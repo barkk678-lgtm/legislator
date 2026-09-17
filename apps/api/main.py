@@ -23,9 +23,11 @@ from jinja2 import Environment, FileSystemLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "render"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "validate"))
 from bill_title import default_bill_title  # noqa: E402
+from embeddings import EmbeddingConfigError, EmbeddingRequestError, embed_one  # noqa: E402
 from engine import amend  # noqa: E402
 from node import LegislativeNode  # noqa: E402
 from render_bill import Bill, write_docx  # noqa: E402
@@ -38,6 +40,7 @@ from agenda_tool import AgendaDraftError, draft_agenda  # noqa: E402
 from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
 from query_tool import QueryDraftError, draft_query, write_query_docx  # noqa: E402
+from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
 from semantic_search import SemanticSearchConfigError, SemanticSearchRequestError, search as semantic_search  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
 from schemas import (  # noqa: E402
@@ -48,6 +51,7 @@ from schemas import (  # noqa: E402
     QueryDraftRequestIn,
     QueryExportRequestIn,
     RenderRequest,
+    RulesAskRequestIn,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -92,6 +96,23 @@ def api_semantic_search(q: str = "", limit: int = 10) -> list[dict]:
         raise HTTPException(503, str(e))
     except SemanticSearchRequestError as e:
         raise HTTPException(502, str(e))
+
+
+@app.get("/api/admin/openai-check")
+def api_openai_check() -> dict:
+    """אבחון בלבד (ברק, 2026-09-17): "האם ה-embeddings יכולים להיווצר
+    מהקוד שרץ ב-Vercel במקום מהסביבה שלך - שם הרשת פתוחה". embedding
+    אחד למחרוזת קבועה וקצרה (עלות זניחה - שברי-שבר סנט) - לא כותב
+    כלום, רק מדווח אם הקריאה ל-api.openai.com הצליחה מכאן (מ-Vercel),
+    בניגוד לסביבת ה-agent (חסום שם ברמת proxy, ראו night-report.md)."""
+    import time as _time
+
+    start = _time.monotonic()
+    try:
+        vector = embed_one("בדיקת חיבור")
+    except (EmbeddingConfigError, EmbeddingRequestError) as e:
+        return {"ok": False, "error": str(e), "error_type": type(e).__name__}
+    return {"ok": True, "dimensions": len(vector), "latency_ms": round((_time.monotonic() - start) * 1000)}
 
 
 @app.get("/api/laws/{law_id}")
@@ -263,3 +284,22 @@ def api_agenda_draft(req: AgendaDraftRequestIn) -> dict:
         return draft_agenda(topic_description=req.topic_description, mk_name=req.mk_name)
     except AgendaDraftError as e:
         raise HTTPException(422, str(e))
+
+
+# ── מומחה התקנון (ברק, 2026-09-17) ──────────────────────────────────────
+# ראו rules_expert.py - חיבור packages/llm.answer_with_sources() +
+# retrieval מילות-מפתח (עד שחיפוש סמנטי, משימה א, יהיה זמין).
+
+
+@app.post("/api/rules/ask")
+def api_rules_ask(req: RulesAskRequestIn) -> dict:
+    try:
+        result = rules_expert_ask(req.question)
+    except RulesExpertError as e:
+        raise HTTPException(503, str(e))
+    return {
+        "text": result.text,
+        "refused": result.refused,
+        "refusal_reason": result.refusal_reason,
+        "cited_source_ids": result.cited_source_ids,
+    }

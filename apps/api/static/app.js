@@ -826,3 +826,45 @@ document.getElementById("agenda-copy-btn").addEventListener("click", async () =>
     appendMsg(document.getElementById("agenda-chat"), "err", "ההעתקה נכשלה - יש להעתיק ידנית.");
   }
 });
+
+// --- מומחה התקנון (ברק, 2026-09-17) ---
+async function sendRulesMessage() {
+  const input = document.getElementById("rules-composer-input");
+  const text = input.value.trim();
+  if (!text) return;
+  const chat = document.getElementById("rules-chat");
+
+  appendMsg(chat, "u", escapeHtml(text));
+  input.value = "";
+  input.disabled = true;
+
+  try {
+    const resp = await fetch("/api/rules/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: text }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      appendMsg(chat, "err", escapeHtml(err.detail || "שגיאה במענה."));
+      return;
+    }
+    const result = await resp.json();
+    if (result.refused) {
+      appendMsg(chat, "a", `לא ניתן לענות על סמך תקנון הכנסת/חוק הכנסת/חוק-יסוד: הכנסת בלבד.<br><span style="color:var(--soft);font-size:12.5px">${escapeHtml(result.refusal_reason || "")}</span>`);
+      return;
+    }
+    const citedHtml = result.cited_source_ids.length
+      ? `<div class="word-count">מקורות: ${result.cited_source_ids.map(escapeHtml).join(", ")}</div>`
+      : "";
+    appendMsg(chat, "a", `${escapeHtml(result.text)}${citedHtml}`);
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById("rules-send-btn").addEventListener("click", sendRulesMessage);
+document.getElementById("rules-composer-input").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") sendRulesMessage();
+});

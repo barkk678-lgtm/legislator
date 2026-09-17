@@ -54,13 +54,13 @@ class Chunk:
         return len(self.text)
 
 
-def _collect_text(node: LegislativeNode) -> str:
+def collect_text(node: LegislativeNode) -> str:
     """טקסט הצומת עצמו + כל צאצאיו, בסדר מסמך, כל אחד בשורה נפרדת.
     raw_block.text הוא HTML גולמי (node.py) - נכלל כמו שהוא, לא
     מנורמל שוב כאן."""
     parts = [node.text] if node.text else []
     for child in node.children:
-        child_text = _collect_text(child)
+        child_text = collect_text(child)
         if child_text:
             parts.append(child_text)
     return "\n".join(parts)
@@ -83,7 +83,7 @@ def chunk_section(
     """סעיף בודד -> chunk אחד (אם קצר מספיק/בלי ילדים לפצל לפיהם) או
     chunk אחד לכל ילד ישיר (אם ארוך מדי) - ראו דוקסטרינג המודול."""
     prefix = _context_prefix(law_title, section.number, section.margin_title)
-    full_text = _collect_text(section)
+    full_text = collect_text(section)
 
     if len(full_text) <= max_chars or not section.children:
         return [
@@ -100,7 +100,7 @@ def chunk_section(
 
     chunks = []
     for i, child in enumerate(section.children):
-        child_text = _collect_text(child)
+        child_text = collect_text(child)
         if not child_text:
             continue
         chunks.append(
