@@ -42,6 +42,7 @@ from law_registry import LawNotFoundError, get_law_config, load_law, law_summari
 from query_tool import QueryDraftError, draft_query, write_query_docx  # noqa: E402
 from admin_ingest import (  # noqa: E402
     IngestAuthError,
+    _require_secret as _require_ingest_secret,
     IngestRateLimitError,
     IngestStorageLimitError,
     run_ingest_batch,
@@ -195,6 +196,86 @@ def api_knesset_files_check() -> dict:
         }
     except _httpx.HTTPError as e:
         return {"reachable": False, "error": str(e)[:200], "error_type": type(e).__name__}
+
+
+# סוגי המסמכים שהם הצעת החוק עצמה. שאר הערכים ב-GroupTypeDesc הם
+# מסמכים מלווים (קטע מדברי הכנסת, חומר רקע, פרוטוקול ועדה, החלטת
+# ממשלה) או החוק לאחר פרסום - לא הצעה. ברק: "אך ורק הצעות חוק".
+_BILL_DOC_TYPES = (
+    "הצעת חוק לדיון מוקדם",
+    "הצעת חוק לקריאה הראשונה",
+    "הצעת חוק לקריאה השנייה והשלישית",
+)
+# חתימות הבייטים של פורמטי Word. סיומת אינה הוכחה - קובץ שנכשל
+# באימות הזה נזרק ולא מנוסה (דרישה מפורשת של ברק).
+_DOCX_MAGIC = b"PK\x03\x04"                       # docx = ZIP
+_DOC_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"   # doc = OLE2
+
+
+@app.get("/api/admin/knesset-bill-docs")
+def api_knesset_bill_docs(x_ingest_secret: str | None = Header(None),
+                          limit: int = 40, knesset: int | None = None) -> dict:
+    """מאתר קובצי Word של **הצעות חוק בלבד** ומוריד אותם מ-Vercel,
+    שם `fs.knesset.gov.il` נגיש (חסום מסביבת ה-agent).
+
+    שלושה מסננים, לפי דרישת ברק:
+    1. `GroupTypeDesc` חייב להיות סוג של הצעת חוק - לא נספח, לא
+       פרוטוקול, לא חומר רקע ולא החוק לאחר פרסום.
+    2. הסיומת חייבת להיות `.docx`. `ApplicationDesc='DOC'` מכסה גם
+       את הפורמט הבינארי הישן, ש-python-docx אינו יודע לקרוא.
+    3. **אימות בייטים אחרי ההורדה** - קובץ שאינו ZIP (כלומר אינו
+       docx באמת) נזרק ומדווח, לא מנוסה.
+
+    מוגן באותו טוקן. ההורדה היא של כתובת שמגיעה מה-API של הכנסת
+    לפי מזהה, לא של כתובת חופשית מהקורא."""
+    import base64  # noqa: PLC0415
+
+    import httpx as _httpx  # noqa: PLC0415
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "knesset"))
+    from odata import fetch  # noqa: PLC0415
+
+    try:
+        _require_ingest_secret(x_ingest_secret)
+    except IngestAuthError as e:
+        raise HTTPException(401, str(e))
+
+    clause = " or ".join(f"GroupTypeDesc eq '{t}'" for t in _BILL_DOC_TYPES)
+    rows = fetch("KNS_DocumentBill",
+                 filter=f"({clause}) and ApplicationDesc eq 'DOC'",
+                 select="Id,BillID,GroupTypeDesc,FilePath,LastUpdatedDate",
+                 orderby="LastUpdatedDate desc", top=limit * 6)
+
+    docs, rejected = [], []
+    with _httpx.Client(timeout=30.0, follow_redirects=True) as client:
+        for r in rows:
+            if len(docs) >= limit:
+                break
+            path = (r.get("FilePath") or "").replace("\\", "/")
+            if not path.lower().endswith(".docx"):
+                rejected.append({"id": r["Id"], "why": "סיומת אינה docx"})
+                continue
+            try:
+                resp = client.get(path)
+                resp.raise_for_status()
+            except _httpx.HTTPError as e:
+                rejected.append({"id": r["Id"], "why": f"הורדה נכשלה: {type(e).__name__}"})
+                continue
+            body = resp.content
+            if not body.startswith(_DOCX_MAGIC):
+                kind = "doc בינארי ישן" if body.startswith(_DOC_MAGIC) else "אינו Word"
+                rejected.append({"id": r["Id"], "why": f"אימות בייטים נכשל ({kind})"})
+                continue
+            docs.append({
+                "id": r["Id"], "bill_id": r.get("BillID"),
+                "doc_type": r.get("GroupTypeDesc"),
+                "updated_at": (r.get("LastUpdatedDate") or "")[:10],
+                "bytes": len(body),
+                "content_b64": base64.b64encode(body).decode(),
+            })
+
+    return {"documents": docs, "rejected": rejected,
+            "examined": len(rows), "accepted": len(docs)}
 
 
 @app.post("/api/admin/ingest-chunks")
