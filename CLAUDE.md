@@ -81,6 +81,33 @@ apps/web/            דף Jinja2 יחיד + JS ונילי, RTL (משימה 10)
 מתוכנן לעתיד, לא נשלל. בזכות ש-`apps/api` נקי מהחלטות, המעבר ל-frontend
 אחר לא אמור לגעת בו.
 
+## גבולות רשת (ממצא שחזור, 2026-09-16/17)
+
+**לסביבת ה-agent (איפה שסשן Claude Code הזה רץ) יש allowlist רשת
+סגור וצר.** נבדק בפועל (לא הונח): `api.anthropic.com` עובד, אבל
+`api.openai.com` **וגם** `google.com`, `api.voyageai.com`,
+`api.cohere.ai/com`, `api.mistral.ai` **כולם** נדחים באותה מדיניות
+בדיוק (403 "gateway answered... policy denial", מאומת via
+`curl "$HTTPS_PROXY/__agentproxy/status"`). זו לא רשימת-חסימה
+ממוקדת-OpenAI - זו רשימת-היתר סגורה שרק כמה שירותים ספציפיים (בעיקר
+Anthropic, npm/pypi/רשמי-Anthropic) נמצאים בה. חריג יחיד שנמצא:
+`generativelanguage.googleapis.com` (Gemini) כן נגיש - כנראה לא
+מכוון, לא מדיניות מוצהרת.
+
+**ל-Vercel (production) יש רשת פתוחה.** נבדק בפועל: `https://
+legislator-tau.vercel.app/api/admin/openai-check` (endpoint אבחון,
+`apps/api/main.py`) מצליח לקרוא ל-`api.openai.com` בהצלחה, בזמן
+שאותה קריאה בדיוק נכשלת מסביבת ה-agent.
+
+**המשמעות המעשית: כל אינטגרציה חיצונית עתידית (ספק LLM/embeddings/
+API חדש, לא Anthropic) חייבת לרוץ/להיבדק מ-Vercel, לא מסביבת
+ה-agent.** אם קריאת רשת לשירות חיצוני חדש נכשלת כאן עם "connection
+refused"/"CONNECT tunnel failed" - זו קודם כל שאלת מדיניות-רשת של
+הסביבה, לא בהכרח בעיה במפתח/בקוד. תבנית עבודה שכבר קיימת בקוד
+לבדיקה/הרצה-מ-Vercel: `apps/api/admin_ingest.py` (endpoint מוגן-טוקן
+שמריץ עבודה שדורשת גישה חיצונית, ראו TASKS.md/night-report.md
+2026-09-17 לפרטים).
+
 **ה-ingest שומר עובדות, לא פרשנויות.** קורפוס שנשמר בדאטהבייס (שלב 1)
 מכיל את מה שנשלף מהמקור כפי שהוא - טקסט גולמי, מבנה שנגזר ממנו בוודאות
 (כמו עץ LegislativeNode עצמו, או רשימת ציטוטים שמפוענחת בוודאות ממקור

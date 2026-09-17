@@ -16,6 +16,7 @@ error`). נבדק ישירות מול ה-API עם טקסט אמיתי מהקור
 
 import os
 import time
+from dataclasses import dataclass
 
 import httpx
 
@@ -58,14 +59,23 @@ def _api_key() -> str:
     return key
 
 
-def embed_batch(
+@dataclass
+class EmbedResult:
+    vectors: list[list[float]]
+    total_tokens: int  # usage.total_tokens האמיתי מ-OpenAI - לחישוב עלות מדויק, לא הערכה
+
+
+def embed_batch_with_usage(
     texts: list[str], *, model: str = EMBEDDING_MODEL, dimensions: int = EMBEDDING_DIM
-) -> list[list[float]]:
-    """מחזירה embedding אחד לכל טקסט ב-texts, באותו סדר. batch יחיד -
-    ה-API של OpenAI תומך בכמה מחרוזות קלט באותה בקשה (מוזיל עלות
-    תקורה), אבל **אם input בודד בתוך ה-batch חורג מהמגבלה, כל הבקשה
-    נכשלת** - לכן קוד ה-ingest קורא כאן רק אחרי שכבר סינן/פיצל לפי
-    chunking.py, לא שולח batch גדול בלי בקרה.
+) -> EmbedResult:
+    """כמו embed_batch, אבל גם מחזירה usage.total_tokens האמיתי -
+    נדרש ל-ingest_log (tools/admin_ingest.py) לחשב עלות בפועל, לא
+    להעריך לפי אורך תווים (עברית לא 1:1 עם אנגלית ב-tokenization).
+
+    batch יחיד - ה-API של OpenAI תומך בכמה מחרוזות קלט באותה בקשה
+    (מוזיל עלות תקורה), אבל **אם input בודד בתוך ה-batch חורג
+    מהמגבלה, כל הבקשה נכשלת** - לכן קוד ה-ingest קורא כאן רק אחרי
+    שכבר סינן/פיצל לפי chunking.py, לא שולח batch גדול בלי בקרה.
 
     dimensions: פרמטר רשמי של OpenAI (`text-embedding-3-large` תומך
     בהקטנת ממד) - ברירת המחדל כאן (1024) *חייבת* להתאים בדיוק ל-
@@ -102,7 +112,18 @@ def embed_batch(
         raise EmbeddingRequestError(f"לא אמור להגיע לכאן: {last_exc}")
 
     ordered = sorted(data["data"], key=lambda row: row["index"])
-    return [row["embedding"] for row in ordered]
+    return EmbedResult(
+        vectors=[row["embedding"] for row in ordered],
+        total_tokens=data.get("usage", {}).get("total_tokens", 0),
+    )
+
+
+def embed_batch(
+    texts: list[str], *, model: str = EMBEDDING_MODEL, dimensions: int = EMBEDDING_DIM
+) -> list[list[float]]:
+    """כמו embed_batch_with_usage, בלי usage - לקוראים שלא צריכים
+    עלות (semantic_search.py: embedding בודד לשאילתה, לא ingest)."""
+    return embed_batch_with_usage(texts, model=model, dimensions=dimensions).vectors
 
 
 def embed_one(text: str, *, model: str = EMBEDDING_MODEL, dimensions: int = EMBEDDING_DIM) -> list[float]:

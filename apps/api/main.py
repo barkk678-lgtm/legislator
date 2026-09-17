@@ -16,7 +16,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
@@ -40,6 +40,7 @@ from agenda_tool import AgendaDraftError, draft_agenda  # noqa: E402
 from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
 from query_tool import QueryDraftError, draft_query, write_query_docx  # noqa: E402
+from admin_ingest import IngestAuthError, IngestRateLimitError, run_ingest_batch  # noqa: E402
 from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
 from semantic_search import SemanticSearchConfigError, SemanticSearchRequestError, search as semantic_search  # noqa: E402
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
@@ -113,6 +114,20 @@ def api_openai_check() -> dict:
     except (EmbeddingConfigError, EmbeddingRequestError) as e:
         return {"ok": False, "error": str(e), "error_type": type(e).__name__}
     return {"ok": True, "dimensions": len(vector), "latency_ms": round((_time.monotonic() - start) * 1000)}
+
+
+@app.post("/api/admin/ingest-chunks")
+def api_admin_ingest_chunks(x_ingest_secret: str | None = Header(None)) -> dict:
+    """מריץ מנה אחת (מוגבלת-תקציב) של ingest ל-search_chunks - ראו
+    admin_ingest.py לפירוט מלא (טוקן/מגבלת-קצב/לוג/המשך-הרצה).
+    מיועד להיקרא חוזר-ונשנה (לא בקשה אחת שממצה את כל הקורפוס) -
+    כל קריאה ממשיכה מהחוק הבא שלא הושלם."""
+    try:
+        return run_ingest_batch(secret=x_ingest_secret)
+    except IngestAuthError as e:
+        raise HTTPException(401, str(e))
+    except IngestRateLimitError as e:
+        raise HTTPException(429, str(e))
 
 
 @app.get("/api/laws/{law_id}")
