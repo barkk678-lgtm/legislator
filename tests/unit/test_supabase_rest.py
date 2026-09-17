@@ -78,12 +78,15 @@ def main():
     # קריאה ישירה מותרת רק כששולפים שורה אחת מפורשות (limit=1); כל
     # יתר הקריאות חייבות לעבור דרך fetch_all/count_rows. הבדיקה מסתכלת
     # על גוף הקריאה עצמו ולא על מספרי שורות, כדי שלא תישבר מעריכות.
+    # מזהים קריאות PostgREST לפי הצורה שלהן בקוד: הארגומנט הראשון
+    # הוא נתיב-מחרוזת שמתחיל ב-"/" (יחסית ל-base_url של Supabase).
+    # קריאה ל-API חיצוני מקבלת URL מלא במשתנה ואינה רלוונטית לכלל הזה.
     unexpected = []
     for path in sorted((ROOT / "apps" / "api").glob("*.py")):
         if path.name == "supabase_rest.py":
             continue
         source = path.read_text(encoding="utf-8")
-        for match in re.finditer(r"client\.get\(", source):
+        for match in re.finditer(r'client\.get\(\s*\n?\s*"/', source):
             call = source[match.start():match.start() + 500]
             if '"limit": "1"' not in call.split(")")[0] + ")":
                 # מרחיבים מעט: הפרמטרים עשויים להתפרס על כמה שורות
