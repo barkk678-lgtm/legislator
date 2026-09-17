@@ -1104,10 +1104,24 @@ async function askResearch() {
     const data = await resp.json();
     if (!data.answered) {
       const list = data.available.map((t) => `<li>${escapeHtml(t.title)}</li>`).join("");
+      // שאלת תוכן שייכת לחיפוש הסמנטי שבאותה לשונית - מציעים מעבר
+      // ישיר במקום להשאיר את המשתמש להבין לבד שיש שם תיבה שנייה.
+      const handoff = data.try_semantic_search
+        ? `<button id="research-handoff-btn" class="primary" style="margin-top:10px">
+             חפשו את זה בחיפוש הסמנטי</button>`
+        : "";
       out.innerHTML = `<div class="notice notice-coverage">
           <b>אין לי תבנית שאילתה לשאלה הזו.</b> ${escapeHtml(data.reason)}
-          <br>מה כן אפשר לשאול כרגע:<ul>${list}</ul>
+          <br>מה כן אפשר לשאול כאן:<ul>${list}</ul>${handoff}
         </div>`;
+      const btn = document.getElementById("research-handoff-btn");
+      if (btn) {
+        btn.addEventListener("click", () => {
+          document.getElementById("research-input").value = data.question;
+          runResearchSearch();
+          document.getElementById("research-input").scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
       return;
     }
     out.innerHTML = `<div class="research-title">${escapeHtml(data.title)}</div>

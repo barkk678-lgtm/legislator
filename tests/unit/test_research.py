@@ -61,6 +61,37 @@ def main():
     finally:
         research.fetch_apply = saved
 
+    # --- המטמון: תשובה מוטמנת לא נוגעת בשרת הכנסת בכלל ---
+    saved_get, saved_put, saved_apply = research._cache_get, research._cache_put, research.fetch_apply
+    try:
+        research._cache_get = lambda tid: {"rows": [{"knesset": 25, "total": 100, "passed": 10,
+                                                     "pass_rate_pct": 10.0}],
+                                           "columns": ["knesset", "total", "passed", "pass_rate_pct"]}
+        research.fetch_apply = lambda *a, **k: (_ for _ in ()).throw(AssertionError("אסור לגעת בשרת הכנסת"))
+        out = research.run_template("pass_rates", {})
+        checks.append((out["from_cache"] is True, "תשובה מגיעה מהמטמון בלי בקשה לכנסת"))
+        # והעיקר: גם שאלה *ממוקדת* נענית מהמטמון, כי הסינון מקומי
+        out2 = research.run_template("pass_rates", {"knesset": 25})
+        checks.append((out2["rows"][0]["knesset"] == 25 and out2["from_cache"] is True,
+                       "גם שאלה על כנסת מסוימת נענית מהמטמון, לא מייצרת בקשות"))
+        # כנסת שאינה בנתונים -> שגיאה ברורה
+        threw = False
+        try:
+            research.run_template("pass_rates", {"knesset": 99})
+        except ResearchError:
+            threw = True
+        checks.append((threw, "כנסת שאין לה נתונים -> שגיאה ברורה"))
+
+        # מטמון שנכשל לא מפיל תשובה - נופלים בחזרה לפיד
+        research._cache_get = lambda tid: None
+        research._cache_put = lambda *a, **k: None
+        research.fetch_apply = lambda *a, **k: [{"KnessetNum": 25, "StatusID": 118, "n": 7}]
+        out3 = research.run_template("pass_rates", {})
+        checks.append((out3["from_cache"] is False and out3["rows"][0]["passed"] == 7,
+                       "אין מטמון -> נשלף מהפיד, התשובה עדיין תקינה"))
+    finally:
+        research._cache_get, research._cache_put, research.fetch_apply = saved_get, saved_put, saved_apply
+
     # --- התבניות מתועדות כראוי לניתוב ---
     for t in TEMPLATES.values():
         checks.append((bool(t.question_examples), f"לתבנית {t.id} יש שאלות לדוגמה לניתוב"))
