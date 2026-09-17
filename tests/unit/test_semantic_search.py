@@ -52,6 +52,23 @@ def main():
     print(("OK " if passed else "FAIL"), "/api/semantic-search בלי משתני סביבה -> 503 ברור, לא קורס ->",
           resp.status_code if not passed else "")
 
+    # --- איחוד תוצאות לפי סעיף (סעיף מפוצל ל-chunks לא יופיע פעמיים) ---
+    from main import _dedupe_by_section  # noqa: PLC0415
+
+    merged = _dedupe_by_section([
+        {"law_id": "law-1", "section_number": "147ב", "combined_score": 0.9},
+        {"law_id": "law-1", "section_number": "147ב", "combined_score": 0.8},
+        {"law_id": "law-1", "section_number": "3", "combined_score": 0.7},
+        {"law_id": "law-2", "section_number": "147ב", "combined_score": 0.6},
+    ])
+    for passed, label in [
+        (len(merged) == 3, "שלוש תוצאות ייחודיות מתוך ארבע"),
+        (merged[0]["combined_score"] == 0.9, "נשמר ה-chunk עם הציון הגבוה לאותו סעיף"),
+        (merged[2]["law_id"] == "law-2", "אותו מספר סעיף בחוק אחר נשאר תוצאה נפרדת"),
+    ]:
+        ok = ok and passed
+        print(("OK " if passed else "FAIL"), label)
+
     # --- ההבחנה בין "לא נמצא" ל"לא מאונדקס" (ברק, 2026-09-17) ---
     # מזריקים את שלוש התלויות של ה-endpoint (חיפוש סמנטי, רשימת
     # המאונדקסים, חיפוש-שמות) כדי לבדוק את לוגיקת ההרכבה עצמה בלי

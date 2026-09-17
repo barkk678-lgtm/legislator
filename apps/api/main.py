@@ -94,6 +94,18 @@ def api_search_laws(q: str = "") -> list[dict]:
     return search_law_titles(q)
 
 
+def _dedupe_by_section(results: list[dict]) -> list[dict]:
+    """תוצאה אחת לכל (חוק, סעיף) - הגבוהה ביותר. התוצאות מגיעות
+    כבר ממוינות מה-RPC, ולכן הראשונה שנראית לכל סעיף היא הטובה
+    ביותר ואין צורך למיין שוב."""
+    best: dict[tuple[str, str], dict] = {}
+    for row in results:
+        key = (row["law_id"], row["section_number"])
+        if key not in best:
+            best[key] = row
+    return list(best.values())
+
+
 @app.get("/api/semantic-search")
 def api_semantic_search(q: str = "", limit: int = 10) -> dict:
     """חיפוש סמנטי היברידי (משימה א, 1.3, 2026-09-16/17) - **שונה
@@ -110,7 +122,10 @@ def api_semantic_search(q: str = "", limit: int = 10) -> dict:
     (search_law_titles) וגם את החיפוש הסמנטי - אין צורך במימוש שני
     של התאמת-שמות."""
     try:
-        results = semantic_search(q, limit=limit)
+        # שולפים יותר מהמבוקש ואז מאחדים לפי סעיף: סעיף ארוך מפוצל
+        # לכמה chunks, ובלי האיחוד אותו סעיף מופיע פעמיים-שלוש ברשימה
+        # ונראה כמו תקלה. שומרים את ה-chunk עם הציון הגבוה ביותר.
+        results = _dedupe_by_section(semantic_search(q, limit=limit * 3))[:limit]
         indexed = indexed_law_ids()
     except SemanticSearchConfigError as e:
         raise HTTPException(503, str(e))
