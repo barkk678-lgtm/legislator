@@ -6,3 +6,5 @@ fastapi
 jinja2
 pyluach
 httpx  # 2026-09-16: law_registry.py משתמש בזה בפועל לחיבור ל-Supabase REST - לא רק לטסטים
+python-multipart
+python-docx

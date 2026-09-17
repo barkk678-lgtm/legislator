@@ -1137,3 +1137,44 @@ document.getElementById("research-ask-btn").addEventListener("click", askResearc
 document.getElementById("research-ask-input").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter") askResearch();
 });
+
+/* ═══ תקציר הצעת חוק ═══ (משימה 2.1, המוצר הראשון)
+ * מציג תמיד כמה שורות נוסח וכמה פסקאות הסבר נכנסו לתקציר, ואת
+ * אזהרות החילוץ - כדי שיהיה אפשר להבחין בין "ההצעה קצרה" לבין
+ * "החילוץ פספס". תקציר משכנע על חילוץ חלקי הוא התקלה המסוכנת כאן. */
+async function generateSummary() {
+  const input = document.getElementById("summary-file");
+  const out = document.getElementById("summary-result");
+  const file = input.files && input.files[0];
+  if (!file) {
+    out.innerHTML = `<div class="hint">בחרו קובץ Word תחילה.</div>`;
+    return;
+  }
+  const btn = document.getElementById("summary-btn");
+  btn.disabled = true;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>קורא את המסמך ומסכם…</div>`;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await fetch("/api/documents/summarize", { method: "POST", body: form });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בהפקת התקציר.")}</div>`;
+      return;
+    }
+    const d = await resp.json();
+    const warn = d.warnings.length
+      ? `<div class="notice notice-coverage" style="margin-top:12px"><b>אזהרות חילוץ:</b>
+           <ul>${d.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>`
+      : "";
+    out.innerHTML = `
+      <div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
+      <div class="citation-date">${escapeHtml(d.initiators.join(", ") || "מגיש לא זוהה")} ·
+        ${d.lines_used} שורות נוסח · ${d.explanatory_used} פסקאות הסבר</div>
+      <div class="summary-body">${escapeHtml(d.summary).replace(/\n/g, "<br>")}</div>
+      ${warn}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById("summary-btn").addEventListener("click", generateSummary);

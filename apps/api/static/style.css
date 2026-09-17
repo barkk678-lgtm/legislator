@@ -346,3 +346,7 @@ select { font-weight: 600; max-width: 420px; }
 .research-table th { text-align: right; padding: 7px 8px; border-bottom: 2px solid var(--rule); color: var(--soft); font-weight: 600; }
 .research-table td { padding: 7px 8px; border-bottom: 1px solid var(--rule); }
 .research-table tbody tr:hover { background: var(--tint-2); }
+
+/* --- תקציר הצעת חוק (2.1) --- */
+.summary-body { margin-top: 14px; line-height: 1.85; font-size: 14.5px; color: var(--ink); }
+.summary-body strong, .summary-body b { color: var(--navy); }

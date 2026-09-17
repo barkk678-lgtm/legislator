@@ -12,11 +12,12 @@ uvicorn main:app --reload - ואז http://127.0.0.1:8000/
 """
 
 import dataclasses
+import io
 import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
@@ -52,6 +53,7 @@ from knesset_citations import OdataError, citations_for_law  # noqa: E402
 from knesset_queries import search_queries  # noqa: E402
 from research import TEMPLATES as RESEARCH_TEMPLATES, ResearchError, ask as research_ask  # noqa: E402
 from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
+from service import LLMConfigError, LLMRequestError  # noqa: E402
 from semantic_search import (  # noqa: E402
     SemanticSearchConfigError,
     SemanticSearchRequestError,
@@ -317,6 +319,44 @@ def api_admin_ingest_chunks(
 # שלושת הנתיבים קוראים חי מהפיד של הכנסת, בלי להעתיק אותו ל-DB:
 # שאילתה ממוקדת נמדדה ב-~0.6 שניות, ושלוש הטבלאות היו תופסות ~30MB
 # מתוך 52MB שנותרו ב-Free tier. 502 = הפיד לא זמין, לא באג אצלנו.
+
+
+@app.post("/api/documents/summarize")
+async def api_summarize_document(file: UploadFile = File(...)) -> dict:
+    """תקציר של הצעת חוק מקובץ שהמשתמש מעלה (משימה 2.1).
+
+    PDF מסומן במפורש כפחות מדויק: החילוץ ממנו נמדד ב-~91% מהמילים
+    העבריות מול הכלי הטוב ביותר, סדר הבלוקים משתנה, וכותרות רצות
+    מתערבבות. לנוסח משולב נדרש Word - ראו docs/night-report.md."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "documents"))
+    from extract_docx import DocumentExtractError, extract_bill  # noqa: PLC0415
+    from summarize import summarize_bill  # noqa: PLC0415
+
+    name = (file.filename or "").lower()
+    if not name.endswith(".docx"):
+        raise HTTPException(
+            415,
+            "כרגע נתמכים קובצי Word (.docx) בלבד. קובץ .doc ישן או PDF - "
+            "יש לשמור מחדש כ-docx.",
+        )
+    try:
+        bill = extract_bill(io.BytesIO(await file.read()))
+    except DocumentExtractError as e:
+        raise HTTPException(422, str(e))
+
+    try:
+        summary = summarize_bill(bill)
+    except (LLMConfigError, LLMRequestError) as e:
+        raise HTTPException(503, f"שירות ה-LLM אינו זמין: {e}")
+
+    return {
+        "summary": summary.text,
+        "title": summary.title,
+        "initiators": summary.initiators,
+        "lines_used": summary.lines_used,
+        "explanatory_used": summary.explanatory_used,
+        "warnings": summary.warnings,
+    }
 
 
 @app.post("/api/research/ask")

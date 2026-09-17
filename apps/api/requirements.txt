@@ -3,3 +3,5 @@ uvicorn
 jinja2
 httpx  # law_registry.py (חיבור Supabase REST) + tests/unit/test_api.py (TestClient)
 pyluach  # המרת תאריך גרגוריאני-עברי, לצורך שנת הצעת חוק ברירת מחדל (bill_title.py)
+python-multipart
+python-docx
