@@ -339,3 +339,10 @@ select { font-weight: 600; max-width: 420px; }
 #citations-box { margin-top: 12px; font-size: 13.5px; }
 #citations-box summary { cursor: pointer; color: var(--navy); font-weight: 600; }
 #similar-bills-notice:not(:empty) { margin-bottom: 14px; }
+
+/* --- טבלת תוצאות מחקר (1.4) --- */
+.research-title { font-weight: 600; color: var(--navy); margin-bottom: 8px; }
+.research-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
+.research-table th { text-align: right; padding: 7px 8px; border-bottom: 2px solid var(--rule); color: var(--soft); font-weight: 600; }
+.research-table td { padding: 7px 8px; border-bottom: 1px solid var(--rule); }
+.research-table tbody tr:hover { background: var(--tint-2); }

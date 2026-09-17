@@ -132,3 +132,9 @@ class RulesAskRequestIn(BaseModel):
     """בקשת שאלה למומחה התקנון (ברק, 2026-09-17) - ראו rules_expert.py."""
 
     question: str
+
+
+class ResearchAskRequestIn(BaseModel):
+    """שאלת מחקר בשפה חופשית (משימה 1.4)."""
+
+    question: str

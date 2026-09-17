@@ -109,3 +109,40 @@ def fetch_raw_array(entity: str, *, filter: str | None = None) -> list[dict]:
             raise OdataError(f"כשל בקריאה ל-{entity}: {e}") from None
     payload = resp.json()
     return payload if isinstance(payload, list) else payload.get("value", [])
+
+
+def fetch_apply(entity: str, apply_expr: str, page_size: int = 100) -> list[dict]:
+    """צבירה בצד השרת (`$apply`), עם עימוד ידני.
+
+    **זו הצורה המסוכנת ביותר בפיד:** התשובה היא מערך חשוף, **בלי
+    מעטפת `value` ובלי `@odata.nextLink`**, והיא נחתכת ב-100 שורות
+    בלי שום סימן. נמדד בפועל: `groupby((KnessetNum,StatusID))` החזיר
+    100 שורות בעוד קיימות 312 - כלומר שני שלישים מהתשובה נעלמו
+    בשקט. העימוד כאן הוא `$skip` ידני, וממשיכים עד שעמוד חוזר קטן
+    מ-page_size.
+
+    **אין לצרף `$filter`:** הפיד דוחה אותו יחד עם `$apply`, ו-
+    `filter(...)` *בתוך* הביטוי נחסם על ידי ה-WAF (סטטוס 473).
+    הסינון נעשה מקומית על התוצאה."""
+    rows: list[dict] = []
+    skip = 0
+    with _client() as client:
+        for _ in range(_MAX_PAGES):
+            params = {"$apply": apply_expr}
+            if skip:
+                params["$skip"] = str(skip)
+            try:
+                resp = client.get(f"{BASE_URL}/{entity}", params=params)
+                resp.raise_for_status()
+            except httpx.HTTPError as e:
+                raise OdataError(f"כשל בצבירה על {entity}: {e}") from None
+            payload = resp.json()
+            page = payload if isinstance(payload, list) else payload.get("value", [])
+            rows.extend(page)
+            if len(page) < page_size:
+                return rows
+            skip += page_size
+    raise OdataError(
+        f"צבירה על {entity} חרגה מתקרת {_MAX_PAGES} העמודים - עדיף לצמצם "
+        f"את הביטוי מאשר להחזיר תוצאה חלקית."
+    )

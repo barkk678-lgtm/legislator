@@ -1056,3 +1056,70 @@ document.getElementById("past-queries-input").addEventListener("keydown", (ev) =
   if (ev.key === "Enter") searchPastQueries();
 });
 document.getElementById("bill-title-input").addEventListener("blur", (ev) => checkSimilarBills(ev.target.value));
+
+/* ═══ שאלת מחקר ═══ (משימה 1.4)
+ * מציג תמיד את המספרים הגולמיים ולא רק ניסוח, כדי שאפשר יהיה
+ * לאמת. וכששאלה נופלת מחוץ לרפרטואר - אומרים את זה ומראים מה כן
+ * אפשר לשאול, במקום להחזיר תשובה שנשמעת טוב ואינה נשענת על כלום. */
+function renderResearchTable(data) {
+  const headers = {
+    knesset: "כנסת", total: "סה״כ הצעות", passed: "התקבלו", pass_rate_pct: "שיעור הצלחה",
+    name: "שם", bills: "הצעות", title: "כותרת", kind: "סוג",
+    became_law: "התקבל כחוק", published_at: "פורסם",
+  };
+  const cells = (r) =>
+    data.columns
+      .map((c) => {
+        let v = r[c];
+        if (typeof v === "boolean") v = v ? "כן" : "—";
+        if (c === "pass_rate_pct") v = `${v}%`;
+        return `<td>${escapeHtml(String(v ?? "—"))}</td>`;
+      })
+      .join("");
+  return `<table class="research-table">
+      <thead><tr>${data.columns.map((c) => `<th>${escapeHtml(headers[c] || c)}</th>`).join("")}</tr></thead>
+      <tbody>${data.rows.map((r) => `<tr>${cells(r)}</tr>`).join("")}</tbody>
+    </table>`;
+}
+
+async function askResearch() {
+  const input = document.getElementById("research-ask-input");
+  const out = document.getElementById("research-ask-results");
+  const question = input.value.trim();
+  if (!question) return;
+
+  input.disabled = true;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>מנתח את השאלה…</div>`;
+  try {
+    const resp = await fetch("/api/research/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בשאלה.")}</div>`;
+      return;
+    }
+    const data = await resp.json();
+    if (!data.answered) {
+      const list = data.available.map((t) => `<li>${escapeHtml(t.title)}</li>`).join("");
+      out.innerHTML = `<div class="notice notice-coverage">
+          <b>אין לי תבנית שאילתה לשאלה הזו.</b> ${escapeHtml(data.reason)}
+          <br>מה כן אפשר לשאול כרגע:<ul>${list}</ul>
+        </div>`;
+      return;
+    }
+    out.innerHTML = `<div class="research-title">${escapeHtml(data.title)}</div>
+      ${data.summary ? `<div class="hint">${escapeHtml(data.summary)}</div>` : ""}
+      ${renderResearchTable(data)}`;
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById("research-ask-btn").addEventListener("click", askResearch);
+document.getElementById("research-ask-input").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") askResearch();
+});

@@ -49,6 +49,7 @@ from admin_ingest import (  # noqa: E402
 from knesset_bills import similar_bills  # noqa: E402
 from knesset_citations import OdataError, citations_for_law  # noqa: E402
 from knesset_queries import search_queries  # noqa: E402
+from research import TEMPLATES as RESEARCH_TEMPLATES, ResearchError, ask as research_ask  # noqa: E402
 from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
 from semantic_search import (  # noqa: E402
     SemanticSearchConfigError,
@@ -65,6 +66,7 @@ from schemas import (  # noqa: E402
     QueryDraftRequestIn,
     QueryExportRequestIn,
     RenderRequest,
+    ResearchAskRequestIn,
     RulesAskRequestIn,
 )
 
@@ -234,6 +236,24 @@ def api_admin_ingest_chunks(
 # שלושת הנתיבים קוראים חי מהפיד של הכנסת, בלי להעתיק אותו ל-DB:
 # שאילתה ממוקדת נמדדה ב-~0.6 שניות, ושלוש הטבלאות היו תופסות ~30MB
 # מתוך 52MB שנותרו ב-Free tier. 502 = הפיד לא זמין, לא באג אצלנו.
+
+
+@app.post("/api/research/ask")
+def api_research_ask(req: ResearchAskRequestIn) -> dict:
+    """שאלת מחקר בשפה חופשית -> תבנית שאילתה -> מספרים גולמיים.
+    רפרטואר סגור בכוונה (ראו research.py): ה-WAF של הכנסת חוסם
+    שאילתות דינמיות, והסכימה לא צפויה מספיק כדי ש-LLM ינחש שדות."""
+    try:
+        return research_ask(req.question)
+    except ResearchError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/research/templates")
+def api_research_templates() -> list[dict]:
+    """מה הכלי יודע לענות - מוצג בממשק כדי שהמשתמש לא ינחש."""
+    return [{"id": t.id, "title": t.title, "examples": t.question_examples}
+            for t in RESEARCH_TEMPLATES.values()]
 
 
 @app.get("/api/laws/{law_id}/citations")
