@@ -216,7 +216,8 @@ _DOC_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"   # doc = OLE2
 
 @app.get("/api/admin/knesset-bill-docs")
 def api_knesset_bill_docs(x_ingest_secret: str | None = Header(None),
-                          limit: int = 40, doc_ids: str | None = None) -> dict:
+                          limit: int = 40, doc_ids: str | None = None,
+                          allow_doc: bool = False) -> dict:
     """מאתר קובצי Word של **הצעות חוק בלבד** ומוריד אותם מ-Vercel,
     שם `fs.knesset.gov.il` נגיש (חסום מסביבת ה-agent).
 
@@ -269,7 +270,13 @@ def api_knesset_bill_docs(x_ingest_secret: str | None = Header(None),
             if len(docs) >= limit:
                 break
             path = (r.get("FilePath") or "").replace("\\", "/")
-            if not path.lower().endswith(".docx"):
+            # allow_doc: מותר רק במסלול doc_ids המפורש, ולצורך חקירה.
+            # `.doc` בינארי אינו נקרא על ידי python-docx, ולכן הוא לעולם
+            # אינו חלק מהמסלול הרגיל - אבל כשמבקשים מסמך מסוים בשמו,
+            # חסימה בגלל סיומת רק מסתירה אותו. אימות הבייטים למטה עדיין
+            # חל: קובץ שאינו Word כלל נזרק גם כאן.
+            allowed_ext = (".docx", ".doc") if (allow_doc and doc_ids) else (".docx",)
+            if not path.lower().endswith(allowed_ext):
                 rejected.append({"id": r["Id"], "why": "סיומת אינה docx"})
                 continue
             try:
@@ -279,8 +286,10 @@ def api_knesset_bill_docs(x_ingest_secret: str | None = Header(None),
                 rejected.append({"id": r["Id"], "why": f"הורדה נכשלה: {type(e).__name__}"})
                 continue
             body = resp.content
-            if not body.startswith(_DOCX_MAGIC):
-                kind = "doc בינארי ישן" if body.startswith(_DOC_MAGIC) else "אינו Word"
+            is_docx = body.startswith(_DOCX_MAGIC)
+            is_legacy_doc = body.startswith(_DOC_MAGIC)
+            if not (is_docx or (allow_doc and doc_ids and is_legacy_doc)):
+                kind = "doc בינארי ישן" if is_legacy_doc else "אינו Word"
                 rejected.append({"id": r["Id"], "why": f"אימות בייטים נכשל ({kind})"})
                 continue
             docs.append({
