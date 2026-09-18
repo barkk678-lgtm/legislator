@@ -216,7 +216,7 @@ _DOC_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"   # doc = OLE2
 
 @app.get("/api/admin/knesset-bill-docs")
 def api_knesset_bill_docs(x_ingest_secret: str | None = Header(None),
-                          limit: int = 40, knesset: int | None = None) -> dict:
+                          limit: int = 40, doc_ids: str | None = None) -> dict:
     """מאתר קובצי Word של **הצעות חוק בלבד** ומוריד אותם מ-Vercel,
     שם `fs.knesset.gov.il` נגיש (חסום מסביבת ה-agent).
 
@@ -242,11 +242,26 @@ def api_knesset_bill_docs(x_ingest_secret: str | None = Header(None),
     except IngestAuthError as e:
         raise HTTPException(401, str(e))
 
-    clause = " or ".join(f"GroupTypeDesc eq '{t}'" for t in _BILL_DOC_TYPES)
-    rows = fetch("KNS_DocumentBill",
-                 filter=f"({clause}) and ApplicationDesc eq 'DOC'",
-                 select="Id,BillID,GroupTypeDesc,FilePath,LastUpdatedDate",
-                 orderby="LastUpdatedDate desc", top=limit * 6)
+    # doc_ids: מזהי מסמך מפורשים, מופרדים בפסיקים. נוסף 2026-09-18
+    # לצורך משיכת נוסחים לקריאה שנייה ושלישית, שאינם נשלפים בברירת
+    # המחדל (הם ישנים - רק 4 מסמכי Word מהסוג הזה קיימים בכלל ב-OData,
+    # מול 2,676 PDF). **המזהה משמש לשליפת שורה מ-KNS_DocumentBill,
+    # לא ככתובת הורדה** - כתובת ההורדה ממשיכה להגיע מה-API של הכנסת
+    # בלבד, בדיוק כמו במסלול הרגיל, ושלושת המסננים חלים כרגיל.
+    # הפרמטר knesset הקודם הוסר: הוא היה מוצהר ולא בשימוש בשום שאילתה.
+    if doc_ids:
+        wanted = [int(x) for x in doc_ids.split(",") if x.strip().isdigit()]
+        if not wanted:
+            raise HTTPException(422, "doc_ids חייב להכיל מזהים מספריים מופרדים בפסיקים")
+        rows = fetch("KNS_DocumentBill",
+                     filter="Id in (" + ",".join(str(i) for i in wanted) + ")",
+                     select="Id,BillID,GroupTypeDesc,FilePath,LastUpdatedDate")
+    else:
+        clause = " or ".join(f"GroupTypeDesc eq '{t}'" for t in _BILL_DOC_TYPES)
+        rows = fetch("KNS_DocumentBill",
+                     filter=f"({clause}) and ApplicationDesc eq 'DOC'",
+                     select="Id,BillID,GroupTypeDesc,FilePath,LastUpdatedDate",
+                     orderby="LastUpdatedDate desc", top=limit * 6)
 
     docs, rejected = [], []
     with _httpx.Client(timeout=30.0, follow_redirects=True) as client:
