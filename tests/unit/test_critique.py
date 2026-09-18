@@ -16,7 +16,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "documents"))
 
-from critique import _parse_explanations, critique_bill  # noqa: E402
+from critique import (  # noqa: E402
+    _explanation_is_anchored,
+    _parse_explanations,
+    _referenced_lines,
+    critique_bill,
+)
 from extract_docx import extract_bill  # noqa: E402
 
 FIX = ROOT / "tests" / "fixtures" / "real-bills"
@@ -86,7 +91,29 @@ def main():
     check("קריסת ההסבר לא מעלימה ממצא", len(result.items) == 1)
     check("סיבת הכישלון מדווחת", "RuntimeError" in result.explain_error)
 
-    # 6. JSON עטוף ב-```json``` (התנהגות נפוצה של מודלים) נקרא נכון.
+    # 6. **שומר העוגן**: הסבר שמצביע על שורה שאינה בממצא נזרק.
+    #    נמצא בביקורת 2026-09-18: המודל ניסח הסבר משכנע לממצא שלא
+    #    הצליח לאתר. ההנחיה אומרת לו עכשיו לכתוב "לא הצלחתי לאתר",
+    #    אבל הנחיה אינה אכיפה - זה החלק שנאכף בקוד.
+    check("מספרי שורות נחלצים מטקסט", _referenced_lines("בשורות 2 ו-3 ובשורה 42") == {2, 3, 42})
+
+    class _F:
+        message = "נמצא ״ בשורות: [2, 3]"
+
+    check("הסבר שמצביע על שורה שבממצא - עובר",
+          _explanation_is_anchored({"what": "בשורה 2 יש גרש"}, _F()))
+    check("הסבר שמצביע על שורה שאינה בממצא - נדחה",
+          not _explanation_is_anchored({"what": "בשורה 99 יש גרש"}, _F()))
+    check("הסבר בלי הצבעה על שורה - עובר (אין מה לאמת)",
+          _explanation_is_anchored({"what": "יש גרש עברי"}, _F()))
+
+    result = critique_bill(dirty, draft_fn=lambda **kw: json.dumps(
+        [{"check": 3, "what": "בשורה 77 יש בעיה", "why": "ב", "fix": "ג"}], ensure_ascii=False))
+    check("הסבר לא-מעוגן נזרק, הממצא נשאר",
+          result.items[0].what == "" and result.items[0].message
+          and result.dropped_explanations == [3])
+
+    # 7. JSON עטוף ב-```json``` (התנהגות נפוצה של מודלים) נקרא נכון.
     parsed = _parse_explanations('```json\n[{"check": 3, "what": "א"}]\n```', [3])
     check("JSON בתוך גדר קוד נקרא", parsed.get(3, {}).get("what") == "א")
 

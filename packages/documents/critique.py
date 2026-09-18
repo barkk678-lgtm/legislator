@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,20 +38,28 @@ from validator import DRAFT_CHECKS, Finding, validate_draft  # noqa: E402
 
 _MAX_DEPTH = 5
 
-_INSTRUCTIONS = """אתה מסביר ממצאי בדיקה בהצעת חוק לעוזר פרלמנטרי שאינו מנסח מקצועי.
+_INSTRUCTIONS = """אתה **מנסח בשפה מובנת** ממצאים שבודק אוטומטי כבר מצא.
+אתה לא מבקר את ההצעה ולא מחפש בה ליקויים - החיפוש כבר נעשה, בקוד.
 
-תקבל רשימה סגורה של ממצאים שנמצאו על ידי בודק אוטומטי, וכן את נוסח
-ההצעה. לכל ממצא, ורק לממצאים שברשימה, כתוב הסבר קצר.
+תקבל רשימה סגורה של ממצאים ואת נוסח ההצעה. לכל ממצא ברשימה, ורק
+לממצאים שברשימה, נסח הסבר.
 
 החזר JSON בלבד - מערך של אובייקטים, אחד לכל ממצא, בסדר שבו קיבלת אותם:
 [{"check": <מספר הבדיקה>, "what": "...", "why": "...", "fix": "..."}]
 
-- "what": מה נמצא, במשפט אחד, בשפה פשוטה. הצבע על המקום המדויק בהצעה.
+- "what": מה הבודק מצא, במשפט אחד, בשפה פשוטה. **רק מה שכתוב בממצא**,
+  מנוסח מחדש - לא הרחבה, לא פרשנות ולא ממצא נוסף שראית בדרך.
 - "why": למה זה משנה, במשפט אחד.
-- "fix": מה לעשות, במשפט אחד. אם התיקון אינו ברור מהמסמך - כתוב מה
-  צריך לברר.
+- "fix": מה לעשות, במשפט אחד.
 
 כללים מחייבים:
+- **אתה לא קובע עובדות על המסמך.** כל טענה עובדתית שלך - איזו שורה,
+  איזה תו, איזה ביטוי - חייבת להיות כתובה בממצא עצמו או מועתקת מילה
+  במילה מנוסח ההצעה שקיבלת. אל תסיק ואל תשלים מהזיכרון.
+- **אם אינך מצליח לאתר בנוסח את מה שהממצא מתאר - כתוב זאת במפורש**
+  ב-"what" ("הבודק סימן X, לא הצלחתי לאתר את המקום המדויק בנוסח").
+  זו תשובה נכונה. **ניחוש שנשמע סביר הוא התשובה הגרועה ביותר** -
+  הוא שולח את הקורא לתקן משהו שאולי תקין.
 - אל תוסיף ממצאים שאינם ברשימה, ואל תשמיט ממצא שקיבלת.
 - אל תרכך ממצא ואל תקבע שהוא בסדר. מי שקבע שזה ליקוי הוא הבודק, לא אתה.
 - אל תמציא מספרי סעיפים, שמות חוקים או ציטוטים שאינם בנוסח שקיבלת.
@@ -79,6 +88,8 @@ class BillCritique:
     explained: bool = False
     explain_error: str = ""
     extraction_warnings: list[str] = field(default_factory=list)
+    # ממצאים שההסבר שלהם נזרק כי הצביע על שורה שאינה בממצא
+    dropped_explanations: list[int] = field(default_factory=list)
 
 
 def as_render_bill(extracted) -> Bill:
@@ -147,6 +158,39 @@ def _parse_explanations(text: str, expected: list[int]) -> dict[int, dict]:
     return out
 
 
+_LINE_REF_RE = re.compile(r"שורה\s+(\d+)|שורות\s+([\d,\s ו-]+)")
+_INT_RE = re.compile(r"\d+")
+
+
+def _referenced_lines(text: str) -> set[int]:
+    """מספרי השורות שטקסט מתייחס אליהם במפורש ("בשורה 42", "בשורות 2 ו-3")."""
+    out: set[int] = set()
+    for single, several in _LINE_REF_RE.findall(text):
+        out.update(int(n) for n in _INT_RE.findall(single or several))
+    return out
+
+
+def _explanation_is_anchored(entry: dict, finding: Finding) -> bool:
+    """שומר דטרמיניסטי: המודל לא רשאי להצביע על שורה שהממצא עצמו לא
+    נקב בה.
+
+    **למה זה קיים ומה הוא לא תופס.** בביקורת ב-2026-09-18 נמצא שהמודל
+    ניסח הסבר משכנע לממצא שהוא לא הצליח לאתר - הוא בחר ביטוי סביר
+    בשורה הנכונה וטען עליו טענה שגויה. ההנחיה עכשיו אומרת לו במפורש
+    לכתוב "לא הצלחתי לאתר", אבל הנחיה אינה אכיפה. השומר הזה אוכף את
+    החלק שאפשר לאכוף בקוד - **מיקום** - ולא מתיימר לאכוף את תוכן
+    הטענה. הסבר שמצביע על שורה שאינה בממצא נזרק, והממצא הדטרמיניסטי
+    מוצג בלעדיו."""
+    claimed = _referenced_lines(f"{entry.get('what', '')} {entry.get('fix', '')}")
+    if not claimed:
+        return True  # הסבר בלי הצבעה על שורה - אין מה לאמת
+    # בצד הממצא נלקחים **כל** המספרים שבהודעה, לא רק אלה שאחרי המילה
+    # "שורה": ההודעה נבנתה בקוד, כל מספר בה לגיטימי, וסינון צר מדי כאן
+    # היה דוחה הסברים תקינים. השומר נועד לתפוס הצבעה על מקום שהממצא
+    # מעולם לא הזכיר - לא להיות מדויק מעבר לזה.
+    return claimed <= set(int(n) for n in _INT_RE.findall(finding.message))
+
+
 def critique_bill(extracted, *, draft_fn=None) -> BillCritique:
     """ביקורת על הצעה שחולצה ממסמך. `draft_fn` מוזרק כדי שהשכבה לא
     תהיה כבולה לספק LLM מסוים וכדי שהבדיקות ירוצו בלי רשת."""
@@ -182,12 +226,17 @@ def critique_bill(extracted, *, draft_fn=None) -> BillCritique:
         critique.explain_error = f"{type(exc).__name__}: {exc}"
         return critique
 
+    by_number = {f.check_number: f for f in problems}
     for item in critique.items:
         entry = explanations.get(item.check_number)
-        if entry:
-            item.what = str(entry.get("what", "")).strip()
-            item.why = str(entry.get("why", "")).strip()
-            item.fix = str(entry.get("fix", "")).strip()
+        if not entry:
+            continue
+        if not _explanation_is_anchored(entry, by_number[item.check_number]):
+            critique.dropped_explanations.append(item.check_number)
+            continue
+        item.what = str(entry.get("what", "")).strip()
+        item.why = str(entry.get("why", "")).strip()
+        item.fix = str(entry.get("fix", "")).strip()
     critique.explained = any(item.what for item in critique.items)
     if not critique.explained:
         critique.explain_error = "המודל לא החזיר הסבר לאף ממצא"

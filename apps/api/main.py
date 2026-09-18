@@ -391,6 +391,7 @@ async def api_critique_document(file: UploadFile = File(...)) -> dict:
         "not_checked": result.not_checked,
         "explained": result.explained,
         "explain_error": result.explain_error,
+        "dropped_explanations": result.dropped_explanations,
         "warnings": result.extraction_warnings,
         "findings": [
             {

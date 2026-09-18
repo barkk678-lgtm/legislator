@@ -1226,6 +1226,11 @@ async function runCritique() {
           ${f.fix ? `<div class="critique-fix"><b>מה לעשות:</b> ${escapeHtml(f.fix)}</div>` : ""}
           <div class="critique-raw">בדיקה ${f.check} — ${escapeHtml(f.message)}</div>
         </div>`).join("");
+      if (d.dropped_explanations && d.dropped_explanations.length) {
+        body += `<div class="notice notice-coverage" style="margin-top:12px">
+          ההסבר לבדיקות ${d.dropped_explanations.join(", ")} נדחה כי הצביע על מקום
+          שהממצא עצמו לא נקב בו — הממצא הדטרמיניסטי מוצג בלעדיו.</div>`;
+      }
       if (!d.explained) {
         body += `<div class="notice notice-coverage" style="margin-top:12px">
           ההסבר בשפה חופשית לא נוצר${d.explain_error ? ` (${escapeHtml(d.explain_error)})` : ""} —
