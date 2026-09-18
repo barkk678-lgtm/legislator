@@ -5,3 +5,6 @@ httpx  # law_registry.py (חיבור Supabase REST) + tests/unit/test_api.py (Te
 pyluach  # המרת תאריך גרגוריאני-עברי, לצורך שנת הצעת חוק ברירת מחדל (bill_title.py)
 python-multipart
 python-docx
+lxml  # validator._check_14 (בדיקת סגנונות ב-docx) + tests/golden - היה
+# מיובא בקוד ולא מוצהר עד 2026-09-18; הבדיקה לא התפוצצה רק כי
+# docx_path=None בנתיב הפרודקשן ולא הגיעה ל-import.

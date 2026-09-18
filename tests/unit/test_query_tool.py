@@ -111,6 +111,35 @@ def main():
     except ImportError:
         print("SKIP write_query_docx (python-docx לא מותקן - כלי בדיקה בלבד, לא תלות אפליקציה)")
 
+    # שומר הנמען (2026-09-18). הנמען הוא נתון שהמשתמש בוחר, לא משהו
+    # שהמודל קובע - ראו CLAUDE.md "פלט מודל אינו עובדה". נמצא בבדיקה
+    # מול 10 שאלות אמיתיות שהמודל פתח גוף ב"לשר הפנים - " כשהנמען
+    # שנבחר היה השר להגנת הסביבה, ורק פעם אחת מתוך ארבע - ולכן
+    # ההנחיה לבדה אינה מספיקה.
+    from query_tool import _strip_addressee  # noqa: PLC0415
+
+    addressee_cases = [
+        ("לשר הפנים - מה היה התקציב?", "מה היה התקציב?", "לשר הפנים -"),
+        ("לכבוד השר להגנת הסביבה: מה קורה?", "מה קורה?", "לכבוד השר להגנת הסביבה:"),
+        ("אל השר, מה נעשה?", "מה נעשה?", "אל השר,"),
+        # אזכור באמצע הגוף הוא תוכן השאלה - לא נוגעים בו
+        ("מה עשה משרד הפנים בנושא?", "מה עשה משרד הפנים בנושא?", ""),
+        ("האם ידוע לשר על עיכובים?", "האם ידוע לשר על עיכובים?", ""),
+    ]
+    for given, want_body, want_removed in addressee_cases:
+        got_body, got_removed = _strip_addressee(given)
+        passed = got_body == want_body and got_removed == want_removed
+        ok = ok and passed
+        print(("OK  " if passed else "FAIL"), f"שומר נמען: {given[:38]}",
+              "" if passed else f"-> {got_body!r} / {got_removed!r}")
+
+    # שם השר אינו מגיע למודל בכלל - הוא לא בהנחיות ולא בתוכן
+    from query_tool import _instructions  # noqa: PLC0415
+
+    no_minister = "הפנים" not in _instructions("רגילה") and "השר להגנת" not in _instructions("רגילה")
+    ok = ok and no_minister
+    print(("OK  " if no_minister else "FAIL"), "שם השר אינו חלק מההנחיות למודל")
+
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1
 

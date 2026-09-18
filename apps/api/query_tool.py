@@ -52,7 +52,11 @@ _INSTRUCTIONS_TEMPLATE = (
     "עניין שאינו בתחום תפקידי השר.\n"
     "4. אסור לכלול פרטים אישיים פרטיים שפגיעתם בפרטיות (שמות פרטיים "
     "של אזרחים, מספרי זהות וכו').\n"
-    "5. גוף השאילתה (בלי שורת הנושא) {word_limit_instruction}\n\n"
+    "5. גוף השאילתה (בלי שורת הנושא) {word_limit_instruction}\n"
+    "6. **גוף השאילתה לעולם אינו נוקב בשם השר ואינו פונה אליו.** "
+    "הנמען נקבע בשדה נפרד ומוזרק למסמך בקוד, לא על ידך. אל תפתח "
+    'ב"לשר X" או "לכבוד השר", ואל תכתוב את שם התיק בשום מקום בגוף - '
+    "כתוב את השאלה עצמה בלבד.\n\n"
     "החזר בדיוק בפורמט הבא, שתי שורות בלבד:\n"
     f"{_SUBJECT_MARK} <נושא קצר, עד 8 מילים>\n"
     f"{_BODY_MARK} <גוף השאילתה המנוסח כשאלה>\n\n"
@@ -60,6 +64,40 @@ _INSTRUCTIONS_TEMPLATE = (
     "כללית, עניין היפותטי, לשון פוגענית וכו') - נסח מחדש בעדינות "
     'לעניין עובדתי וממוקד במקום לסרב, אלא אם באמת אי אפשר: במקרה כזה החזר "לא ניתן לנסח שאילתה: <הסבר קצר>" בשורה יחידה.'
 )
+
+
+# פנייה לנמען בפתח גוף השאילתה. **הנמען אינו נתון שהמודל קובע** -
+# המשתמש בוחר שר בשדה, והשם מוזרק למסמך ב-write_query_docx. נמצא
+# בבדיקה מול 10 שאלות אמיתיות (2026-09-18) שהמודל פתח גוף שאילתה
+# ב"לשר הפנים - " בזמן שהנמען שנבחר היה השר להגנת הסביבה: הוא הסיק
+# מהנושא מי השר "הנכון" ודרס את בחירת המשתמש בתוך הטקסט.
+#
+# **התקלה לא הייתה דטרמיניסטית** - היא הופיעה פעם אחת מתוך ארבע
+# הרצות של אותה שאלה בדיוק. לכן ההנחיה לבדה אינה מספיקה, וזה
+# המקום שבו העובדה מופרדת מהניסוח בקוד ולא בבקשה.
+_ADDRESSEE_PREFIX_RE = re.compile(
+    r"^\s*(?:לכבוד\s+)?(?:ל|אל\s+)?(?:ה?שר(?:ת|ה)?|ה?ממונה)\b[^\n]{0,60}?"
+    r"\s*[-–—:,]\s*"
+)
+
+
+def _strip_addressee(body: str) -> tuple[str, str]:
+    """מסירה פנייה לנמען מתחילת גוף השאילתה. מחזירה (גוף, מה שהוסר).
+
+    **הסרה ולא דחייה:** מה שנשאר אחרי הקידומת הוא השאלה עצמה, מנוסחת
+    היטב - אין סיבה לזרוק טיוטה שלמה בגלל קידומת. ההסרה מדווחת החוצה
+    (`removed_addressee`) ואינה שקטה.
+
+    מטופלת רק **קידומת בפתח**, שהיא הדפוס שנצפה וההסרה בה בטוחה.
+    אזכור שר באמצע הגוף עלול להיות תוכן השאלה עצמה ("מה עשה משרד
+    הפנים") ולכן רק מסומן, לא נוגעים בו - ראו _mentions_minister."""
+    match = _ADDRESSEE_PREFIX_RE.match(body)
+    if not match:
+        return body, ""
+    stripped = body[match.end():].lstrip()
+    if not stripped:
+        return body, ""  # הכול היה קידומת - לא נוגעים, שהמשתמש יראה
+    return stripped[0].upper() + stripped[1:] if stripped[:1].isascii() else stripped, match.group(0).strip()
 
 
 class QueryDraftError(Exception):
@@ -99,7 +137,7 @@ def draft_query(*, topic_description: str, kind: QueryKind, minister: str, mk_na
         raise QueryDraftError(f"תשובת ה-LLM לא בפורמט הצפוי (נושא:/גוף:): {raw!r}")
 
     subject = subject_match.group(1).strip()
-    body = body_match.group(1).strip()
+    body, removed_addressee = _strip_addressee(body_match.group(1).strip())
     limit = _WORD_LIMITS[kind]
     wc = _word_count(body)
     return {
@@ -108,6 +146,7 @@ def draft_query(*, topic_description: str, kind: QueryKind, minister: str, mk_na
         "mk_name": mk_name,
         "subject": subject,
         "body": body,
+        "removed_addressee": removed_addressee,
         "word_count": wc,
         "word_limit": limit,
         "within_limit": limit is None or wc <= limit,

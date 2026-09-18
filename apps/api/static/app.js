@@ -727,7 +727,7 @@ async function sendQueryMessage() {
       "a",
       `ניסחתי טיוטה לפי הפורמט המקובל.` +
         `<div class="draft"><div class="to">שאילתה ${escapeHtml(currentQueryDraft.kind)} ${escapeHtml(minister)}</div>` +
-        `${escapeHtml(currentQueryDraft.body)}${wordCountHtml(currentQueryDraft.word_count, currentQueryDraft.word_limit)}</div>`
+        `${escapeHtml(currentQueryDraft.body)}${wordCountHtml(currentQueryDraft.word_count, currentQueryDraft.word_limit)}${currentQueryDraft.removed_addressee ? `<div class="word-count">הוסרה פנייה לנמען מתחילת הגוף (${escapeHtml(currentQueryDraft.removed_addressee)}) — הנמען נקבע בשדה ומוזרק למסמך</div>` : ""}</div>`
     );
   } finally {
     input.disabled = false;

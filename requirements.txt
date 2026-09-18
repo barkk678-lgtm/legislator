@@ -8,3 +8,6 @@ pyluach
 httpx  # 2026-09-16: law_registry.py משתמש בזה בפועל לחיבור ל-Supabase REST - לא רק לטסטים
 python-multipart
 python-docx
+lxml  # validator._check_14 (בדיקת סגנונות ב-docx) + tests/golden - היה
+# מיובא בקוד ולא מוצהר עד 2026-09-18; הבדיקה לא התפוצצה רק כי
+# docx_path=None בנתיב הפרודקשן ולא הגיעה ל-import.
