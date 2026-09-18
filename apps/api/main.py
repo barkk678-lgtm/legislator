@@ -17,8 +17,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile, Form
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 
@@ -431,6 +431,90 @@ async def api_critique_document(file: UploadFile = File(...)) -> dict:
             for it in result.items
         ],
     }
+
+
+@app.post("/api/reservations/analyze")
+async def api_reservations_analyze(file: UploadFile = File(...)) -> dict:
+    """מדידת הצעה שהועלתה: כמה הסתייגויות אפשר לייצר וכמה עוגנים
+    מובחנים יש. **מדידה בלבד, בלי LLM ובלי רשת.**"""
+    sections, bill = await _reservation_sections(file)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "reservations"))
+    from generate import measure  # noqa: PLC0415
+
+    result = measure(sections)
+    return {
+        "title": bill.title,
+        "sections_found": len(sections),
+        "total": result["total"],
+        "distinct": result["distinct"],
+        "per_section": result["per_section"],
+        "warnings": bill.warnings,
+    }
+
+
+@app.post("/api/reservations/generate")
+async def api_reservations_generate(
+    file: UploadFile = File(...),
+    proposers: str = Form(""),
+    limit_per_section: int = Form(50),
+) -> StreamingResponse:
+    """מצב הכמות -> קובץ Word בפורמט שבו הסתייגויות מוגשות לוועדה.
+
+    **בלי LLM בכלל בנתיב הזה** - מצב הכמות דטרמיניסטי לחלוטין, וזו
+    בדיוק ההגנה המבנית (CLAUDE.md חוק ברזל 8)."""
+    sections, bill = await _reservation_sections(file)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "reservations"))
+    from generate import budgetary_flags, quantity_reservations  # noqa: PLC0415
+    from render_docx import build_document  # noqa: PLC0415
+
+    items, flags = [], {}
+    for number, text in sections:
+        produced = quantity_reservations(text, section_number=number)[:limit_per_section]
+        for index, reason in budgetary_flags(produced, section_text=text).items():
+            flags[len(items) + index] = reason
+        items.extend(produced)
+
+    names = [n.strip() for n in proposers.split(",") if n.strip()]
+    doc = build_document(bill_title=bill.title or "הצעת חוק",
+                         reservations=items, proposers=names, budget_flags=flags)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": 'attachment; filename="reservations.docx"',
+                 "X-Reservations-Count": str(len(items))},
+    )
+
+
+async def _reservation_sections(file: UploadFile):
+    """חילוץ (מספר סעיף, נוסח) מהצעה שהועלתה. Word בלבד - ראו
+    drafting-rules.md §9.3: מתוך 2,680 נוסחי קריאה 2-3 ב-OData רק
+    4 הם Word, ולכן אין משיכה אוטומטית והמשתמש מעלה בעצמו."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "documents"))
+    from extract_docx import DocumentExtractError, extract_bill  # noqa: PLC0415
+
+    if not (file.filename or "").lower().endswith(".docx"):
+        raise HTTPException(415, "נתמכים קובצי Word (.docx) בלבד.")
+    try:
+        bill = extract_bill(io.BytesIO(await file.read()))
+    except DocumentExtractError as e:
+        raise HTTPException(422, str(e))
+
+    sections, current, buffer = [], "", []
+    for line in bill.lines:
+        if line.number:
+            if current:
+                sections.append((current.rstrip("."), " ".join(buffer).strip()))
+            current, buffer = line.number, [line.text]
+        elif current:
+            buffer.append(line.text)
+    if current:
+        sections.append((current.rstrip("."), " ".join(buffer).strip()))
+    if not sections:
+        raise HTTPException(422, "לא זוהו סעיפים ממוספרים במסמך.")
+    return sections, bill
 
 
 @app.post("/api/research/ask")

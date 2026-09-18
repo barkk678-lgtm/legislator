@@ -1256,3 +1256,69 @@ async function runCritique() {
   }
 }
 document.getElementById("critique-btn").addEventListener("click", runCritique);
+
+/* ═══ הסתייגויות ═══ (2026-09-18)
+ * שני המספרים מוצגים תמיד יחד ולעולם לא לחוד: "עד N הסתייגויות,
+ * מתוכן כ-M מובחנות". N לבדו מטעה - 400 וריאציות על אותו תאריך
+ * נראות כמו 400 רעיונות. ראו generate.measure להגדרת "מובחן". */
+function resSections(d) {
+  return d.per_section.map((s) => `
+    <tr><td>${escapeHtml(s.section)}</td><td>${s.quantity.toLocaleString()}</td>
+    <td>${s.anchors}</td></tr>`).join("");
+}
+
+async function measureReservations() {
+  const input = document.getElementById("res-file");
+  const out = document.getElementById("res-result");
+  const file = input.files && input.files[0];
+  if (!file) { out.innerHTML = `<div class="hint">בחרו קובץ Word תחילה.</div>`; return; }
+  const btn = document.getElementById("res-measure-btn");
+  btn.disabled = true;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>מודד…</div>`;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await fetch("/api/reservations/analyze", { method: "POST", body: form });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה במדידה.")}</div>`;
+      return;
+    }
+    const d = await resp.json();
+    out.innerHTML = `
+      <div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
+      <div class="res-headline">עד <b>${d.total.toLocaleString()}</b> הסתייגויות,
+        מתוכן כ-<b>${d.distinct}</b> מובחנות</div>
+      <div class="hint">${d.sections_found} סעיפים נמדדו. "מובחנת" = ערך שונה
+        בהצעה שאפשר לשנות. המספר הגדול הוא וריאציות על אותם ערכים.</div>
+      <table class="res-table"><thead><tr><th>סעיף</th><th>הסתייגויות</th>
+        <th>עוגנים מובחנים</th></tr></thead><tbody>${resSections(d)}</tbody></table>`;
+  } finally { btn.disabled = false; }
+}
+
+async function generateReservations() {
+  const input = document.getElementById("res-file");
+  const out = document.getElementById("res-result");
+  const file = input.files && input.files[0];
+  if (!file) { out.innerHTML = `<div class="hint">בחרו קובץ Word תחילה.</div>`; return; }
+  const btn = document.getElementById("res-generate-btn");
+  btn.disabled = true;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("proposers", document.getElementById("res-proposers").value || "");
+    const resp = await fetch("/api/reservations/generate", { method: "POST", body: form });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בהפקה.")}</div>`;
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "הסתייגויות.docx"; a.click();
+    URL.revokeObjectURL(url);
+  } finally { btn.disabled = false; }
+}
+document.getElementById("res-measure-btn").addEventListener("click", measureReservations);
+document.getElementById("res-generate-btn").addEventListener("click", generateReservations);

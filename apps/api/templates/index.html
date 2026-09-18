@@ -21,6 +21,7 @@
       <button data-t="agenda"><span class="ico">!</span>הצעות לסדר</button>
       <button data-t="rules"><span class="ico">✦</span>מומחה התקנון</button>
       <button data-t="proto"><span class="ico">≡</span>תקציר הצעה</button>
+      <button data-t="reservations"><span class="ico">≠</span>הסתייגויות</button>
       <button data-t="research"><span class="ico">◎</span>מחקר</button>
     </div>
   </nav>
@@ -42,6 +43,9 @@
     </div>
     <div class="topbar" data-bar="merge" hidden>
       <h1>נוסח משולב</h1><span class="sub">בקרוב</span>
+    </div>
+    <div class="topbar" data-bar="reservations" hidden>
+      <h1>הסתייגויות</h1><span class="sub">נוסח לקריאה שנייה ושלישית</span>
     </div>
     <div class="topbar" data-bar="query" hidden>
       <h1>שאילתות</h1><span class="sub">ניסוח שאילתה לשר לפי הפורמט המקובל</span>
@@ -211,6 +215,34 @@
               <input type="file" id="critique-file" accept=".docx" class="inp" />
               <button id="critique-btn" class="primary" style="margin-top:10px">בדיקת ניסוח</button>
               <div id="critique-result" style="margin-top:16px"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div class="tab" id="reservations">
+        <div class="cols" style="grid-template-columns:1fr">
+          <section class="card" style="max-width:900px;margin:0 auto;width:100%">
+            <header><h2>הסתייגויות</h2><span>נוסח לקריאה שנייה ושלישית</span></header>
+            <div class="body">
+              <div class="notice" style="margin-bottom:14px">
+                <b>נתמך: קובץ Word (.docx) של נוסח שהוועדה הכינה.</b>
+                מתוך 2,680 נוסחים לקריאה שנייה ושלישית במאגר הכנסת, 4 בלבד
+                הם Word — ולכן אין משיכה אוטומטית, ויש להעלות את הקובץ
+                שקיבלתם מהוועדה.
+                <br><b>מצב הכמות דטרמיניסטי לחלוטין:</b> הוא מייצר וריאציות
+                על ערכים שכבר קיימים בהצעה ואינו כותב טקסט חדש בשום דפוס.
+              </div>
+              <input type="file" id="res-file" accept=".docx" class="inp" />
+              <div class="fld" style="margin-top:10px">
+                <label>מציעים (מופרדים בפסיקים)</label>
+                <input id="res-proposers" class="inp" type="text"
+                       placeholder="לדוגמה: ישראל ישראלי, פלוני אלמוני" />
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <button id="res-measure-btn" class="primary">מדידה</button>
+                <button id="res-generate-btn">הפקת מסמך Word</button>
+              </div>
+              <div id="res-result" style="margin-top:16px"></div>
             </div>
           </section>
         </div>
