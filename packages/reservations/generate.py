@@ -16,6 +16,8 @@ import re
 from dataclasses import dataclass
 
 from anchors import Anchor, find_anchors
+from guards import screen_bill_name, screen_budgetary
+from model import Reservation
 
 _MAX_VALUES_PER_ANCHOR = 50
 
@@ -50,47 +52,79 @@ _DOMAINS = {
 }
 
 
-@dataclass(frozen=True)
-class Reservation:
-    text: str
-    anchor: str
-    value: str
-    axis: str  # "replace" | "after"
+def _blocked(anchor: Anchor, section_text: str) -> str | None:
+    """שומר מבני על העוגן. מחזיר סיבה אם אסור לעגן בו, אחרת None.
 
-
-def _blocked(anchor: Anchor) -> str | None:
-    """שומר מבני. מחזיר סיבה אם אסור לעגן בערך הזה, אחרת None."""
-    if anchor.in_law_citation:
-        # ראו drafting-rules.md §9.1: 5 ערכים בתוך ציטוטי שם, אפס
-        # עיגונים אנושיים מתוך 484. להסתייג ממספר התיקון או משנת
-        # החוק המתוקן הוא להסתייג משם החוק - 86(ד)(3).
-        return "יושב בתוך ציטוט של שם חוק"
+    השומר על שם ההצעה (86(ד)(3)) נאכף כאן ולא אחרי הייצור: אין טעם
+    לייצר 50 הסתייגויות ואז לפסול את כולן - העוגן נפסל פעם אחת."""
+    verdict = screen_bill_name(
+        "", anchor=anchor.text, section_text=section_text, amends_existing_law=True
+    )
+    if not verdict.allowed:
+        return verdict.reason
     return None
 
 
-def quantity_reservations(section_text: str) -> list[Reservation]:
+def quantity_reservations(
+    section_text: str, *, section_number: str = ""
+) -> list[Reservation]:
     """כל ההסתייגויות שמצב הכמות מייצר לסעיף אחד, לפי סדר העוגנים
     בנוסח - הסדר הוא חלק מהתקינות (תקנון הכנסת: הסתייגויות מנומקות
     "לפי הסדר שבו נרשמו")."""
     out: list[Reservation] = []
     for anchor in find_anchors(section_text):
-        if _blocked(anchor) or anchor.kind not in _DOMAINS:
+        if _blocked(anchor, section_text) or anchor.kind not in _DOMAINS:
             continue
         for value in _DOMAINS[anchor.kind](anchor.text):
-            out.append(Reservation(f'במקום "{anchor.text}" יבוא "{value}".',
-                                   anchor.text, value, "replace"))
-            out.append(Reservation(f'אחרי "{anchor.text}" יבוא "{value}".',
-                                   anchor.text, value, "after"))
+            for axis in ("replace", "after"):
+                out.append(
+                    Reservation(
+                        anchor=anchor.text, value=value, axis=axis,
+                        section_number=section_number,
+                    )
+                )
     return out
 
 
-def measure(section_texts: list[str]) -> dict:
-    """שני המספרים שהממשק מציג, **מדודים ולא מובטחים**: כמה אפשר
-    לייצר בסך הכול, וכמה נקודות עיגון מובחנות יש."""
+def budgetary_flags(
+    reservations: list[Reservation], *, section_text: str
+) -> dict[int, str]:
+    """סימון הסתייגויות תקציביות (§3ג). מפתח = אינדקס ברשימה."""
+    flags = {}
+    for i, item in enumerate(reservations):
+        flag = screen_budgetary(item, section_text=section_text)
+        if flag.budgetary:
+            flags[i] = flag.reason
+    return flags
+
+
+def measure(sections: list[tuple[str, str]]) -> dict:
+    """שני המספרים שהממשק מציג. **מדודים, ולא מובטחים.**
+
+    `sections` = [(מספר הסעיף, נוסח הסעיף), ...] של ההצעה כולה.
+
+    - `total` - כמה הסתייגויות מצב הכמות מסוגל לייצר בסך הכול.
+    - `distinct` - כמה **נקודות עיגון מובחנות** יש, כלומר כמה
+      הסתייגויות שעומדות בפני עצמן. זה מה שמצב האיכות מייצר, והוא
+      בסדר גודל של עשרות מול אלפים.
+
+    ההבחנה אינה קוסמטית: 400 וריאציות על אותו תאריך הן הסתייגות
+    אחת מבחינת תוכן, וכלי שמציג "400" בלי "מתוכן 4 מובחנות" מטעה.
+    """
+    from quality import anchor_points  # noqa: PLC0415
+
     total = 0
-    anchors: set[str] = set()
-    for text in section_texts:
-        items = quantity_reservations(text)
+    distinct = 0
+    per_section = []
+    for number, text in sections:
+        items = quantity_reservations(text, section_number=number)
+        points = anchor_points(text)
         total += len(items)
-        anchors |= {item.anchor for item in items}
-    return {"total": total, "distinct_anchors": len(anchors)}
+        distinct += len(points)
+        per_section.append({
+            "section": number,
+            "quantity": len(items),
+            "anchors": len({item.anchor for item in items}),
+            "distinct_points": len(points),
+        })
+    return {"total": total, "distinct": distinct, "per_section": per_section}
