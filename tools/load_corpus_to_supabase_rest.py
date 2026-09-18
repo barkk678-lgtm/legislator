@@ -57,7 +57,12 @@ SUPABASE_PROJECT_URL = "https://aamxwjmmlsqkinrzirdz.supabase.co"
 SRC_DIR = Path(os.environ.get("LOAD_CORPUS_SQL_DIR", "/tmp/corpus_sql"))
 PROGRESS_LOG = Path(__file__).parent / "load_progress.jsonl"
 
-SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+# שני השמות נתמכים, והקנוני הוא SUPABASE_SERVICE_ROLE_KEY - זה מה
+# שכל שאר הקוד קורא (apps/api/admin_ingest.py, research.py,
+# tools/build_search_chunks.py) וזה מה שמוגדר ב-Vercel. הקובץ הזה
+# היה היחיד שציפה ל-SUPABASE_SERVICE_KEY, והפער הזה שווה שעה של
+# חיפוש למי שמגדיר את המפתח פעם אחת ומריץ (נמצא 2026-09-18).
+SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
 if not SERVICE_KEY:
     print("שגיאה: SUPABASE_SERVICE_KEY לא מוגדר בסביבה", file=sys.stderr)
     sys.exit(1)
