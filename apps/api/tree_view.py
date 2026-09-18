@@ -36,6 +36,13 @@ def node_view(node: LegislativeNode) -> dict:
         "full_title": node.full_title,  # משמעותי רק בשורש (node_type=="law")
         "text": node.text,
         "status": node.status,
+        # **סעיף שאי אפשר לערוך חייב להיראות אחרת** (ברק, 2026-09-18).
+        # עד כאן הוא נראה תקין לחלוטין ופשוט לא הגיב ללחיצה - הכישלון
+        # השקט הגרוע ביותר בממשק. סעיף בלי מספר אינו נמצא על ידי
+        # find_sections, ולכן amend() לא יראה אותו: 429 סעיפים
+        # בקורפוס, מהם 111 בפקודת מס הכנסה לבדה. ראו
+        # docs/night-report.md 18.9 לאבחון המלא (הסיבה: {{ח:סעיף*}}).
+        "editable": not (node.node_type == "section" and not node.number),
         "children": [node_view(c) for c in node.children if c.is_normative],
     }
 

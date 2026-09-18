@@ -254,7 +254,22 @@ function renderNode(node, depth) {
     numberSpan.textContent = node.number || "";
     header.appendChild(numberSpan);
 
-    if (node.node_type === "section") {
+    /* סעיף שאי אפשר לערוך - חייב להיראות אחרת (ברק, 2026-09-18).
+     * עד כאן הוא נראה תקין ופשוט לא הגיב: הכישלון השקט הגרוע ביותר
+     * בממשק. הסיבה היא סעיף בלי מספר, ש-find_sections לא מוצאת
+     * ו-amend() לא רואה - 429 בקורפוס, 111 בפקודת מס הכנסה לבדה. */
+    const notEditable = node.node_type === "section" && node.editable === false;
+    if (notEditable) {
+      wrapper.classList.add("not-editable");
+      const badge = document.createElement("span");
+      badge.className = "not-editable-badge";
+      badge.textContent = "לא ניתן לעריכה";
+      badge.title = "לסעיף הזה אין מספר במקור, ולכן המערכת אינה יכולה " +
+        "לנסח עליו הוראת תיקון. הנוסח מוצג לקריאה בלבד.";
+      header.appendChild(badge);
+    }
+
+    if (node.node_type === "section" && !notEditable) {
       const titleSpan = document.createElement("span");
       titleSpan.className = "node-margin-title";
       titleSpan.contentEditable = "true";

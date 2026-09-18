@@ -374,3 +374,13 @@ select { font-weight: 600; max-width: 420px; }
 .res-table { width: 100%; margin-top: 14px; border-collapse: collapse; font-size: 13.5px; }
 .res-table th, .res-table td { padding: 6px 10px; border-bottom: 1px solid var(--rule); text-align: start; }
 .res-table th { color: var(--soft); font-weight: 700; }
+
+/* סעיף שאי אפשר לערוך. **לא מוסתר ולא מושתק** - הנוסח נשאר קריא,
+   אבל ברור מיד שהמערכת לא תוכל לנסח עליו הוראת תיקון. הכישלון
+   הקודם היה שהוא נראה תקין ולא הגיב ללחיצה. */
+.node.not-editable { background: var(--skip-bg); border-inline-start: 3px solid var(--faint); }
+.node.not-editable .node-text { color: var(--soft); }
+.not-editable-badge {
+  flex: none; margin-inline-start: 8px; font-size: 11.5px; padding: 1px 7px;
+  border-radius: 999px; background: var(--faint); color: #fff; cursor: help;
+}
