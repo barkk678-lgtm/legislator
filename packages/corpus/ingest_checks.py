@@ -18,6 +18,7 @@
 import re
 
 from node import LegislativeNode
+from wikitext_parser import _join_unclosed_templates
 
 # תבניות ברמה העליונה (שורה שמתחילה ב-{{, כמו wikitext_parser.py עצמו
 # בודק) ש-parse_wikitext יודעת לטפל בהן במפורש - תוכן/מבנה אמיתי.
@@ -93,15 +94,63 @@ def _top_level_templates(wikitext: str) -> list[str]:
     """שמות כל התבניות שמופיעות כשורה משל עצמה (אותו תנאי בדיוק כמו
     parse_wikitext: line.strip().startswith('{{')), כולל כפילויות -
     לא set, כדי לאפשר ספירה."""
+    # **אותו מבט בדיוק כמו הפרסר, ולא העתק שלו** (2026-09-18): מאז
+    # תיקון הבאג הרב-שורתי, שורה שנפתחת בתבנית שאינה נסגרת בה מאוחדת
+    # עם ההמשך לשורה לוגית אחת. בלי האיחוד כאן, הבדיקה הייתה רואה את
+    # שורות ההמשך כ"תבניות ברמה העליונה" ומדווחת על תבניות שהפרסר
+    # כבר עיכל - בדיוק מה שקרה לחוק העברת סמכויות. הפונקציה מיובאת
+    # ולא משוכפלת דווקא כאן, בניגוד לשאר הקבועים במודול: שתי הגדרות
+    # שונות ל"מה הפרסר רואה" הופכות את הבדיקה חסרת ערך.
     names = []
-    for raw_line in wikitext.splitlines():
+    for raw_line in _join_unclosed_templates(wikitext.splitlines()):
         line = raw_line.strip()
         if not line.startswith("{{"):
+            continue
+        if "\n" in raw_line:
+            # בלוק רב-שורתי מאוחד. אם אף ענף בפרסר לא הכיר את התבנית
+            # הפותחת, הוא **נשמר כ-raw_block** ולא מדולג (ראו
+            # wikitext_parser, אותו תנאי `"\n" in line` בדיוק) - ולכן
+            # אין כאן אובדן תוכן, שזה כל מה שהבדיקה הזו באה למנוע.
+            # ההתאמה בין השניים אינה מונחת: check_merged_blocks_preserved
+            # למטה סופרת ומאמתת אותה מול העץ בפועל.
             continue
         match = re.match(r"\{\{([^|}]+)", line)
         if match:
             names.append(match.group(1))
     return names
+
+
+def _unknown_merged_openers(wikitext: str) -> list[str]:
+    """תבניות פותחות של בלוקים רב-שורתיים מאוחדים שאינן מוכרות לפרסר -
+    בדיוק אלה שאמורות להישמר כ-raw_block."""
+    out = []
+    known = _KNOWN_STRUCTURAL_TEMPLATES | _KNOWN_BENIGN_SKIP_TEMPLATES
+    for raw_line in _join_unclosed_templates(wikitext.splitlines()):
+        if "\n" not in raw_line or not raw_line.strip().startswith("{{"):
+            continue
+        match = re.match(r"\{\{([^|}]+)", raw_line.strip())
+        if match and match.group(1) not in known:
+            out.append(match.group(1))
+    return out
+
+
+def check_merged_blocks_preserved(wikitext: str, tree: LegislativeNode) -> list[str]:
+    """כל בלוק רב-שורתי שתבניתו אינה מוכרת חייב להופיע בעץ כ-raw_block.
+
+    הבדיקה הזו היא מה שמצדיק את הדילוג ב-_top_level_templates: במקום
+    להניח שהבלוק נשמר, סופרים. אם הפרסר ישתנה יום אחד ויתחיל לדלג על
+    בלוקים כאלה, הבדיקה תיפול - ולא ייווצר מצב שבו תוכן נעלם בשקט
+    ושתי הבדיקות מסכימות ביניהן שהכול תקין."""
+    expected = len(_unknown_merged_openers(wikitext))
+    if not expected:
+        return []
+    actual = _count_node_type(tree, "raw_block")
+    if actual < expected:
+        return [
+            f"{expected} בלוקים רב-שורתיים בתבנית לא-מוכרת, אבל בעץ יש רק "
+            f"{actual} צמתי raw_block - תוכן אבד"
+        ]
+    return []
 
 
 def check_no_unknown_templates(wikitext: str) -> list[str]:
@@ -278,4 +327,5 @@ def run_sanity_checks(wikitext: str, tree: LegislativeNode) -> list[str]:
     problems += check_section_count(wikitext, tree)
     problems += check_has_normative_content(tree)
     problems += check_unique_ids(tree)
+    problems += check_merged_blocks_preserved(wikitext, tree)
     return problems

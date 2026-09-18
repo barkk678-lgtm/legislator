@@ -20,6 +20,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "corpus"))
 
+from ingest_checks import (  # noqa: E402
+    check_merged_blocks_preserved,
+    check_no_unknown_templates,
+)
 from wikitext_parser import _join_unclosed_templates, parse_wikitext  # noqa: E402
 
 FIXTURES = ROOT / "tests" / "fixtures" / "wikitext"
@@ -76,6 +80,31 @@ def main():
     except Exception:  # noqa: BLE001
         described = False
     check("קלט פגום -> שגיאה מתוארת ולא IndexError", described)
+
+    # 5. הבלוק נשמר כ-raw_block ולא מדולג (הכרעת ברק 2026-09-18:
+    #    "מילון מונחים הוא תוכן, לא עיטור"), ושתי בדיקות השפיות
+    #    מסכימות על כך - האחת מדלגת עליו, השנייה מאמתת שהוא באמת שם.
+    if tree is not None:
+        def walk(node):
+            yield node
+            for child in node.children:
+                yield from walk(child)
+
+        raw = [n for n in walk(tree) if n.node_type == "raw_block"]
+        check("הבלוק נשמר כ-raw_block", len(raw) == 1, f"נמצאו {len(raw)}")
+        if raw:
+            check("תוכן הבלוק נשמר במלואו",
+                  "אֲמָרָה" in raw[0].text and "תְּרוּפָה" in raw[0].text)
+        check("check_no_unknown_templates לא מתלונן על בלוק מאוחד",
+              check_no_unknown_templates(MULTILINE) == [])
+        check("check_merged_blocks_preserved מאשר שהבלוק בעץ",
+              check_merged_blocks_preserved(MULTILINE, tree) == [])
+
+    # 6. ...ואם הבלוק *לא* היה בעץ, הבדיקה הייתה נופלת - כלומר
+    #    הדילוג ב-check_no_unknown_templates אינו הנחה עיוורת.
+    empty = parse_wikitext("{{ח:כותרת|ריק}}", law_id="law-test")
+    check("בלוק חסר מהעץ -> כשל שפיות",
+          check_merged_blocks_preserved(MULTILINE, empty) != [])
 
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1
