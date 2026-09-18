@@ -16,7 +16,10 @@ python3 tests/golden/test_kaytanot.py
 | נתיב | תוכן |
 |---|---|
 | `CLAUDE.md` | חוקי הברזל של הפרויקט. לקרוא ראשון |
+| `docs/README.md` | **אינדקס התיעוד** — מי מקור האמת לכל נושא |
+| `PROJECT_CONTEXT.md` | מה המוצר, למי, ולמה ההחלטות התקבלו |
 | `TASKS.md` | רשימת המשימות וסדר הביצוע |
+| `docs/open-gaps.md` | מה לא עובד, מדורג לפי השפעה על המשתמש |
 | `docs/template-spec.md` | מפרט תבנית החקיקה, מונדס לאחור |
 | `docs/data-sources.md` | מאיפה מביאים נוסחי חוקים |
 | `docs/validator-checklist.md` | 15 בדיקות על הפלט |
