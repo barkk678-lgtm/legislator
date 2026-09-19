@@ -445,14 +445,107 @@ async def api_reservations_analyze(file: UploadFile = File(...)) -> dict:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "reservations"))
     from generate import measure  # noqa: PLC0415
 
+    from quality import anchor_points  # noqa: PLC0415
+
     result = measure(sections)
+    # **עלות מצב האיכות, דטרמיניסטית ולפני כל קריאה למודל:** קריאה
+    # אחת לכל סעיף, וגודל ההנחיה ידוע מראש. מוצג כדי שההחלטה להריץ
+    # תילקח מתוך מספר ולא מתוך תחושה.
+    quality_calls = sum(1 for _, text in sections if anchor_points(text))
     return {
         "title": bill.title,
         "sections_found": len(sections),
-        "total": result["total"],
+        # **אין "total".** measure() הפסיקה להחזיר אותו במכוון (ברק,
+        # 2026-09-18): מספר ההסתייגויות האפשריות אינו מדידה של ההצעה
+        # אלא תוצר של תקרה שאנחנו קובעים. ה-endpoint המשיך לקרוא לו
+        # עד 2026-09-19 והחזיר 500 על כל מדידה.
         "distinct": result["distinct"],
         "per_section": result["per_section"],
+        "quality_calls": quality_calls,
+        "quality_points": sum(len(anchor_points(text)) for _, text in sections),
+        "quality_prompt_chars": sum(len(text) for _, text in sections if anchor_points(text)),
         "warnings": bill.warnings,
+    }
+
+
+@app.post("/api/reservations/quality")
+async def api_reservations_quality(
+    file: UploadFile = File(...),
+    proposers: str = Form(""),
+    sections_limit: int = Form(0),
+    download: bool = Form(False),
+):
+    """מצב האיכות: הסתייגות מהותית אחת לכל נקודת עיגון.
+
+    **כאן המודל כן כותב טקסט, ולכן כאן - ורק כאן - שומר 86(ד)(2)
+    חל.** מה שנחסם נזרק ואינו מוחזר למשתמש (חוק ברזל 7); מוחזרת
+    רק הספירה, לדיווח.
+
+    `sections_limit` קיים בשביל העלות: קריאה אחת למודל לכל סעיף.
+    הטוקנים בפועל מוחזרים ב-`usage`, ולא בהערכה - `draft_fn` כאן
+    עוטף את `complete` ישירות וסופר את מה שה-API דיווח."""
+    sections, bill = await _reservation_sections(file)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "reservations"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
+    from client import DEFAULT_MODEL, LLMConfigError, LLMRequestError, complete  # noqa: PLC0415
+    from quality import quality_reservations  # noqa: PLC0415
+    from render_docx import build_document  # noqa: PLC0415
+
+    usage = {"drafting_calls": 0, "screening_calls": 0,
+             "input_tokens": 0, "output_tokens": 0, "model": DEFAULT_MODEL}
+
+    def _counted(kind):
+        def call(*, instructions: str, content: str, max_tokens: int = 1600) -> str:
+            completion = complete(system=instructions, user_message=content,
+                                  max_tokens=max_tokens)
+            usage[kind] += 1
+            usage["input_tokens"] += completion.input_tokens
+            usage["output_tokens"] += completion.output_tokens
+            return completion.text
+        return call
+
+    # **שתי קריאות, לא אחת.** הניסוח וסינון 86(ד)(2) הן שתי קריאות
+    # נפרדות בתשלום, ודיווח שסופר רק את הראשונה מציג כמחצית מהעלות.
+    drafted = _counted("drafting_calls")
+    screened = _counted("screening_calls")
+
+    chosen = sections[:sections_limit] if sections_limit > 0 else sections
+    items, blocked = [], []
+    try:
+        for number, text in chosen:
+            passed, reasons = quality_reservations(
+                text, section_number=number, draft_fn=drafted,
+                screen_draft_fn=screened)
+            items.extend(passed)
+            blocked.extend(reasons)
+    except LLMConfigError as e:
+        raise HTTPException(503, str(e))
+    except LLMRequestError as e:
+        raise HTTPException(502, f"שכבת ה-LLM נכשלה: {e}")
+
+    if download:
+        names = [n.strip() for n in proposers.split(",") if n.strip()]
+        doc = build_document(bill_title=bill.title or "הצעת חוק",
+                             reservations=items, proposers=names, budget_flags={})
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return StreamingResponse(
+            buffer,
+            media_type=("application/vnd.openxmlformats-officedocument"
+                        ".wordprocessingml.document"),
+            headers={"Content-Disposition": 'attachment; filename="reservations-quality.docx"',
+                     "X-Reservations-Count": str(len(items))},
+        )
+
+    return {
+        "title": bill.title,
+        "sections_used": len(chosen),
+        "sections_found": len(sections),
+        "passed": [{"section_number": it.section_number, "text": it.text,
+                    "rationale": it.rationale} for it in items],
+        "blocked_count": len(blocked),
+        "usage": usage,
     }
 
 

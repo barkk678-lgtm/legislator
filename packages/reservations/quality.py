@@ -65,6 +65,7 @@ def quality_reservations(
     section_heading: str = "",
     draft_fn=None,
     screen_fn=None,
+    screen_draft_fn=None,
 ) -> tuple[list[DraftedReservation], list[str]]:
     """מחזירה (הסתייגויות שעברו, סיבות חסימה). **הנחסמות אינן
     מוחזרות** - רק ספירה וסיבה, לדיווח פנימי, לא להצגה למשתמש."""
@@ -89,7 +90,18 @@ def quality_reservations(
     except json.JSONDecodeError:
         return [], ["הניסוח לא חזר כ-JSON תקין"]
 
-    screen = screen_fn if screen_fn is not None else screen_content
+    # `screen_draft_fn` מעביר את **התחבורה** של קריאת הסינון בלבד -
+    # ההכרעה ("תקין" בלבד עובר, כל השאר חוסם) נשארת כולה בתוך
+    # screen_content. זה נדרש כדי שקריאת הסינון תיספר בעלות: היא
+    # קריאה נפרדת בתשלום לכל הסתייגות, ודיווח שמתעלם ממנה מציג
+    # כמחצית מהעלות האמיתית.
+    if screen_fn is not None:
+        screen = screen_fn
+    elif screen_draft_fn is not None:
+        def screen(item):
+            return screen_content(item, draft_fn=screen_draft_fn)
+    else:
+        screen = screen_content
     passed: list[DraftedReservation] = []
     blocked: list[str] = []
     allowed_points = set(range(1, len(points) + 1))

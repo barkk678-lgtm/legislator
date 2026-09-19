@@ -1278,8 +1278,8 @@ document.getElementById("critique-btn").addEventListener("click", runCritique);
  * נראות כמו 400 רעיונות. ראו generate.measure להגדרת "מובחן". */
 function resSections(d) {
   return d.per_section.map((s) => `
-    <tr><td>${escapeHtml(s.section)}</td><td>${s.quantity.toLocaleString()}</td>
-    <td>${s.anchors}</td></tr>`).join("");
+    <tr><td>${escapeHtml(s.section)}</td><td>${s.anchors}</td>
+    <td>${escapeHtml((s.anchor_values || []).join(", "))}</td></tr>`).join("");
 }
 
 async function measureReservations() {
@@ -1302,12 +1302,15 @@ async function measureReservations() {
     const d = await resp.json();
     out.innerHTML = `
       <div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
-      <div class="res-headline">עד <b>${d.total.toLocaleString()}</b> הסתייגויות,
-        מתוכן כ-<b>${d.distinct}</b> מובחנות</div>
-      <div class="hint">${d.sections_found} סעיפים נמדדו. "מובחנת" = ערך שונה
-        בהצעה שאפשר לשנות. המספר הגדול הוא וריאציות על אותם ערכים.</div>
-      <table class="res-table"><thead><tr><th>סעיף</th><th>הסתייגויות</th>
-        <th>עוגנים מובחנים</th></tr></thead><tbody>${resSections(d)}</tbody></table>`;
+      <div class="res-headline"><b>${d.distinct}</b> עוגנים מובחנים</div>
+      <div class="hint">${d.sections_found} סעיפים נמדדו. "עוגן מובחן" = ערך
+        בהצעה שאפשר לשנות. אין כאן "כמה הסתייגויות אפשר לייצר" - המספר הזה
+        תלוי בתקרה שתבחרו ואינו מדידה של ההצעה.</div>
+      <div class="hint" style="margin-top:8px">מצב האיכות על ההצעה הזו:
+        <b>${d.quality_calls}</b> קריאות למודל (אחת לסעיף),
+        <b>${d.quality_points}</b> נקודות עיגון.</div>
+      <table class="res-table"><thead><tr><th>סעיף</th><th>עוגנים מובחנים</th>
+        <th>הערכים</th></tr></thead><tbody>${resSections(d)}</tbody></table>`;
   } finally { btn.disabled = false; }
 }
 
@@ -1335,5 +1338,48 @@ async function generateReservations() {
     URL.revokeObjectURL(url);
   } finally { btn.disabled = false; }
 }
+
+async function qualityReservations() {
+  const input = document.getElementById("res-file");
+  const out = document.getElementById("res-result");
+  const file = input.files && input.files[0];
+  if (!file) { out.innerHTML = `<div class="hint">בחרו קובץ Word תחילה.</div>`; return; }
+  const btn = document.getElementById("res-quality-btn");
+  const limit = parseInt(document.getElementById("res-quality-limit").value, 10) || 0;
+  btn.disabled = true;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>מנסח…</div>`;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("sections_limit", String(limit));
+    const resp = await fetch("/api/reservations/quality", { method: "POST", body: form });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בניסוח.")}</div>`;
+      return;
+    }
+    const d = await resp.json();
+    const u = d.usage || {};
+    // מה שנחסם אינו מוצג - רק נספר. ראו CLAUDE.md חוק ברזל 7.
+    const blocked = d.blocked_count
+      ? `<div class="hint">${d.blocked_count} ניסוחים נחסמו בשומרים ואינם מוצגים.</div>`
+      : "";
+    out.innerHTML = `
+      <div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
+      <div class="res-headline"><b>${d.passed.length}</b> הסתייגויות מהותיות,
+        מתוך ${d.sections_used} סעיפים</div>
+      ${blocked}
+      <div class="hint">עלות בפועל: ${u.drafting_calls} קריאות ניסוח +
+        ${u.screening_calls} קריאות סינון,
+        ${(u.input_tokens || 0).toLocaleString()} טוקני קלט,
+        ${(u.output_tokens || 0).toLocaleString()} טוקני פלט (${escapeHtml(u.model || "")}).</div>
+      <table class="res-table"><thead><tr><th>סעיף</th><th>ההסתייגות</th>
+        <th>נימוק</th></tr></thead><tbody>${d.passed.map((r) => `
+        <tr><td>${escapeHtml(r.section_number)}</td>
+            <td>${escapeHtml(r.text)}</td>
+            <td>${escapeHtml(r.rationale || "")}</td></tr>`).join("")}</tbody></table>`;
+  } finally { btn.disabled = false; }
+}
 document.getElementById("res-measure-btn").addEventListener("click", measureReservations);
 document.getElementById("res-generate-btn").addEventListener("click", generateReservations);
+document.getElementById("res-quality-btn").addEventListener("click", qualityReservations);

@@ -238,9 +238,20 @@
                 <input id="res-proposers" class="inp" type="text"
                        placeholder="לדוגמה: ישראל ישראלי, פלוני אלמוני" />
               </div>
-              <div style="display:flex;gap:8px;margin-top:10px">
+              <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
                 <button id="res-measure-btn" class="primary">מדידה</button>
                 <button id="res-generate-btn">הפקת מסמך Word</button>
+                <span style="flex:1"></span>
+                <label class="hint" for="res-quality-limit">מצב איכות, סעיפים ראשונים:</label>
+                <input id="res-quality-limit" class="inp" type="number" min="0" value="3"
+                       style="width:72px" />
+                <button id="res-quality-btn">ניסוח מהותי</button>
+              </div>
+              <div class="notice" style="margin-top:10px">
+                <b>מצב האיכות אינו דטרמיניסטי.</b> נקודות העיגון נבחרות מהנוסח
+                בלי מודל, אבל הניסוח עצמו נכתב על ידי מודל — ולכן כאן, ורק כאן,
+                חל סף 86(ד)(2), וכל ניסוח עובר את השומרים. מה שנחסם נזרק ואינו
+                מוצג. קריאה אחת למודל לכל סעיף; 0 = כל הסעיפים.
               </div>
               <div id="res-result" style="margin-top:16px"></div>
             </div>
