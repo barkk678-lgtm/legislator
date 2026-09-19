@@ -178,6 +178,11 @@ class StarredSectionAmbiguity(Exception):
 _DOTTED_SECTION_ANCHOR_RE = re.compile(r"^סעיף\s+[^\s.]+\.")
 _LIST_ANCHOR_WORDS = ("תוספת", "לוח", "טופס", "פרט", "חלק")
 
+# ארגומנט בעל שם: `שם=ערך`. השם עצמו אינו מכיל `=`, ולכן די
+# בתו הראשון שהוא `=`. **ריק לפני ה-`=` אינו שם** (`|=x|`),
+# ולכן `+` ולא `*` - טסט שלילי ב-test_wikitext_parser.
+_NAMED_ARG_RE = re.compile(r"^[^=|{}]+=")
+
 
 def _next_template_name(lines: list[str], line_index: int) -> str:
     """שם התבנית בשורה הלא-ריקה הבאה, או "" אם אין."""
@@ -223,7 +228,7 @@ def _starred_section_use(call: _Call, lines: list[str], line_index: int,
     294 מתוך 294. "list_item"/"section"/"unknown" כולם משמרים את
     ההתנהגות שהייתה, ולכן אינם טענה חדשה שדורשת ראיה."""
     anchor_arg = next((a for a in call.args if a.startswith("עוגן=")), None)
-    positional = [a for a in call.args if "=" not in a]
+    positional = [a for a in call.args if not _NAMED_ARG_RE.match(a)]
     has_number = bool(positional) and bool(positional[0].strip())
 
     if anchor_arg is None:
@@ -661,11 +666,23 @@ def parse_wikitext(
             continue
 
         if name in ("ח:סעיף", "ח:סעיף*"):
-            number = call.args[0] if call.args else ""
-            raw_title = call.args[1] if len(call.args) > 1 else ""
+            # **ארגומנט בעל שם אינו מיקומי - כלל, לא רשימה.**
+            # זו הפעם השלישית שאותה מלכודת מכה: `number = args[0]`
+            # לקח את `עוגן=סעיף 30.א` כמספר הסעיף, ואחר כך גם את
+            # `אחר=[יד]` (2,274 מופעים ב-16 חוקים). ברק (2026-09-19):
+            # "התיקון אינו להוסיף עוד שם לרשימה אלא לסנן כל ארגומנט
+            # בעל-שם לפני שלוקחים args[0]." כל ארגומנט שיש בו `=`
+            # לפני התו הראשון אינו מיקומי, נקודה - וזה יתפוס גם את
+            # השם הבא שעוד לא ראינו.
+            positional_args = [a for a in call.args if not _NAMED_ARG_RE.match(a)]
+            named_args = [a for a in call.args if _NAMED_ARG_RE.match(a)]
+            number = positional_args[0] if positional_args else ""
+            raw_title = positional_args[1] if len(positional_args) > 1 else ""
             title = _flatten(raw_title)
             title_raw = raw_title if "{{" in raw_title else None
-            extra_args = call.args[2:]
+            # הערות התיקון הן המיקומיים שאחרי הכותרת; הארגומנטים
+            # בעלי השם נשמרים אחריהם כדי שלא יאבדו מהנתונים.
+            extra_args = positional_args[2:] + named_args
             raw_amendment_note = "|".join(extra_args) if extra_args else None
 
             while stack[-1][0] >= _STRUCTURAL_LEVEL_SECTION:

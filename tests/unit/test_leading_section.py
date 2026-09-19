@@ -70,6 +70,28 @@ def main() -> int:
     checks.append(("האזהרה מצטטת את הטקסט עצמו", "פרק א" in loud[0]))
     checks.append(("41 הסעיפים לא נפגעו", d["sections_found"] == 41))
 
+    # **האזהרה חייבת להגיע ללקוח, לא רק ל-warnings בקוד** (ברק):
+    # הצעה שחצי ממנה נעלמה היא בדיוק מה שהמשתמש צריך לדעת עליו.
+    data = (FIX / "13948363.docx").read_bytes()
+    q = api.post("/api/reservations/quality",
+                 files={"file": ("b.docx", data, _TYPE)},
+                 data={"sections_limit": "1"})
+    checks.append(("מצב איכות מחזיר warnings ללקוח (גם בלי מפתח -> 503)",
+                   q.status_code == 503 or "warnings" in q.json()))
+    g = api.post("/api/reservations/generate",
+                 files={"file": ("b.docx", data, _TYPE)})
+    checks.append(("הורדת Word מחזירה את מספר האזהרות בכותרת",
+                   g.headers.get("X-Extraction-Warnings") == "1"))
+
+    # ה-JS מרנדר אותן בשתי הלשוניות
+    js = (ROOT / "apps" / "api" / "static" / "app.js").read_text(encoding="utf-8")
+    checks.append(("app.js: extractionWarnings קיימת",
+                   "function extractionWarnings(" in js))
+    checks.append(("app.js: מוצגת במדידה ובמצב איכות",
+                   js.count("${extractionWarnings(d)}") == 2))
+    checks.append(("app.js: הורדה שקטה מדווחת על אזהרות",
+                   "X-Extraction-Warnings" in js))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)

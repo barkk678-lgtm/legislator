@@ -568,6 +568,9 @@ async def api_reservations_quality(
                     "rationale": it.rationale} for it in items],
         "blocked_count": len(blocked),
         "usage": usage,
+        # אזהרות החילוץ חוזרות גם כאן, לא רק ב-/analyze: המשתמש
+        # יכול להגיע ישירות לניסוח בלי למדוד קודם.
+        "warnings": bill.warnings,
     }
 
 
@@ -603,7 +606,9 @@ async def api_reservations_generate(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": 'attachment; filename="reservations.docx"',
-                 "X-Reservations-Count": str(len(items))},
+                 "X-Reservations-Count": str(len(items)),
+                 # בהורדת קובץ אין גוף JSON להציג בו אזהרות.
+                 "X-Extraction-Warnings": str(len(bill.warnings))},
     )
 
 

@@ -1282,6 +1282,16 @@ function resSections(d) {
     <td>${escapeHtml((s.anchor_values || []).join(", "))}</td></tr>`).join("");
 }
 
+// אזהרות חילוץ, בראש התוצאה ולא בתחתיתה. **הן קריטיות בלשונית
+// הזו:** ההצעה 13948363 איבדה חצי מעצמה בשקט לפני התיקון של
+// 2026-09-19, ומה שהמשתמש ראה היה תוצאה שנראית תקינה לגמרי.
+function extractionWarnings(d) {
+  if (!d.warnings || !d.warnings.length) return "";
+  return `<div class="notice notice-coverage" style="margin-bottom:12px">
+    <b>שימו לב — החילוץ מהמסמך אינו ודאי:</b>
+    <ul>${d.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>`;
+}
+
 async function measureReservations() {
   const input = document.getElementById("res-file");
   const out = document.getElementById("res-result");
@@ -1301,6 +1311,7 @@ async function measureReservations() {
     }
     const d = await resp.json();
     out.innerHTML = `
+      ${extractionWarnings(d)}
       <div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
       <div class="res-headline"><b>${d.distinct}</b> עוגנים מובחנים</div>
       <div class="hint">${d.sections_found} סעיפים נמדדו. "עוגן מובחן" = ערך
@@ -1331,11 +1342,17 @@ async function generateReservations() {
       out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בהפקה.")}</div>`;
       return;
     }
+    const warnCount = parseInt(resp.headers.get("X-Extraction-Warnings") || "0", 10);
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "הסתייגויות.docx"; a.click();
     URL.revokeObjectURL(url);
+    // הורדה שקטה מסתירה אזהרת חילוץ. אם יש - אומרים, ומפנים למדידה.
+    out.innerHTML = warnCount
+      ? `<div class="notice notice-coverage"><b>המסמך הופק, אבל החילוץ אינו ודאי
+           (${warnCount} אזהרות).</b> לחצו "מדידה" כדי לראות אותן לפני ההגשה.</div>`
+      : `<div class="hint">המסמך הופק.</div>`;
   } finally { btn.disabled = false; }
 }
 
@@ -1365,6 +1382,7 @@ async function qualityReservations() {
       ? `<div class="hint">${d.blocked_count} ניסוחים נחסמו בשומרים ואינם מוצגים.</div>`
       : "";
     out.innerHTML = `
+      ${extractionWarnings(d)}
       <div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
       <div class="res-headline"><b>${d.passed.length}</b> הסתייגויות מהותיות,
         מתוך ${d.sections_used} סעיפים</div>

@@ -353,6 +353,41 @@ def main():
     checks.append(("רשימה לא-ממוספרת: המבנה לא השתנה בעקבות הסימון",
                    [c.node_type for c in siman.children] == ["section"] * 4))
 
+    # ── ארגומנט בעל שם אינו מיקומי (2026-09-19) ─────────────────────
+    # הפעם השלישית שאותה מלכודת הכתה: עוגן=, ואז אחר=. הכלל הוא
+    # כללי ולא רשימת שמות, ולכן הוא יתפוס גם את השם הבא.
+    named = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:סעיף*|עוגן=תוספת פרט 15}}
+{{ח:ת}} תוכן הפריט.
+{{ח:סעיף|9|כותרת אמיתית|אחר=[יד]}}
+{{ח:ת}} תוכן הסעיף.
+"""
+    named_tree = parse_wikitext(named, law_id="test-named")
+    nums = [c.number for c in named_tree.children]
+    checks.append(("עוגן= אינו נלקח כמספר הסעיף", "עוגן=תוספת פרט 15" not in nums))
+    checks.append(("אחר= אינו נלקח כמספר הסעיף",
+                   not any("אחר=" in (n or "") for n in nums)))
+    checks.append(("אף מספר סעיף אינו מכיל '='",
+                   not any("=" in (n or "") for n in nums)))
+    checks.append(("המספר המיקומי האמיתי נשמר", "9" in nums))
+    s9 = [c for c in named_tree.children if c.number == "9"][0]
+    checks.append(("הכותרת נלקחת מהמיקומי השני ולא מהבעל-שם",
+                   s9.margin_title == "כותרת אמיתית"))
+    checks.append(("הארגומנט בעל השם נשמר ולא נזרק",
+                   "אחר=[יד]" in (s9.raw_amendment_note or "")))
+
+    # **טסטים שליליים** (CLAUDE.md): מה שנראה כמו ארגומנט בעל שם ואינו.
+    from wikitext_parser import _NAMED_ARG_RE  # noqa: PLC0415
+    for value, is_named in (
+        ("עוגן=סעיף 30.ב", True), ("אחר=[יד]", True), ("א=ב", True),
+        ("4", False), ("", False), ("שטר למוכ״ז", False),
+        ("=ריק לפני השווה", False),
+        ("{{ח:הערה|7}}ג1", False),
+        ("תיקון: ק״ת תשפ״ו", False),
+    ):
+        checks.append((f"סיווג ארגומנט {value[:22]!r}",
+                       bool(_NAMED_ARG_RE.match(value)) is is_named))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)
