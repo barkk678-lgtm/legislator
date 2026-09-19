@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import datetime
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -52,6 +51,15 @@ from embeddings import EmbeddingConfigError, EmbeddingRequestError, EmbeddingToo
 
 from law_registry import LawNotFoundError, load_law  # noqa: E402
 from supabase_rest import count_rows, fetch_all  # noqa: E402
+
+# ── מקור יחיד למפתחות ──────────────────────────────────────────────
+# ראו packages/config/env_file.py: סביבה גוברת, ואם המשתנה אינו שם -
+# נטען מ-/root/.claude/legislator.env (600, מחוץ לריפו).
+_CONFIG_DIR = str(Path(__file__).resolve().parents[2] / "packages" / "config")
+if _CONFIG_DIR not in sys.path:
+    sys.path.insert(0, _CONFIG_DIR)
+from env_file import MissingSecret, get as env_get, require, require_supabase  # noqa: E402
+
 
 # --- מגבלות קצב (ברק, 2026-09-17) - ראו night-report.md לחישוב
 # העלות המרבית התיאורטי לשעה/ליום מהמספרים האלה. ---
@@ -83,18 +91,19 @@ class IngestStorageLimitError(Exception):
 
 
 def _require_secret(provided: str | None) -> None:
-    expected = os.environ.get("INGEST_SECRET")
+    expected = env_get("INGEST_SECRET")
     if not expected:
-        raise IngestAuthError("INGEST_SECRET לא מוגדר בסביבה - ה-endpoint חסום כברירת מחדל, לא פתוח.")
+        raise IngestAuthError(
+            "INGEST_SECRET אינו מוגדר - ה-endpoint חסום כברירת מחדל, לא פתוח.")
     if not provided or provided != expected:
         raise IngestAuthError("טוקן שגוי/חסר.")
 
 
 def _supabase_client() -> httpx.Client:
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    if not url or not key:
-        raise RuntimeError("חסרים SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY.")
+    try:
+        url, key = require_supabase()
+    except MissingSecret as e:
+        raise RuntimeError(str(e)) from None
     return httpx.Client(
         base_url=f"{url.rstrip('/')}/rest/v1",
         headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"},

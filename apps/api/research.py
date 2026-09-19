@@ -31,6 +31,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "knesset"))
 from odata import OdataError, escape, fetch, fetch_apply  # noqa: E402
 
+# ── מקור יחיד למפתחות ──────────────────────────────────────────────
+# ראו packages/config/env_file.py: סביבה גוברת, ואם המשתנה אינו שם -
+# נטען מ-/root/.claude/legislator.env (600, מחוץ לריפו).
+_CONFIG_DIR = str(Path(__file__).resolve().parents[2] / "packages" / "config")
+if _CONFIG_DIR not in sys.path:
+    sys.path.insert(0, _CONFIG_DIR)
+from env_file import MissingSecret, get as env_get, require, require_supabase  # noqa: E402
+
+
 _STATUS_PASSED = 118  # התקבלה בקריאה שלישית
 
 # **למה יש כאן מטמון בכלל:** לא מהירות - סיכון חסימה. ה-WAF של
@@ -182,11 +191,11 @@ _RUNNERS = {
 def _cache_client():
     """None כשאין תצורת Supabase - מצב תקין (dev מקומי), לא שגיאה.
     המטמון הוא אופטימיזציה; הכלי חייב לעבוד גם בלעדיו."""
-    import os  # noqa: PLC0415
-
     import httpx  # noqa: PLC0415
 
-    url, key = os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    # כאן **לא** זורקים: מחקר בלי DB עדיין עובד על נתוני הכנסת.
+    url = env_get("SUPABASE_URL")
+    key = env_get("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not key:
         return None
     return httpx.Client(

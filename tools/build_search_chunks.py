@@ -23,7 +23,6 @@
 
 import argparse
 import json
-import os
 import sys
 import time
 import urllib.error
@@ -38,13 +37,21 @@ from chunking import chunk_law  # noqa: E402
 from node import LegislativeNode  # noqa: E402
 from embeddings import EmbeddingTooLongError, embed_batch  # noqa: E402
 
+# ── מקור יחיד למפתחות ──────────────────────────────────────────────
+# ראו packages/config/env_file.py: סביבה גוברת, ואם המשתנה אינו שם -
+# נטען מ-/root/.claude/legislator.env (600, מחוץ לריפו).
+_CONFIG_DIR = str(Path(__file__).resolve().parents[1] / "packages" / "config")
+if _CONFIG_DIR not in sys.path:
+    sys.path.insert(0, _CONFIG_DIR)
+from env_file import MissingSecret, get as env_get, require, require_supabase  # noqa: E402
+
+
 PROGRESS_LOG = Path(__file__).parent / "build_search_chunks_progress.jsonl"
 EMBED_BATCH_SIZE = 50  # OpenAI תומך ביותר, אבל batch קטן שומר על retry זול אם משהו נכשל
 
 
 def _supabase_config() -> tuple[str, str]:
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    url, key = require_supabase()
     missing = [n for n, v in [("SUPABASE_URL", url), ("SUPABASE_SERVICE_ROLE_KEY", key)] if not v]
     if missing:
         print(f"שגיאה: חסרים משתני סביבה: {', '.join(missing)}", file=sys.stderr)

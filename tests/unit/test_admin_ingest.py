@@ -8,6 +8,17 @@
 מהם (או תחרוג מתקציב האחסון) צריכה להיכשל בבדיקה, לא בהרצה שעולה כסף.
 """
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "support"))
+from isolate_env import clear_secret, isolate, set_secret  # noqa: E402
+
+# **הרמטיות.** עד 2026-09-19 הטסט הזה הסתמך על כך שבמקרה אין מפתחות
+# בסביבה. מרגע שהם נטענים מקובץ, ההסתמכות הזו נשברה - ראו
+# tests/support/isolate_env.py.
+isolate()
+
+
 import os
 import sys
 from pathlib import Path
@@ -32,7 +43,7 @@ def main():
     print(("OK " if threw else "FAIL"), "בלי INGEST_SECRET בסביבה -> תמיד IngestAuthError, לא endpoint פתוח בטעות")
 
     # --- INGEST_SECRET מוגדר, טוקן נכון -> עובר ---
-    admin_ingest.os.environ["INGEST_SECRET"] = "סוד-לבדיקה"
+    set_secret("INGEST_SECRET", "סוד-לבדיקה")
     try:
         threw = False
         try:
@@ -61,7 +72,7 @@ def main():
         ok = ok and threw
         print(("OK " if threw else "FAIL"), "בלי טוקן בכלל -> IngestAuthError")
     finally:
-        del admin_ingest.os.environ["INGEST_SECRET"]
+        clear_secret("INGEST_SECRET")
 
     # --- ה-endpoint עצמו: בלי header, בלי INGEST_SECRET -> 401 ברור, לא קורס ---
     from fastapi.testclient import TestClient  # noqa: E402

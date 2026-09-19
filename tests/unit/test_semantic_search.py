@@ -6,6 +6,17 @@
 ROLE_KEY חסרים - בדיוק המצב האמיתי כאן.
 """
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "support"))
+from isolate_env import clear_secret, isolate, set_secret  # noqa: E402
+
+# **הרמטיות.** עד 2026-09-19 הטסט הזה הסתמך על כך שבמקרה אין מפתחות
+# בסביבה. מרגע שהם נטענים מקובץ, ההסתמכות הזו נשברה - ראו
+# tests/support/isolate_env.py.
+isolate()
+
+
 import os
 import sys
 from pathlib import Path

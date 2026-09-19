@@ -7,6 +7,18 @@ length is 8192 tokens" - ניסוח שהסיווג לא זיהה, ולכן כל 
 "דלג על סעיף אחד" ל"אבד חוק שלם", ולכן הוא ננעל בבדיקה.
 """
 
+import os
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "support"))
+from isolate_env import clear_secret, isolate, set_secret  # noqa: E402
+
+# **הרמטיות.** עד 2026-09-19 הטסט הזה הסתמך על כך שבמקרה אין מפתחות
+# בסביבה. מרגע שהם נטענים מקובץ, ההסתמכות הזו נשברה - ראו
+# tests/support/isolate_env.py.
+isolate()
+
+
 import sys
 from pathlib import Path
 
@@ -42,9 +54,10 @@ class _FakeClient:
 
 def _classify(message):
     """מחזיר את סוג החריגה שנזרקת עבור הודעת 400 נתונה."""
-    original_client, original_key = embeddings.httpx.Client, embeddings.os.environ.get("OPENAI_API_KEY")
+    original_client = embeddings.httpx.Client
+    original_key = os.environ.get("OPENAI_API_KEY")
     embeddings.httpx.Client = lambda *a, **k: _FakeClient(message)
-    embeddings.os.environ["OPENAI_API_KEY"] = "sk-בדיקה"
+    set_secret("OPENAI_API_KEY", "sk-בדיקה")
     try:
         embed_batch(["טקסט כלשהו"])
         return None
@@ -55,9 +68,9 @@ def _classify(message):
     finally:
         embeddings.httpx.Client = original_client
         if original_key is None:
-            del embeddings.os.environ["OPENAI_API_KEY"]
+            clear_secret("OPENAI_API_KEY")
         else:
-            embeddings.os.environ["OPENAI_API_KEY"] = original_key
+            set_secret("OPENAI_API_KEY", original_key)
 
 
 def main():

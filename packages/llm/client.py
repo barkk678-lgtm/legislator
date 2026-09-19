@@ -16,11 +16,21 @@ thinking מכובה במפורש (type=disabled) - נבדק בפועל (2026-09-
 מבני שדורש תשובת טקסט ודאית בכל קריאה.
 """
 
-import os
+from pathlib import Path
+import sys
 import time
 from dataclasses import dataclass
 
 import httpx
+
+# ── מקור יחיד למפתחות ──────────────────────────────────────────────
+# ראו packages/config/env_file.py: סביבה גוברת, ואם המשתנה אינו שם -
+# נטען מ-/root/.claude/legislator.env (600, מחוץ לריפו).
+_CONFIG_DIR = str(Path(__file__).resolve().parents[2] / "packages" / "config")
+if _CONFIG_DIR not in sys.path:
+    sys.path.insert(0, _CONFIG_DIR)
+from env_file import MissingSecret, require, require_supabase  # noqa: E402
+
 
 _API_URL = "https://api.anthropic.com/v1/messages"
 _API_VERSION = "2023-06-01"
@@ -45,14 +55,11 @@ class RawCompletion:
 
 
 def _api_key() -> str:
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise LLMConfigError(
-            "חסר משתנה סביבה ANTHROPIC_API_KEY - נדרש לכל קריאה לשכבת ה-LLM "
-            "(packages/llm). בלי זה, כל הכלים שתלויים בה (דברי הסבר, שאילתא, "
-            "הצעה לסדר) לא זמינים - זו שגיאת תצורה, לא כשל בקורפוס."
-        )
-    return key
+    try:
+        return require("ANTHROPIC_API_KEY", used_for="שכבת ה-LLM (packages/llm)")
+    except MissingSecret as e:
+        # שגיאת תצורה, לא כשל בקורפוס - ההבחנה הזו חשובה למשתמש.
+        raise LLMConfigError(str(e)) from None
 
 
 def complete(

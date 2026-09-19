@@ -18,7 +18,6 @@ tier - ראו docs/indexing-priority-250.md). `indexed_law_ids()` כאן
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -28,6 +27,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm")
 from embeddings import EmbeddingConfigError, EmbeddingRequestError, embed_one  # noqa: E402
 
 from supabase_rest import fetch_all  # noqa: E402
+
+# ── מקור יחיד למפתחות ──────────────────────────────────────────────
+# ראו packages/config/env_file.py: סביבה גוברת, ואם המשתנה אינו שם -
+# נטען מ-/root/.claude/legislator.env (600, מחוץ לריפו).
+_CONFIG_DIR = str(Path(__file__).resolve().parents[2] / "packages" / "config")
+if _CONFIG_DIR not in sys.path:
+    sys.path.insert(0, _CONFIG_DIR)
+from env_file import MissingSecret, get as env_get, require, require_supabase  # noqa: E402
+
 
 
 class SemanticSearchConfigError(Exception):
@@ -41,13 +49,10 @@ class SemanticSearchRequestError(Exception):
 
 
 def _supabase_client() -> httpx.Client:
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    missing = [n for n, v in [("SUPABASE_URL", url), ("SUPABASE_SERVICE_ROLE_KEY", key)] if not v]
-    if missing:
-        raise SemanticSearchConfigError(
-            "חסרים משתני סביבה נדרשים לחיפוש סמנטי: " + ", ".join(missing)
-        )
+    try:
+        url, key = require_supabase()
+    except MissingSecret as e:
+        raise SemanticSearchConfigError(str(e)) from None
     return httpx.Client(
         base_url=f"{url.rstrip('/')}/rest/v1",
         headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"},

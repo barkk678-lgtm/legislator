@@ -3,3 +3,11 @@ __pycache__/
 .venv/
 /tmp/
 /tools/load_progress.jsonl
+
+# מפתחות - לעולם לא בריפו. המקור הוא /root/.claude/legislator.env
+# (מחוץ לריפו, 600). השורות כאן הן חגורת ביטחון למקרה שקובץ כזה
+# ייווצר בטעות בתוך עץ העבודה. ראו packages/config/env_file.py.
+*.env
+.env*
+!*.env.example
+legislator.env

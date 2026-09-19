@@ -53,6 +53,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packages" / "corpus"))
 from sql_parser import ParseError, parse_law_file  # noqa: E402
 
+# ── מקור יחיד למפתחות ──────────────────────────────────────────────
+# ראו packages/config/env_file.py: סביבה גוברת, ואם המשתנה אינו שם -
+# נטען מ-/root/.claude/legislator.env (600, מחוץ לריפו).
+_CONFIG_DIR = str(Path(__file__).resolve().parents[1] / "packages" / "config")
+if _CONFIG_DIR not in sys.path:
+    sys.path.insert(0, _CONFIG_DIR)
+from env_file import MissingSecret, get as env_get, require, require_supabase  # noqa: E402
+
+
 SUPABASE_PROJECT_URL = "https://aamxwjmmlsqkinrzirdz.supabase.co"
 SRC_DIR = Path(os.environ.get("LOAD_CORPUS_SQL_DIR", "/tmp/corpus_sql"))
 PROGRESS_LOG = Path(__file__).parent / "load_progress.jsonl"
@@ -62,7 +71,8 @@ PROGRESS_LOG = Path(__file__).parent / "load_progress.jsonl"
 # tools/build_search_chunks.py) וזה מה שמוגדר ב-Vercel. הקובץ הזה
 # היה היחיד שציפה ל-SUPABASE_SERVICE_KEY, והפער הזה שווה שעה של
 # חיפוש למי שמגדיר את המפתח פעם אחת ומריץ (נמצא 2026-09-18).
-SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
+# SUPABASE_SERVICE_KEY נשאר כשם חלופי לתאימות לאחור עם סקריפטים ישנים.
+SERVICE_KEY = env_get("SUPABASE_SERVICE_ROLE_KEY") or env_get("SUPABASE_SERVICE_KEY")
 if not SERVICE_KEY:
     print("שגיאה: SUPABASE_SERVICE_KEY לא מוגדר בסביבה", file=sys.stderr)
     sys.exit(1)

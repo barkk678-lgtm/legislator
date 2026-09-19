@@ -49,7 +49,6 @@ space="law" - כדי לא לספור סעיפי תוספת/לוח-השוואה) 
 """
 
 import json
-import os
 import sys
 import time
 from dataclasses import dataclass
@@ -64,6 +63,15 @@ sys.path.insert(0, str(ROOT / "packages" / "corpus"))
 from law_search import search_laws  # noqa: E402
 from node import LegislativeNode, find_sections  # noqa: E402
 from wikitext_parser import parse_wikitext  # noqa: E402
+
+# ── מקור יחיד למפתחות ──────────────────────────────────────────────
+# ראו packages/config/env_file.py: סביבה גוברת, ואם המשתנה אינו שם -
+# נטען מ-/root/.claude/legislator.env (600, מחוץ לריפו).
+_CONFIG_DIR = str(Path(__file__).resolve().parents[2] / "packages" / "config")
+if _CONFIG_DIR not in sys.path:
+    sys.path.insert(0, _CONFIG_DIR)
+from env_file import MissingSecret, get as env_get, require, require_supabase  # noqa: E402
+
 
 FIXTURES = ROOT / "tests" / "fixtures" / "wikitext"
 
@@ -120,15 +128,10 @@ def _load_fixture_law(law_id: str) -> LegislativeNode:
 def _supabase_config() -> tuple[str, str]:
     """קוראת את שני משתני הסביבה. נכשלת ברעש ומיידית אם חסר אחד -
     ראו הדוקסטרינג העליון להסבר למה זה קורה כאן ולא בייבוא המודול."""
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    missing = [name for name, val in [("SUPABASE_URL", url), ("SUPABASE_SERVICE_ROLE_KEY", key)] if not val]
-    if missing:
-        raise RuntimeError(
-            "חסרים משתני סביבה נדרשים לחיבור לקורפוס המלא: "
-            + ", ".join(missing)
-            + ". בלי אלה אין גישה אלא לשני חוקי ה-fixture."
-        )
+    try:
+        url, key = require_supabase()
+    except MissingSecret as e:
+        raise RuntimeError(f"{e} בלי זה אין גישה אלא לשני חוקי ה-fixture.") from None
     return url.rstrip("/"), key
 
 

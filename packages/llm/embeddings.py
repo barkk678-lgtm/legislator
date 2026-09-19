@@ -14,12 +14,22 @@ error`). נבדק ישירות מול ה-API עם טקסט אמיתי מהקור
 (כמבוקש) מכשל רשת חולף שכן כדאי לנסות שוב.
 """
 
-import os
+from pathlib import Path
+import sys
 import re
 import time
 from dataclasses import dataclass
 
 import httpx
+
+# ── מקור יחיד למפתחות ──────────────────────────────────────────────
+# ראו packages/config/env_file.py: סביבה גוברת, ואם המשתנה אינו שם -
+# נטען מ-/root/.claude/legislator.env (600, מחוץ לריפו).
+_CONFIG_DIR = str(Path(__file__).resolve().parents[2] / "packages" / "config")
+if _CONFIG_DIR not in sys.path:
+    sys.path.insert(0, _CONFIG_DIR)
+from env_file import MissingSecret, require, require_supabase  # noqa: E402
+
 
 _API_URL = "https://api.openai.com/v1/embeddings"
 EMBEDDING_MODEL = "text-embedding-3-large"
@@ -57,12 +67,10 @@ class EmbeddingTooLongError(EmbeddingRequestError):
 
 
 def _api_key() -> str:
-    key = os.environ.get("OPENAI_API_KEY")
-    if not key:
-        raise EmbeddingConfigError(
-            "חסר משתנה סביבה OPENAI_API_KEY - נדרש לכל קריאה ל-embeddings (packages/llm/embeddings.py)."
-        )
-    return key
+    try:
+        return require("OPENAI_API_KEY", used_for="embeddings (packages/llm/embeddings.py)")
+    except MissingSecret as e:
+        raise EmbeddingConfigError(str(e)) from None
 
 
 @dataclass

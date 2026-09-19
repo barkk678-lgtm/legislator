@@ -8,6 +8,17 @@ insertions -> apply_changes -> amend -> validate -> docx) עובד מקצה
 10ב, לא רק תיוג), (4) /insert-preview מחזיר בדיוק את התווית שתיווצר.
 """
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "support"))
+from isolate_env import clear_secret, isolate, set_secret  # noqa: E402
+
+# **הרמטיות.** עד 2026-09-19 הטסט הזה הסתמך על כך שבמקרה אין מפתחות
+# בסביבה. מרגע שהם נטענים מקובץ, ההסתמכות הזו נשברה - ראו
+# tests/support/isolate_env.py.
+isolate()
+
+
 import sys
 from pathlib import Path
 

@@ -46,5 +46,19 @@
       "Bash(git push --force*)",
       "Bash(git push -f*)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 tools/session_env_notice.py",
+            "timeout": 15,
+            "statusMessage": "בודק את קובץ המפתחות"
+          }
+        ]
+      }
+    ]
   }
 }
