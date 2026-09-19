@@ -84,8 +84,15 @@ def main() -> int:
 
     # הכלי עצמו: נכשל ברעש כשיש פיגור, כדי שריצה מתוזמנת תצבע אדום
     tool = (ROOT / "tools" / "check_for_update.py").read_text(encoding="utf-8")
-    checks.append(("check_for_update מחזיר קוד שגיאה כשיש פיגור",
-                   "return 1 if stale else 0" in tool))
+    # **השתנה במכוון ב-19.9:** פיגור שתוקן בטעינה אוטומטית אינו
+    # כשל. מה שמפיל את הריצה הוא **כשל טעינה** - חוק שנשאר מיושן
+    # בגלל כשל הוא בדיוק המצב שהמנגנון נבנה כדי למנוע.
+    checks.append(("כשל טעינה -> קוד יציאה 1",
+                   "if failures:" in tool and "return 1" in tool))
+    checks.append(("פיגור שתוקן אינו מפיל את הריצה",
+                   "return 1 if stale else 0" not in tool))
+    checks.append(("הטעינה האוטומטית קיימת", "load_updated(" in tool))
+    checks.append(("הגנת טיוטות קיימת", "laws_with_open_drafts" in tool))
     checks.append(("check_for_update משתמש ב-recentchanges ולא בסריקה",
                    "recentchanges" in tool and "rcdir" in tool))
     checks.append(("check_for_update מדפדף ב-rccontinue", "continue" in tool))

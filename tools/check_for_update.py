@@ -11,9 +11,14 @@
 דפים השתנו מאז חותמת זמן. סריקת 1,109 דפים הייתה 1,109 בקשות
 ליום מול IP אחד; הדלתא היא בדרך כלל אפס עד עשרות.
 
-**מה זה לא עושה: הוא לא טוען כלום.** הוא כותב
-`latest_known_revision_id`/`latest_checked_at` ומדווח. הטעינה
-עצמה היא החלטה נפרדת - ראו decisions.md.
+**הוא גם טוען** (ברק שינה את ההחלטה, 19.9). הנימוק המקורי
+לאי-טעינה היה "אל תשנה נוסח תחת משתמש שעורך", אבל הריצה ב-04:00
+ואיש אינו עורך אז - והמחיר של ההחלטה היה שבעה חוקים מיושנים
+במערכת במשך שבוע. ראו decisions.md, 2026-09-19 (ו).
+
+**ההגנה היחידה: חוק עם טיוטה פתוחה אינו מתעדכן**, רק מסומן.
+ראו `laws_with_open_drafts` - ובפרט את ההבחנה בין "אין טיוטות"
+לבין "לא ידעתי לבדוק".
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -78,6 +84,35 @@ def _patch(url: str, key: str, path: str, where: dict, body: dict) -> None:
     urllib.request.urlopen(req, timeout=120).read()
 
 
+class DraftGuardUnavailable(Exception):
+    """טבלת הטיוטות קיימת אבל לא ניתן לקרוא אותה. **לא מעדכנים.**"""
+
+
+def laws_with_open_drafts(url: str, key: str) -> tuple[set[str], str]:
+    """(מזהי חוקים עם טיוטה פתוחה, תיאור מצב ההגנה).
+
+    **שלושה מצבים, ורק אחד מהם הוא "אין טיוטות":**
+
+    1. הטבלה אינה קיימת (404/PGRST205) - אין טיוטות במערכת בכלל,
+       ולכן אין מה להגן עליו. מדווח במפורש, כדי שאיש לא יבלבל
+       בין "ההגנה עברה" לבין "ההגנה לא רצה".
+    2. הטבלה קיימת ונקראה - מחזירים את מי שיש עליו טיוטה.
+    3. הטבלה קיימת והקריאה נכשלה - **זורקים**. עדכון במצב הזה
+       עלול לדרוס טיוטה פתוחה, ואין דרך לדעת.
+    """
+    try:
+        rows = _rest(url, key, "drafts",
+                     {"select": "law_id", "status": "eq.open", "order": "law_id"})
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        if exc.code in (404, 400) and ("PGRST205" in body or "does not exist" in body):
+            return set(), "טבלת drafts אינה קיימת - אין טיוטות במערכת"
+        raise DraftGuardUnavailable(
+            f"טבלת drafts קיימת אך הקריאה נכשלה ({exc.code}): {body[:160]}") from None
+    ids = {r["law_id"] for r in rows}
+    return ids, f"טבלת drafts נקראה - {len(ids)} חוקים עם טיוטה פתוחה"
+
+
 def _rest(url: str, key: str, path: str, params: dict) -> list:
     assert "order" in params, "בלי order הדפדוף אינו יציב"
     rows, off = [], 0
@@ -92,6 +127,62 @@ def _rest(url: str, key: str, path: str, params: dict) -> list:
         if len(page) < _PAGE:
             return rows
         off += _PAGE
+
+
+def load_updated(stale: list[dict]) -> list[dict]:
+    """טוען את החוקים שהתעדכנו כ**גרסה חדשה**, ומחזיר את הכשלים.
+
+    **גרסה חדשה ולא החלפה:** כאן הנוסח עצמו השתנה ויש
+    `wikitext_revision_id` חדש, ולכן הגרסה הישנה נשמרת
+    כהיסטוריה ו-`current_version_id` זז אליה. `replace_law_version`
+    נדרש רק כשהפרסר משתנה והנוסח לא - ראו decisions.md.
+
+    משתמש באותה שרשרת בדיוק כמו `tools/load_corpus.py`
+    (`build_ingest_plan` -> `load_one_law`), לא בקוד טעינה חדש.
+    חוק שנכשל **אינו מפיל את השאר** - כולם מנוסים, והכשלים
+    מוחזרים כדי שהריצה תיכשל ברעש בסוף."""
+    import tempfile  # noqa: PLC0415
+
+    sys.path.insert(0, str(ROOT / "tools"))
+    from db_ingest import SanityIngestError, build_ingest_plan, fetch_with_retry  # noqa: PLC0415
+    from knesset_odata import classify_validity, fetch_israel_laws  # noqa: PLC0415
+    from load_corpus_to_supabase_rest import load_one_law  # noqa: PLC0415
+
+    print(f"\nטוען {len(stale)} חוקים שהתעדכנו...")
+    kns = fetch_israel_laws()
+    out_dir = Path(tempfile.mkdtemp(prefix="corpus-update-"))
+    failures = []
+    for law in stale:
+        title, law_id = law["title"], law["id"]
+        try:
+            export = fetch_with_retry(title)
+            plan = build_ingest_plan(
+                law_id, title, source_ref="", law_is_new=True,
+                fetch=lambda _t, _e=export: _e,
+                validity=classify_validity(title, kns))
+        except SanityIngestError as e:
+            failures.append({**law, "error": f"בדיקת שפיות: {e}"})
+            print(f"   ✗ {title[:46]:48s} בדיקת שפיות נכשלה")
+            continue
+        except Exception as e:  # noqa: BLE001
+            failures.append({**law, "error": f"{type(e).__name__}: {e}"})
+            print(f"   ✗ {title[:46]:48s} {type(e).__name__}")
+            continue
+
+        sql_path = out_dir / f"{law_id}.sql"
+        sql_path.write_text(plan.sql, encoding="utf-8")
+        try:
+            _, status, detail = load_one_law(sql_path)
+        except Exception as e:  # noqa: BLE001
+            failures.append({**law, "error": f"{type(e).__name__}: {e}"})
+            print(f"   ✗ {title[:46]:48s} טעינה: {type(e).__name__}")
+            continue
+        if status != "ok":
+            failures.append({**law, "error": detail})
+            print(f"   ✗ {title[:46]:48s} {detail[:70]}")
+        else:
+            print(f"   ✓ {title[:46]:48s} {detail}")
+    return failures
 
 
 def main() -> int:
@@ -127,6 +218,18 @@ def main() -> int:
     for s in stale:
         print(f"   {s['title'][:56]:58s} {s['ours']} -> {s['theirs']}")
 
+    # ── טעינה אוטומטית ────────────────────────────────────────────
+    drafted, guard_state = laws_with_open_drafts(url, key)
+    print(f"\nהגנת טיוטות: {guard_state}")
+    to_load = [s for s in stale if s["id"] not in drafted]
+    skipped = [s for s in stale if s["id"] in drafted]
+    for s in skipped:
+        print(f"   דולג (טיוטה פתוחה): {s['title'][:56]}")
+
+    failures = []
+    if to_load and os.environ.get("CHECK_ONLY") != "1":
+        failures = load_updated(to_load)
+
     # **כתיבה חזרה, בשתי בקשות ועוד אחת לכל חוק מפגר.**
     # הגרסה הראשונה כתבה `latest_known_revision_id` לכל 1,109
     # החוקים - 1,109 בקשות PATCH, שנחתכו באמצע (681). זה גם היה
@@ -140,19 +243,32 @@ def main() -> int:
     now = datetime.now(timezone.utc).isoformat()
     _patch(url, key, "laws", {"id": "not.is.null"},
            {"latest_checked_at": now, "latest_known_revision_id": None})
-    for s_ in stale:
+    # **מסומן רק מי שעדיין מפגר**: מי שנטען נמחק מהסימון, ומי
+    # שדולג בגלל טיוטה או נכשל בטעינה - נשאר מסומן, וזה בדיוק
+    # מה שהחיווי בממשק אמור להראות.
+    failed_ids = {f["id"] for f in failures}
+    still_stale = [s for s in stale
+                   if s["id"] in {x["id"] for x in skipped} or s["id"] in failed_ids]
+    for s_ in still_stale:
         _patch(url, key, "laws", {"id": f"eq.{s_['id']}"},
                {"latest_known_revision_id": s_["theirs"]})
-    print(f"\nנרשם: {checked} חוקים נבדקו, {len(stale)} סומנו כמפגרים.")
+    print(f"\nנרשם: {checked} נבדקו, {len(stale)} מפגרו, "
+          f"{len(stale) - len(still_stale)} עודכנו, {len(still_stale)} נשארו מסומנים.")
 
     out = os.environ.get("OUT")
     if out:
         Path(out).write_text(json.dumps(stale, ensure_ascii=False, indent=1),
                              encoding="utf-8")
         print(f"נכתב: {out}")
-    # יציאה שאינה אפס כשיש פיגור - כדי שריצה מתוזמנת תצבע אדום
-    # ולא תעבור בשקט. **זו כל הנקודה של התזמון.**
-    return 1 if stale else 0
+    # **כשל טעינה מפיל את הריצה.** חוק שנשאר מיושן בגלל כשל הוא
+    # בדיוק המצב שהמנגנון הזה נבנה כדי למנוע, ולכן הוא חייב
+    # להיות אדום ולא שורה בלוג. דילוג בגלל טיוטה **אינו** כשל.
+    if failures:
+        print(f"\n**{len(failures)} חוקים נכשלו בטעינה:**")
+        for f in failures:
+            print(f"   {f['title'][:50]:52s} {f['error'][:90]}")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
