@@ -17,8 +17,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile, Form
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile, Form
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 
@@ -54,6 +54,8 @@ from knesset_queries import search_queries  # noqa: E402
 from research import TEMPLATES as RESEARCH_TEMPLATES, ResearchError, ask as research_ask  # noqa: E402
 from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
 from service import LLMConfigError, LLMRequestError  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "config"))
+from env_file import MissingSecret  # noqa: E402
 from semantic_search import (  # noqa: E402
     SemanticSearchConfigError,
     SemanticSearchRequestError,
@@ -87,6 +89,22 @@ _jinja_env = Environment(loader=FileSystemLoader(HERE / "templates"))
 def index() -> str:
     template = _jinja_env.get_template("index.html")
     return template.render()
+
+
+# ── שגיאות תצורה -> 503 עם הסבר, לא 500 ───────────────────────────
+# נמצא ב-tests/unit/test_endpoint_smoke.py (2026-09-19): שלוש נקודות
+# קצה החזירו "Internal Server Error" כשמפתח חסר. זו אינה קריסה, וזה
+# בדיוק מה שיקרה ביום שמפתח יפוג או יסובב - המשתמש היה מקבל שגיאה
+# שנראית כמו באג במקום הסבר מה חסר.
+#
+# מרכזי ולא בכל endpoint: כל נתיב שנוגע ב-DB או במודל מגיע לכאן,
+# כולל כאלה שייכתבו אחר כך. **ההודעה מכילה שם משתנה בלבד ולעולם
+# לא ערך** - ראו packages/config/env_file.py.
+@app.exception_handler(MissingSecret)
+@app.exception_handler(LLMConfigError)
+@app.exception_handler(EmbeddingConfigError)
+async def _config_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 @app.get("/api/laws")

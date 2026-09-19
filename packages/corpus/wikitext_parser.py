@@ -172,59 +172,72 @@ class StarredSectionAmbiguity(Exception):
     והנחה לפי סימן אחד תייצר מבנה שגוי שייראה תקין."""
 
 
+# `עוגן=סעיף 30.ב` מול `עוגן=סעיף 57ג` - **הנקודה היא הסימן.**
+# הקבוצה הראשונה היא מספר סעיף ואחריה מזהה סעיף קטן; השנייה היא
+# מספר סעיף רגיל שיכול לכלול אותיות. ראו _starred_section_use.
+_DOTTED_SECTION_ANCHOR_RE = re.compile(r"^סעיף\s+[^\s.]+\.")
+_LIST_ANCHOR_WORDS = ("תוספת", "לוח", "טופס", "פרט", "חלק")
+
+
 def _starred_section_use(call: _Call, lines: list[str], line_index: int) -> str:
-    """מכריע מהו {{ח:סעיף*}} - "subsection" או "list_item".
+    """מכריע מהו {{ח:סעיף*}}: "subsection", "list_item", "section"
+    או **"unknown"**.
 
-    **שני מבחינים עצמאיים שחייבים להסכים** (CLAUDE.md: מבחין יחיד
-    הוא הנחה):
+    **הסימן הוא הנקודה בעוגן** (ברק אישר, 2026-09-19, על בסיס פילוח
+    של 7,760 מופעים ב-256 חוקים):
 
-    1. `עוגן=`: `עוגן=סעיף 30.ב` מול `עוגן=תוספת פרט 4`.
-    2. **הארגומנט המיקומי הראשון**: פריט ברשימה נושא מספר משלו
-       (`{{ח:סעיף*|4|קריאת מדי־לחות|...}}` = פרט 4), וסעיף קטן עם
-       כותרת שוליים **אינו** (`{{ח:סעיף*||שטר למוכ״ז|...}}`).
+    - `עוגן=סעיף 30.ב` - מנוקד. מספר סעיף, נקודה, מזהה סעיף קטן.
+      **294 מופעים בקורפוס, ובכל 294 הארגומנט המיקומי ריק או חסר.**
+      אפס מקרים של עוגן מנוקד עם מספר מיקומי מלא. זו הראיה.
+    - `עוגן=סעיף 57ג` - בלי נקודה. סעיף רגיל לכל דבר, שנכתב
+      ב-`ח:סעיף*` ולא ב-`ח:סעיף`.
+    - עוגן שמזכיר תוספת/לוח/טופס/פרט/חלק - פריט, גם כשהוא מתחיל
+      במילה "סעיף" (`עוגן=סעיף פרק כא תוספת פרט 1`).
 
-    **תיקון 2026-09-19, אחרי שהמבחין הראשון שניסחתי הופרך:** ניסיתי
-    להשתמש בתבנית שבשורה הבאה ({{ח:תת}} מול {{ח:ת}}) כמבחין שני,
-    והקורפוס הפריך אותה על 10 מופעים - `{{ח:סעיף*|4|...|עוגן=תוספת
-    פרט 4}}` שאחריו `{{ח:תת|(א)}}`. **שני הסימנים היו נכונים**: זה
-    אכן פרט בתוספת, ולפרט הזה יש סעיפים קטנים. התבנית הבאה אינה
-    מבחינה בין שני השימושים, היא מבחינה בין "יש מבנה פנימי" ל"אין" -
-    שאלה אחרת לגמרי.
+    **מה שבוטל, ולמה:** הגרסה הקודמת השתמשה ב"ארגומנט מיקומי ראשון
+    ריק ⇒ סעיף קטן" כמבחין שני עצמאי. הקורפוס הפריך אותו על 11
+    חוקים: `{{ח:סעיף*|||תיקון: ק״ת תשפ״ו|עוגן=תוספת 1 חלק 1}}` -
+    המשבצת הריקה קיימת רק כדי לפנות מקום להערת התיקון, לא כדי
+    לסמן שאין מספר. הארגומנט המיקומי נשאר כאן **רק כבדיקת
+    סתירה** לכיוון אחד: סעיף קטן אינו יכול לשאת מספר סעיף משלו.
 
-    כשאין `עוגן=` **וגם** אין מספר - שניהם שותקים, ואז התבנית
-    שבשורה הבאה מכריעה כברירת מחדל שלישית. זה המצב במועצת הצמחים
-    (`{{ח:סעיף*}}` ואז `{{ח:ת}} אבטיח`)."""
+    **ומה קורה כשאין עוגן בכלל: "unknown", ולא ניחוש.** 278 מופעים
+    בקורפוס. אין לנו ראיה שהם סעיפים קטנים, ויש ראיה נסיבתית הפוכה
+    (האחים שלהם שכן נושאים עוגן אומרים "תוספת"). הם נשארים בדיוק
+    כפי שהיו לפני התיקון ומסומנים ב-`unrecognized_starred`.
+
+    **הערה על חוק הברזל "מבחין יחיד הוא הנחה":** ההכרעה היחידה
+    שמשנה התנהגות היא "subsection", ולה **שני** סימנים שמסכימים על
+    294 מתוך 294. "list_item"/"section"/"unknown" כולם משמרים את
+    ההתנהגות שהייתה, ולכן אינם טענה חדשה שדורשת ראיה."""
     anchor_arg = next((a for a in call.args if a.startswith("עוגן=")), None)
-    by_anchor = None
-    if anchor_arg:
-        value = anchor_arg[len("עוגן=") :].strip()
-        if value.startswith("סעיף"):
-            by_anchor = "subsection"
-        elif value.startswith(("תוספת", "לוח", "טופס", "פרט", "חלק")):
-            by_anchor = "list_item"
-
     positional = [a for a in call.args if "=" not in a]
-    by_number = None
-    if positional:
-        by_number = "list_item" if positional[0].strip() else "subsection"
+    has_number = bool(positional) and bool(positional[0].strip())
 
-    if by_anchor and by_number and by_anchor != by_number:
+    if anchor_arg is None:
+        return "unknown"
+
+    value = anchor_arg[len("עוגן=") :].strip()
+    if any(word in value for word in _LIST_ANCHOR_WORDS):
+        use = "list_item"
+    elif _DOTTED_SECTION_ANCHOR_RE.match(value):
+        use = "subsection"
+    elif value.startswith("סעיף"):
+        use = "section"
+    else:
+        return "unknown"
+
+    # בדיקת הסתירה היחידה שיש לה משמעות: סעיף קטן אינו נושא מספר
+    # סעיף משלו. אפס מופעים כאלה בקורפוס - אם יופיע אחד, זו צורה
+    # שלא ראינו ולא מנחשים עליה.
+    if use == "subsection" and has_number:
         raise StarredSectionAmbiguity(
-            f"{{{{ח:סעיף*}}}} בשורה {line_index}: העוגן אומר {by_anchor!r} "
-            f"והארגומנט המיקומי אומר {by_number!r}. צורה שלא נצפתה - "
-            f"לא מנחשים. המקור: {lines[line_index].strip()[:120]!r}"
+            f"{{{{ח:סעיף*}}}} בשורה {line_index}: העוגן {value!r} מנוקד "
+            f"ולכן סעיף קטן, אבל יש ארגומנט מיקומי {positional[0]!r}. "
+            f"צורה שלא נצפתה - לא מנחשים. "
+            f"המקור: {lines[line_index].strip()[:120]!r}"
         )
-    if by_anchor or by_number:
-        return by_anchor or by_number
-
-    for j in range(line_index + 1, min(line_index + 4, len(lines))):
-        nxt = lines[j].strip()
-        if not nxt:
-            continue
-        match = re.match(r"\{\{([^|}]+)", nxt)
-        name = match.group(1).strip() if match else ""
-        return "subsection" if _CONTENT_DEPTH.get(name, 0) >= 1 else "list_item"
-    return "list_item"
+    return use
 
 
 def _find_template(text: str, start: int) -> _Call:
@@ -457,6 +470,7 @@ def parse_wikitext(
     )
     collisions: list[str] = []
     content_derived_ids: list[str] = []
+    unrecognized_starred_ids: list[str] = []
     continuation_completions: list[str] = []
 
     # מחסנית של (רמה_מבנית, צומת, מרחב_מספור_נוכחי)
@@ -589,7 +603,9 @@ def parse_wikitext(
             line_index += 1
             continue
 
-        if name == "ח:סעיף*" and _starred_section_use(call, lines, line_index) == "subsection":
+        starred_use = (_starred_section_use(call, lines, line_index)
+                       if name == "ח:סעיף*" else "")
+        if starred_use == "subsection":
             # **סעיף קטן שקיבל כותרת שוליים משלו** - תופעה אמיתית
             # בחקיקה מנדטורית, לא אנומליה. "שטר למוכ״ז" מתארת את
             # סעיף קטן (ב), לא את סעיף 30.
@@ -643,7 +659,13 @@ def parse_wikitext(
                 text="",
                 raw_amendment_note=raw_amendment_note,
                 numbering_space=numbering_space,
+                # {{ח:סעיף*}} שאין לו עוגן, ולכן אין סימן חד-משמעי מה
+                # הוא. **נשאר בדיוק כפי שהיה לפני התיקון ומסומן** -
+                # ראו _starred_section_use ו-node.unrecognized_starred.
+                unrecognized_starred=(starred_use == "unknown"),
             )
+            if node.unrecognized_starred:
+                unrecognized_starred_ids.append(node.id)
             parent_node.children.append(node)
             stack.append((_STRUCTURAL_LEVEL_SECTION, node, numbering_space))
             line_index += 1
@@ -763,5 +785,6 @@ def parse_wikitext(
     _mark_status(root)
     root.id_collisions = collisions
     root.content_derived_ids = content_derived_ids
+    root.unrecognized_starred_ids = unrecognized_starred_ids
     root.continuation_completions = continuation_completions
     return root

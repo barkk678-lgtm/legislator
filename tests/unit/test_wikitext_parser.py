@@ -305,6 +305,54 @@ def main():
         raised = True
     checks.append(("סתירה בין המבחינים: StarredSectionAmbiguity, לא ניחוש", raised))
 
+    # ── כלל הנקודה (ברק אישר 2026-09-19) ─────────────────────────────
+    # עוגן **בלי** נקודה הוא סעיף רגיל, לא סעיף קטן. הנוסח האמיתי
+    # מחוק הביטוח הלאומי - אחד מ-11 החוקים שהפריכו את המבחין הקודם.
+    plain_anchor = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:סעיף*|57א|זכאות ליולדת חלף דמי אבטלה|תיקון: תשפ״א־8|עוגן=סעיף 57ג}}
+{{ח:ת}} תוכן הסעיף.
+"""
+    plain_tree = parse_wikitext(plain_anchor, law_id="test-plain")
+    s57 = plain_tree.children[0]
+    checks.append(("עוגן בלי נקודה: נוצר section ולא subsection", s57.node_type == "section"))
+    checks.append(("עוגן בלי נקודה: המספר 57א נשמר", s57.number == "57א"))
+    checks.append(("עוגן בלי נקודה: לא מסומן כלא-מזוהה", s57.unrecognized_starred is False))
+
+    # עוגן מורכב שמתחיל ב"סעיף" אבל מזכיר תוספת - פריט, לא סעיף קטן.
+    # הנוסח האמיתי מחוק ההתייעלות הכלכלית 2009/2010.
+    compound = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:קטע3|תוספת|תוספת}}
+{{ח:סעיף*|1|הודעה מאת ספק מים|תיקון: תש״ע|עוגן=סעיף פרק כא תוספת פרט 1}}
+{{ח:ת}} תוכן.
+"""
+    compound_tree = parse_wikitext(compound, law_id="test-compound")
+    item = compound_tree.children[0].children[0]
+    checks.append(("עוגן מורכב עם 'תוספת': פריט, המספר נשמר", item.number == "1"))
+    checks.append(("עוגן מורכב: לא מסומן כלא-מזוהה", item.unrecognized_starred is False))
+
+    # ── בלי עוגן בכלל: unknown, והתנהגות **זהה** לפני התיקון ─────────
+    # ברק (2026-09-19): "אל תנחש לשום כיוון... נשאר כפי שהוא היום,
+    # מסומן כלא-מזוהה, ומדווח לי במספר."
+    no_anchor = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:קטע3|תוספת|תוספת ראשונה}}
+{{ח:סעיף*|||תיקון: ק״ת תשפ״ד}}
+{{ח:ת}} טופס 1
+"""
+    na_tree = parse_wikitext(no_anchor, law_id="test-noanchor")
+    na = na_tree.children[0].children[0]
+    checks.append(("בלי עוגן: נוצר section כמו לפני התיקון", na.node_type == "section"))
+    checks.append(("בלי עוגן: **לא** סווג כסעיף קטן", na.node_type != "subsection"))
+    checks.append(("בלי עוגן: מסומן unrecognized_starred", na.unrecognized_starred is True))
+    checks.append(("בלי עוגן: נרשם בשורש לספירה",
+                   na_tree.unrecognized_starred_ids == [na.id]))
+
+    # מועצת הצמחים - {{ח:סעיף*}} חשוף. גם הוא לא-מזוהה עכשיו, אבל
+    # העץ שלו לא השתנה: 4 פריטים, אותו מבנה.
+    checks.append(("רשימה לא-ממוספרת: כל 4 מסומנים כלא-מזוהים",
+                   len(list_tree.unrecognized_starred_ids) == 4))
+    checks.append(("רשימה לא-ממוספרת: המבנה לא השתנה בעקבות הסימון",
+                   [c.node_type for c in siman.children] == ["section"] * 4))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)

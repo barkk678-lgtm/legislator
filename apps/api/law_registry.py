@@ -15,7 +15,7 @@ wikitext_parser.py). שני הנתיבים לא חולקים קוד, ולכן ט
 רק כשקוד DB-מכוון נקרא בפועל, לא בייבוא המודול** (כדי שהמודול ייבא
 נקי גם כש-Supabase לא מוגדר בכלל - מצב תקין ב-dev/test, לא שגיאה).
 **אבל אם קוד DB-מכוון כן נקרא וחסר משתנה - שגיאה ברורה ומיידית
-(RuntimeError עם שם המשתנה החסר), לפני כל קריאת רשת** - לא נכשל
+(MissingSecret עם שם המשתנה החסר, שממופה ל-503), לפני כל קריאת רשת** - לא נכשל
 באמצע בניית תשובה עם שגיאת httpx מבלבלת (ברק: "לא כישלון שקט
 באמצע בקשה"). service_role משמש אך ורק כאן בצד השרת - אף פעם לא
 חוזר ללקוח (לא מופיע בשום JSON שה-API מחזיר).
@@ -128,10 +128,11 @@ def _load_fixture_law(law_id: str) -> LegislativeNode:
 def _supabase_config() -> tuple[str, str]:
     """קוראת את שני משתני הסביבה. נכשלת ברעש ומיידית אם חסר אחד -
     ראו הדוקסטרינג העליון להסבר למה זה קורה כאן ולא בייבוא המודול."""
-    try:
-        url, key = require_supabase()
-    except MissingSecret as e:
-        raise RuntimeError(f"{e} בלי זה אין גישה אלא לשני חוקי ה-fixture.") from None
+    # **MissingSecret ולא RuntimeError** (2026-09-19): main.py ממפה
+    # אותה מרכזית ל-503 עם הסבר. RuntimeError בורחת כ-500 "Internal
+    # Server Error" - שגיאה שנראית כמו קריסה ואינה, ומסתירה מהמשתמש
+    # שמדובר בתצורה חסרה. נמצא בבדיקת העשן של נקודות הקצה.
+    url, key = require_supabase()
     return url.rstrip("/"), key
 
 
@@ -315,7 +316,7 @@ def law_summaries() -> list[dict]:
     ]
     try:
         summaries.extend(_db_law_summaries())
-    except RuntimeError:
+    except MissingSecret:
         pass  # Supabase לא מוגדר - מצב תקין, ראו דוקסטרינג
 
     _SUMMARIES_CACHE["data"] = summaries
