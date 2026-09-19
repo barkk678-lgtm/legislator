@@ -360,8 +360,10 @@ async def api_summarize_document(file: UploadFile = File(...)) -> dict:
     if not name.endswith(".docx"):
         raise HTTPException(
             415,
-            "כרגע נתמכים קובצי Word (.docx) בלבד. קובץ .doc ישן או PDF - "
-            "יש לשמור מחדש כ-docx.",
+            "כרגע נתמכים קובצי Word (.docx) בלבד. ב-.doc הישן הטקסט אמנם "
+            "נקרא, אבל עומק ההזחה של הסעיפים אינו ניתן לשחזור ממנו "
+            "(ראו packages/documents/extract_doc.py) - ולכן יש לפתוח "
+            "את הקובץ ב-Word ולשמור מחדש כ-docx. PDF - אותו הדבר.",
         )
     try:
         bill = extract_bill(io.BytesIO(await file.read()))
@@ -399,8 +401,10 @@ async def api_critique_document(file: UploadFile = File(...)) -> dict:
     if not name.endswith(".docx"):
         raise HTTPException(
             415,
-            "כרגע נתמכים קובצי Word (.docx) בלבד. קובץ .doc ישן או PDF - "
-            "יש לשמור מחדש כ-docx.",
+            "כרגע נתמכים קובצי Word (.docx) בלבד. ב-.doc הישן הטקסט אמנם "
+            "נקרא, אבל עומק ההזחה של הסעיפים אינו ניתן לשחזור ממנו "
+            "(ראו packages/documents/extract_doc.py) - ולכן יש לפתוח "
+            "את הקובץ ב-Word ולשמור מחדש כ-docx. PDF - אותו הדבר.",
         )
     try:
         bill = extract_bill(io.BytesIO(await file.read()))
@@ -496,7 +500,12 @@ async def _reservation_sections(file: UploadFile):
     from extract_docx import DocumentExtractError, extract_bill  # noqa: PLC0415
 
     if not (file.filename or "").lower().endswith(".docx"):
-        raise HTTPException(415, "נתמכים קובצי Word (.docx) בלבד.")
+        raise HTTPException(
+            415,
+            "נתמכים קובצי Word (.docx) בלבד. ב-.doc הישן הטקסט נקרא אבל "
+            "מספרי הסעיפים אינם ניתנים להפרדה מהנוסח המצוטט שבתוכם, "
+            "והסתייגות שתעוגן למספר שגוי גרועה מהודעת שגיאה.",
+        )
     try:
         bill = extract_bill(io.BytesIO(await file.read()))
     except DocumentExtractError as e:
