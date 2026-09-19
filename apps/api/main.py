@@ -378,10 +378,12 @@ async def api_summarize_document(file: UploadFile = File(...)) -> dict:
     if not name.endswith(".docx"):
         raise HTTPException(
             415,
-            "כרגע נתמכים קובצי Word (.docx) בלבד. ב-.doc הישן הטקסט אמנם "
-            "נקרא, אבל עומק ההזחה של הסעיפים אינו ניתן לשחזור ממנו "
-            "(ראו packages/documents/extract_doc.py) - ולכן יש לפתוח "
-            "את הקובץ ב-Word ולשמור מחדש כ-docx. PDF - אותו הדבר.",
+            "נתמכים קובצי Word מסוג .docx בלבד. **פתחו את הקובץ ב-Word "
+            "ושמרו אותו מחדש: קובץ ← שמירה בשם ← מסמך Word (.docx).** "
+            "ב-.doc הישן הטקסט נקרא, אבל עומק ההזחה של הסעיפים אינו "
+            "ניתן לשחזור ממנו, ובלעדיו אי אפשר להבחין בין מספור ההצעה "
+            "לנוסח המצוטט שבתוכה. שמירה מחדש ב-Word משחזרת את המבנה "
+            "ואת הסגנונות. PDF - אותו הדבר.",
         )
     try:
         bill = extract_bill(io.BytesIO(await file.read()))
@@ -419,10 +421,12 @@ async def api_critique_document(file: UploadFile = File(...)) -> dict:
     if not name.endswith(".docx"):
         raise HTTPException(
             415,
-            "כרגע נתמכים קובצי Word (.docx) בלבד. ב-.doc הישן הטקסט אמנם "
-            "נקרא, אבל עומק ההזחה של הסעיפים אינו ניתן לשחזור ממנו "
-            "(ראו packages/documents/extract_doc.py) - ולכן יש לפתוח "
-            "את הקובץ ב-Word ולשמור מחדש כ-docx. PDF - אותו הדבר.",
+            "נתמכים קובצי Word מסוג .docx בלבד. **פתחו את הקובץ ב-Word "
+            "ושמרו אותו מחדש: קובץ ← שמירה בשם ← מסמך Word (.docx).** "
+            "ב-.doc הישן הטקסט נקרא, אבל עומק ההזחה של הסעיפים אינו "
+            "ניתן לשחזור ממנו, ובלעדיו אי אפשר להבחין בין מספור ההצעה "
+            "לנוסח המצוטט שבתוכה. שמירה מחדש ב-Word משחזרת את המבנה "
+            "ואת הסגנונות. PDF - אותו הדבר.",
         )
     try:
         bill = extract_bill(io.BytesIO(await file.read()))
@@ -613,15 +617,25 @@ async def _reservation_sections(file: UploadFile):
     if not (file.filename or "").lower().endswith(".docx"):
         raise HTTPException(
             415,
-            "נתמכים קובצי Word (.docx) בלבד. ב-.doc הישן הטקסט נקרא אבל "
-            "מספרי הסעיפים אינם ניתנים להפרדה מהנוסח המצוטט שבתוכם, "
-            "והסתייגות שתעוגן למספר שגוי גרועה מהודעת שגיאה.",
+            "נתמכים קובצי Word מסוג .docx בלבד. **פתחו את הקובץ ב-Word "
+            "ושמרו אותו מחדש: קובץ ← שמירה בשם ← מסמך Word (.docx).** "
+            "ב-.doc הישן מספרי הסעיפים אינם ניתנים להפרדה מהנוסח "
+            "המצוטט שבתוכם, והסתייגות שתעוגן למספר שגוי גרועה "
+            "מהודעת שגיאה.",
         )
     try:
         bill = extract_bill(io.BytesIO(await file.read()))
     except DocumentExtractError as e:
         raise HTTPException(422, str(e))
 
+    # **טקסט שלפני הסעיף הממוספר הראשון אינו נזרק** (ברק,
+    # 2026-09-19). הגרסה הקודמת פתחה סעיף רק כשהיה `line.number`,
+    # וכל מה שקדם לו נעלם בשקט. זה לא מקרה קצה: בשתי הצעות אמיתיות
+    # (`13948363`, `13948394`) **סעיף 1 הוא היחיד שממוספר אוטומטית
+    # ב-Word**, ולכן `number` שלו ריק - וזה בדיוק הסעיף שמגדיר
+    # "(להלן - החוק העיקרי)" שכל שאר הסעיפים מפנים אליו.
+    # ב-13948363 נתפס סעיף אחד מתוך שניים: חצי מההצעה, בלי אזהרה.
+    lead: list[str] = []
     sections, current, buffer = [], "", []
     for line in bill.lines:
         if line.number:
@@ -630,8 +644,31 @@ async def _reservation_sections(file: UploadFile):
             current, buffer = line.number, [line.text]
         elif current:
             buffer.append(line.text)
+        elif line.text.strip():
+            lead.append(line.text)
     if current:
         sections.append((current.rstrip("."), " ".join(buffer).strip()))
+
+    if lead:
+        text = " ".join(lead).strip()
+        first = sections[0][0] if sections else ""
+        # מספר שלפני הראשון שכן זוהה. אם הראשון הוא "2" - זה "1".
+        inferred = ""
+        if first.isdigit() and int(first) > 1:
+            inferred = str(int(first) - 1)
+        if inferred:
+            sections.insert(0, (inferred, text))
+            bill.warnings.append(
+                f"סעיף {inferred} לא נשא מספר במסמך (כנראה מספור אוטומטי "
+                f"של Word, שאינו טקסט) - שוחזר מהמיקום ומהסעיף שאחריו. "
+                f"ודאו שהמספור נכון.")
+        else:
+            # לא ניתן להסיק - **אזהרה רועשת**, לא השמטה שקטה.
+            bill.warnings.append(
+                f"נמצא טקסט לפני הסעיף הממוספר הראשון ולא ניתן להסיק "
+                f"את מספרו (הסעיף הראשון שזוהה: {first or 'אין'}). "
+                f"{len(lead)} שורות אינן משויכות לאף סעיף: "
+                f"{text[:120]!r}")
     if not sections:
         raise HTTPException(422, "לא זוהו סעיפים ממוספרים במסמך.")
     return sections, bill

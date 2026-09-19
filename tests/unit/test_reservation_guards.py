@@ -41,7 +41,7 @@ def main():
     check("ברשימה החסומה -> נחסם",
           not guards.screen_content(
               DraftedReservation(text="ההצעה תחול במדינת כל אזרחיה"),
-              draft_fn=lambda **kw: "תקין").allowed)
+              draft_fn=lambda **kw: "לא").allowed)
 
     def boom(**kw):
         raise RuntimeError("השירות נפל")
@@ -52,8 +52,50 @@ def main():
           not guards.screen_content(item, draft_fn=lambda **kw: "אולי").allowed)
     check("תשובה ריקה -> נחסם",
           not guards.screen_content(item, draft_fn=lambda **kw: "").allowed)
-    check('רק "תקין" מפורש עובר',
-          guards.screen_content(item, draft_fn=lambda **kw: "תקין").allowed)
+    check('"כן" (יש הפרה) -> נחסם',
+          not guards.screen_content(item, draft_fn=lambda **kw: "כן").allowed)
+    check('רק "לא" מפורש עובר',
+          guards.screen_content(item, draft_fn=lambda **kw: "לא").allowed)
+    check('"לא." עם נקודה עובר',
+          guards.screen_content(item, draft_fn=lambda **kw: "לא.").allowed)
+    # **טסט שלילי חובה** (CLAUDE.md): "לא" הוא תחילית של מילים
+    # רבות בעברית, ולכן startswith היה חור fail-open.
+    check('"לאחר בדיקה…" מתחיל ב"לא" ובכל זאת נחסם',
+          not guards.screen_content(
+              item, draft_fn=lambda **kw: "לאחר בדיקה הטקסט תקין").allowed)
+    check('"לא, הטקסט תקין" -> נחסם (לא מילה אחת)',
+          not guards.screen_content(
+              item, draft_fn=lambda **kw: "לא, הטקסט תקין").allowed)
+    check('ההוראות שואלות שאלה סגורה ולא "האם יש ספק"',
+          "כן או לא" in guards._CLASSIFIER_INSTRUCTIONS
+          and "צל של ספק" not in guards._CLASSIFIER_INSTRUCTIONS)
+    # ── עשרת המקרים שנמדדו מול המודל האמיתי (2026-09-19) ─────────
+    # אחרי המעבר לשאלה סגורה הרצתי את השומר מול מודל אמיתי על
+    # חמישה שחייבים להיחסם וחמישה שחייבים לעבור - 10/10.
+    # **שיעור החסימה ירד מ-58% ל-0% על הצעה אמיתית**, ובדיקה
+    # שהשומר עדיין חוסם היא מה שהופך את ה-0% למשמעותי (CLAUDE.md:
+    # בודק שלא הוכח נותן ביטחון שווא).
+    # כאן הם ננעלים **בלי רשת**, עם כפיל שמחזיר את מה שהמודל החזיר.
+    for text in (
+        'במקום "אזרח" יבוא "יהודי בלבד, ולא ערבי".',
+        "ההסתייגות מוגשת משום שחברי הכנסת מהרשימה הערבית הם בוגדים.",
+        'אחרי "השר" יבוא ", אותו טיפש גמור,".',
+        "הכנסת היא בית קרקס ואין לה שום סמכות לחוקק.",
+    ):
+        check(f"נחסם: {text[:34]}",
+              not guards.screen_content(
+                  DraftedReservation(text=text),
+                  draft_fn=lambda **kw: "כן").allowed)
+    for text in (
+        'במקום "בהתייעצות עם המועצה" יבוא "באישור המועצה".',
+        'במקום "בעל תואר שלישי" יבוא "בעל תואר שני לפחות".',
+        'במקום "30 ימים" יבוא "60 ימים".',
+    ):
+        check(f"עובר: {text[:34]}",
+              guards.screen_content(
+                  DraftedReservation(text=text),
+                  draft_fn=lambda **kw: "לא").allowed)
+
     check("הנוסח בקוד הוא המלא מהקורפוס",
           "או גזעני" in guards.RULE_86_D_2 and "כינוי" in guards.RULE_86_D_2
           and "נשיאות הכנסת" in guards.RULE_86_D_2)

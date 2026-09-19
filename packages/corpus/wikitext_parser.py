@@ -179,7 +179,19 @@ _DOTTED_SECTION_ANCHOR_RE = re.compile(r"^סעיף\s+[^\s.]+\.")
 _LIST_ANCHOR_WORDS = ("תוספת", "לוח", "טופס", "פרט", "חלק")
 
 
-def _starred_section_use(call: _Call, lines: list[str], line_index: int) -> str:
+def _next_template_name(lines: list[str], line_index: int) -> str:
+    """שם התבנית בשורה הלא-ריקה הבאה, או "" אם אין."""
+    for j in range(line_index + 1, min(line_index + 5, len(lines))):
+        nxt = lines[j].strip()
+        if not nxt:
+            continue
+        match = re.match(r"\{\{([^|}]+)", nxt)
+        return match.group(1).strip() if match else ""
+    return ""
+
+
+def _starred_section_use(call: _Call, lines: list[str], line_index: int,
+                         numbering_space: str = "law") -> str:
     """מכריע מהו {{ח:סעיף*}}: "subsection", "list_item", "section"
     או **"unknown"**.
 
@@ -215,6 +227,22 @@ def _starred_section_use(call: _Call, lines: list[str], line_index: int) -> str:
     has_number = bool(positional) and bool(positional[0].strip())
 
     if anchor_arg is None:
+        # **בלי עוגן: התבנית הבאה מכריעה, ורק במרחב החוק** (ברק
+        # אישר 2026-09-19 אחרי שעבר על כל 34 המקרים בעין).
+        #
+        # שתי משפחות, כל אחת עם סימן מאשר משלה:
+        #   {{ח:סעיף*||ויתור על חובות האוחז}} ואז {{ח:תתת|(2)}}
+        #   {{ח:סעיף*|אחר=[(ז)]}}            ואז {{ח:תתת|(2)}}
+        # הראשונה זהה למקרה השטרות פחות העוגן; בשנייה ערך ה-`אחר=`
+        # הוא **בעצמו** תווית של סעיף קטן. `אחר=` **מאשר ואינו
+        # מגדיר** - ההכרעה היא התבנית הבאה, והתווית נלקחת ממנה.
+        #
+        # **רק במרחב `law`.** אותה צורה במרחב `schedule` היא פריט
+        # בתוספת שיש לו מבנה פנימי - 34 מופעים נוספים - וההכרעה
+        # שם נשארת "לא מזוהה".
+        if (numbering_space == "law"
+                and _next_template_name(lines, line_index) in ("ח:תת", "ח:תתת")):
+            return "subsection"
         return "unknown"
 
     value = anchor_arg[len("עוגן=") :].strip()
@@ -604,7 +632,13 @@ def parse_wikitext(
             line_index += 1
             continue
 
-        starred_use = (_starred_section_use(call, lines, line_index)
+        # מרחב המספור שיחול על הצומת הזה, בלי לשנות את המחסנית:
+        # הרשומה העמוקה ביותר שאינה ברמת סעיף או מתחתיה.
+        pending_space = next(
+            (entry[2] for entry in reversed(stack)
+             if entry[0] < _STRUCTURAL_LEVEL_SECTION),
+            "law")
+        starred_use = (_starred_section_use(call, lines, line_index, pending_space)
                        if name == "ח:סעיף*" else "")
         if starred_use == "subsection":
             # **סעיף קטן שקיבל כותרת שוליים משלו** - תופעה אמיתית

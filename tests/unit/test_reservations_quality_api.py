@@ -37,7 +37,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 from main import app  # noqa: E402
 
 BILL = ROOT / "tests" / "fixtures" / "reservations" / "573919.docx"
-_SCREEN_MARK = "תקין"
+# תשובת "עובר" של שומר 86(ד)(2) אחרי המעבר לשאלה סגורה
+# (2026-09-19): "לא" = אין הפרה. ראו guards._CLASSIFIER_INSTRUCTIONS.
+_SCREEN_MARK = "לא"
 
 
 class _Resp:
