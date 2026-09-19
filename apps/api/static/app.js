@@ -126,6 +126,21 @@ function renderLawSearchResults() {
       note.textContent = "(לא נתמך לעריכה)";
       item.appendChild(note);
     }
+    // **חיווי עדכניות, לא רענון.** plan.md §1.2: אם חוק התעדכן
+    // אין לשנות את הנוסח תחת המשתמש - רק להודיע. נכתב מהריצה
+    // היומית (tools/check_for_update.py).
+    if (law.outdated) {
+      const stale = document.createElement("span");
+      stale.className = "law-result-stale";
+      stale.textContent = "● נוסח חדש יותר בוויקיטקסט";
+      stale.title = "הנוסח הטעון אינו העדכני. פנו לברק לרענון.";
+      item.appendChild(stale);
+    } else if (!law.freshness_checked_at) {
+      const unknown = document.createElement("span");
+      unknown.className = "law-result-note";
+      unknown.textContent = "(עדכניות לא נבדקה)";
+      item.appendChild(unknown);
+    }
     // mousedown לא click - כדי שהבחירה תתפוס לפני שה-blur של השדה
     // סוגר את תיבת התוצאות (מרוץ אירועים סטנדרטי ב-autocomplete).
     item.addEventListener("mousedown", (ev) => {

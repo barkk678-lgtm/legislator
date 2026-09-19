@@ -149,7 +149,8 @@ def _db_law_summaries() -> list[dict]:
     with _supabase_client() as client:
         laws_rows = fetch_all(
             client, "/laws",
-            {"select": "id,full_title,law_versions!laws_current_version_fk(source_ref)",
+            {"select": "id,full_title,latest_known_revision_id,latest_checked_at,"
+                       "law_versions!laws_current_version_fk(source_ref,wikitext_revision_id)",
              "current_version_id": "not.is.null"},
         )
         # amendable_law_ids: view ב-DB (לא שאילתה על nodes ישירות מכאן) -
@@ -163,13 +164,26 @@ def _db_law_summaries() -> list[dict]:
 
     summaries = []
     for row in laws_rows:
-        source_ref = (row.get("law_versions") or {}).get("source_ref") or None
+        version = row.get("law_versions") or {}
+        source_ref = version.get("source_ref") or None
+        # **חיווי עדכניות** (ברק, 2026-09-19): `latest_known_revision_id`
+        # נכתב ב-tools/check_for_update.py מריצה יומית. גדול מהגרסה
+        # הטעונה = בוויקיטקסט יש נוסח חדש יותר. **רק ידיעה** - אין
+        # רענון אוטומטי, בוודאי לא באמצע עבודה (plan.md §1.2).
+        # `None` פירושו "לא נבדק מעולם", וזה **לא** "עדכני".
+        loaded = version.get("wikitext_revision_id")
+        known = row.get("latest_known_revision_id")
         summaries.append(
             {
                 "id": row["id"],
                 "title": row["full_title"] or row["id"],
                 "amendable": row["id"] in section_parents,
                 "known_source_ref": source_ref,
+                # NULL ב-latest_known_revision_id פירושו "נבדק והוא
+                # עדכני"; NULL ב-latest_checked_at פירושו "לא נבדק
+                # מעולם" - **ואלה שני דברים שונים.**
+                "outdated": bool(known and loaded and known != loaded),
+                "freshness_checked_at": row.get("latest_checked_at"),
             }
         )
     return summaries

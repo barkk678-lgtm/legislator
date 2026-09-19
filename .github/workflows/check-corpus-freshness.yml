@@ -1,0 +1,38 @@
+# בדיקה יומית שהקורפוס ב-DB תואם לוויקיטקסט.
+#
+# **למה זה קיים:** docs/strategy/plan.md §1.2 תכנן את המנגנון הזה
+# ב-13.9 ומעולם לא הפעיל אותו - latest_known_revision_id היה NULL
+# בכל 1,109 החוקים. התוצאה: חוק ניירות ערך הוצג במערכת בנוסח
+# שאינו הדין במשך שלושה ימים, בלי שום סימן. זה השורש, לא הסימפטום.
+#
+# **הריצה אינה טוענת כלום.** היא מסמנת ומדווחת; הטעינה היא הכרעה
+# של ברק. ריצה שמוצאת פיגור **נכשלת במכוון** (exit 1) כדי שתהיה
+# אדומה ולא תעבור בשקט.
+name: בדיקת עדכניות הקורפוס
+
+on:
+  schedule:
+    - cron: "0 4 * * *"   # 04:00 UTC יומי
+  workflow_dispatch:       # גם הפעלה ידנית
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: בדיקת revision מול he.wikisource
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OUT: stale.json
+        run: python3 tools/check_for_update.py
+      - name: שמירת רשימת החוקים המפגרים
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stale-laws
+          path: stale.json
+          if-no-files-found: ignore

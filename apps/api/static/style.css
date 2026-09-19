@@ -384,3 +384,12 @@ select { font-weight: 600; max-width: 420px; }
   flex: none; margin-inline-start: 8px; font-size: 11.5px; padding: 1px 7px;
   border-radius: 999px; background: var(--faint); color: #fff; cursor: help;
 }
+
+/* חיווי שהנוסח הטעון אינו העדכני שבוויקיטקסט. נכתב מהריצה היומית
+   (tools/check_for_update.py); ראו plan.md §1.2 - ידיעה, לא רענון. */
+.law-result-stale {
+  font-size: 11px;
+  color: var(--warn);
+  margin-inline-start: 8px;
+  white-space: nowrap;
+}
