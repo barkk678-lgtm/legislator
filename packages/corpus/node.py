@@ -125,6 +125,11 @@ class LegislativeNode:
     # לכך ראיה - עשרת האחים שלהם שכן נושאים עוגן אומרים "תוספת". לכן
     # הם נשארים בדיוק כפי שהיו לפני התיקון, ומסומנים. אם יימצא סימן -
     # יסווגו אז.
+    starred_as_subsection: list[str] = field(default_factory=list)  # יושב
+    # בשורש בלבד - כל {{ח:סעיף*}} שזוהה כסעיף קטן ולכן **לא** יצר
+    # צומת section. נדרש כדי ש-check_section_count תישאר שוויון מדויק
+    # ולא אי-שוויון מרופף: raw == section_nodes + len(זה). ראו
+    # ingest_checks.check_section_count.
     unrecognized_starred_ids: list[str] = field(default_factory=list)  # יושב
     # בשורש בלבד - כל id של צומת עם unrecognized_starred=True, לספירה
     # על הקורפוס המלא (אותו דפוס כמו id_collisions/content_derived_ids).

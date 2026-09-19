@@ -270,14 +270,27 @@ def check_no_unconsumed_content(wikitext: str) -> list[str]:
 
 def check_section_count(wikitext: str, tree: LegislativeNode) -> list[str]:
     """מספר {{ח:סעיף}}/{{ח:סעיף*}} ברמה העליונה בוויקיטקסט הגולמי
-    חייב להיות זהה למספר צמתי node_type=='section' בעץ - כל אי-התאמה
-    פירושה סעיף שנבלע/דולג בשקט."""
+    חייב להיות זהה למספר צמתי `section` בעץ **ועוד** מספר ה-
+    {{ח:סעיף*}} שזוהו כסעיף קטן - כל אי-התאמה פירושה סעיף שנבלע
+    או דולג בשקט.
+
+    **למה יש כאן חיבור, ולמה זה עדיין שוויון מדויק** (2026-09-19):
+    מאז כלל הנקודה, `{{ח:סעיף*}}` עם עוגן מנוקד אינו יוצר צומת
+    `section` כלל - הוא סעיף קטן. הבדיקה בצורתה הקודמת נכשלה על
+    כל ששת החוקים שהתיקון נגע בהם, ובצדק: היא קידדה את ההנחה
+    הישנה ש"כל ח:סעיף* הוא סעיף".
+
+    **לא ריככתי אותה לאי-שוויון.** הפרסר מדווח בדיוק כמה מופעים
+    הוסטו (`root.starred_as_subsection`), ולכן הזהות נשמרת ועדיין
+    תתפוס סעיף שנעלם בשקט - שזו כל מטרתה."""
     raw_count = sum(1 for n in _top_level_templates(wikitext) if n in ("ח:סעיף", "ח:סעיף*"))
     tree_count = _count_node_type(tree, "section")
-    if raw_count != tree_count:
+    as_subsection = len(getattr(tree, "starred_as_subsection", ()))
+    if raw_count != tree_count + as_subsection:
+        extra = f" + {as_subsection} שזוהו כסעיף קטן" if as_subsection else ""
         return [
             f"מספר {{{{ח:סעיף}}}} בוויקיטקסט הגולמי ({raw_count}) "
-            f"לא תואם למספר צמתי section בעץ ({tree_count})"
+            f"לא תואם למספר צמתי section בעץ ({tree_count}{extra})"
         ]
     return []
 

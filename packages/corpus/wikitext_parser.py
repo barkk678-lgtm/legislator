@@ -471,6 +471,7 @@ def parse_wikitext(
     collisions: list[str] = []
     content_derived_ids: list[str] = []
     unrecognized_starred_ids: list[str] = []
+    starred_as_subsection: list[str] = []
     continuation_completions: list[str] = []
 
     # מחסנית של (רמה_מבנית, צומת, מרחב_מספור_נוכחי)
@@ -621,6 +622,7 @@ def parse_wikitext(
             # **אין מספר סעיף חדש**, ולכן amend() ינסח "בסעיף 30,
             # בסעיף קטן (ב)" ולא "בסעיף 30(ב) לחוק העיקרי".
             pending_margin_title = _flatten(call.args[1]) if len(call.args) > 1 else ""
+            starred_as_subsection.append(str(line_index))
             line_index += 1
             continue
 
@@ -786,5 +788,6 @@ def parse_wikitext(
     root.id_collisions = collisions
     root.content_derived_ids = content_derived_ids
     root.unrecognized_starred_ids = unrecognized_starred_ids
+    root.starred_as_subsection = starred_as_subsection
     root.continuation_completions = continuation_completions
     return root
