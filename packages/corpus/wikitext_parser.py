@@ -164,6 +164,69 @@ def _join_unclosed_templates(lines: list[str]) -> list[str]:
     return out
 
 
+class StarredSectionAmbiguity(Exception):
+    """שני המבחינים של {{ח:סעיף*}} אינם מסכימים - **לא מנחשים**.
+
+    ברק (2026-09-19): "אם המבחין הכפול נכשל על מופע כלשהו - עצור
+    ברעש ואל תנחש לפי סימן יחיד." מופע כזה הוא צורה שלא ראינו,
+    והנחה לפי סימן אחד תייצר מבנה שגוי שייראה תקין."""
+
+
+def _starred_section_use(call: _Call, lines: list[str], line_index: int) -> str:
+    """מכריע מהו {{ח:סעיף*}} - "subsection" או "list_item".
+
+    **שני מבחינים עצמאיים שחייבים להסכים** (CLAUDE.md: מבחין יחיד
+    הוא הנחה):
+
+    1. `עוגן=`: `עוגן=סעיף 30.ב` מול `עוגן=תוספת פרט 4`.
+    2. **הארגומנט המיקומי הראשון**: פריט ברשימה נושא מספר משלו
+       (`{{ח:סעיף*|4|קריאת מדי־לחות|...}}` = פרט 4), וסעיף קטן עם
+       כותרת שוליים **אינו** (`{{ח:סעיף*||שטר למוכ״ז|...}}`).
+
+    **תיקון 2026-09-19, אחרי שהמבחין הראשון שניסחתי הופרך:** ניסיתי
+    להשתמש בתבנית שבשורה הבאה ({{ח:תת}} מול {{ח:ת}}) כמבחין שני,
+    והקורפוס הפריך אותה על 10 מופעים - `{{ח:סעיף*|4|...|עוגן=תוספת
+    פרט 4}}` שאחריו `{{ח:תת|(א)}}`. **שני הסימנים היו נכונים**: זה
+    אכן פרט בתוספת, ולפרט הזה יש סעיפים קטנים. התבנית הבאה אינה
+    מבחינה בין שני השימושים, היא מבחינה בין "יש מבנה פנימי" ל"אין" -
+    שאלה אחרת לגמרי.
+
+    כשאין `עוגן=` **וגם** אין מספר - שניהם שותקים, ואז התבנית
+    שבשורה הבאה מכריעה כברירת מחדל שלישית. זה המצב במועצת הצמחים
+    (`{{ח:סעיף*}}` ואז `{{ח:ת}} אבטיח`)."""
+    anchor_arg = next((a for a in call.args if a.startswith("עוגן=")), None)
+    by_anchor = None
+    if anchor_arg:
+        value = anchor_arg[len("עוגן=") :].strip()
+        if value.startswith("סעיף"):
+            by_anchor = "subsection"
+        elif value.startswith(("תוספת", "לוח", "טופס", "פרט", "חלק")):
+            by_anchor = "list_item"
+
+    positional = [a for a in call.args if "=" not in a]
+    by_number = None
+    if positional:
+        by_number = "list_item" if positional[0].strip() else "subsection"
+
+    if by_anchor and by_number and by_anchor != by_number:
+        raise StarredSectionAmbiguity(
+            f"{{{{ח:סעיף*}}}} בשורה {line_index}: העוגן אומר {by_anchor!r} "
+            f"והארגומנט המיקומי אומר {by_number!r}. צורה שלא נצפתה - "
+            f"לא מנחשים. המקור: {lines[line_index].strip()[:120]!r}"
+        )
+    if by_anchor or by_number:
+        return by_anchor or by_number
+
+    for j in range(line_index + 1, min(line_index + 4, len(lines))):
+        nxt = lines[j].strip()
+        if not nxt:
+            continue
+        match = re.match(r"\{\{([^|}]+)", nxt)
+        name = match.group(1).strip() if match else ""
+        return "subsection" if _CONTENT_DEPTH.get(name, 0) >= 1 else "list_item"
+    return "list_item"
+
+
 def _find_template(text: str, start: int) -> _Call:
     """מפרסר קריאת תבנית {{...}} יחידה החל מ-start, בכיבוד קינון.
     מחזיר את שם התבנית, רשימת הארגומנטים (מחרוזות גולמיות, קינון פנימי
@@ -406,6 +469,7 @@ def parse_wikitext(
     in_toc_zone = False  # בתוך <div class="law-toc">...</div> - תוכן
     # עניינים אוטומטי, עודף לגמרי מול העץ שכבר נבנה (ראו _TOC_DIV_OPEN_RE).
 
+    pending_margin_title = ""  # ראו הענף של {{ח:סעיף*}} למטה
     lines = _join_unclosed_templates(text.splitlines())
     line_index = 0
     while line_index < len(lines):
@@ -525,6 +589,25 @@ def parse_wikitext(
             line_index += 1
             continue
 
+        if name == "ח:סעיף*" and _starred_section_use(call, lines, line_index) == "subsection":
+            # **סעיף קטן שקיבל כותרת שוליים משלו** - תופעה אמיתית
+            # בחקיקה מנדטורית, לא אנומליה. "שטר למוכ״ז" מתארת את
+            # סעיף קטן (ב), לא את סעיף 30.
+            #
+            # עד 2026-09-19 נוצר כאן צומת section בלי מספר ובלי תוכן,
+            # **אח** של הסעיף האמיתי - כך שסעיף 30 בפקודת השטרות הוצג
+            # למשתמש בלי תוכן כלל וחמישה "סעיפים" רפאים לצדו. לא
+            # "בלי מספר": בלי כלום.
+            #
+            # עכשיו: אין צומת. כותרת השוליים נשמרת, ותבנית העומק
+            # שבשורה הבאה ({{ח:תת|(ב)}}) היא שיוצרת את הצומת - עם
+            # המספר שלה, תחת הסעיף הפתוח, ועם הכותרת הזו.
+            # **אין מספר סעיף חדש**, ולכן amend() ינסח "בסעיף 30,
+            # בסעיף קטן (ב)" ולא "בסעיף 30(ב) לחוק העיקרי".
+            pending_margin_title = _flatten(call.args[1]) if len(call.args) > 1 else ""
+            line_index += 1
+            continue
+
         if name in ("ח:סעיף", "ח:סעיף*"):
             number = call.args[0] if call.args else ""
             raw_title = call.args[1] if len(call.args) > 1 else ""
@@ -611,12 +694,15 @@ def parse_wikitext(
                 id=_unique_child_id(parent_node, _slug(label, len(parent_node.children)), collisions),
                 node_type=node_type,
                 number=label or "",
-                margin_title=None,
+                # כותרת שוליים שהגיעה מ-{{ח:סעיף*}} שקדם לשורה הזו.
+                # נצרכת פעם אחת בלבד ואז מתאפסת.
+                margin_title=normalize_text(pending_margin_title) or None,
                 text=normalize_text(flattened),
                 text_raw=flattened,
                 is_normative=is_normative,
                 numbering_space=numbering_space,
             )
+            pending_margin_title = ""
             parent_node.children.append(node)
             stack.append((depth, node, numbering_space))
             line_index += 1

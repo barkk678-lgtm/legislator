@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpu
 
 from ingest_checks import check_unique_ids  # noqa: E402
 from node import effective_source_ref  # noqa: E402
-from wikitext_parser import parse_wikitext  # noqa: E402
+from wikitext_parser import StarredSectionAmbiguity, parse_wikitext  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "wikitext"
 
@@ -247,6 +247,63 @@ def main():
     s1_sig = signatures_tree.children[0].children[0]
     checks.append(("אזור חתימות: לא נדבק לצומת התוכן שלפניו", s1_sig.text == "משפט תקין."))
     checks.append(("אזור חתימות: לא מסומן completed_by_continuation", s1_sig.completed_by_continuation is False))
+
+    # {{ח:סעיף*}} כסעיף קטן עם כותרת שוליים (2026-09-19) - הנוסח
+    # **האמיתי** של סעיף 30 בפקודת השטרות [נוסח חדש], מועתק כלשונו.
+    # עד התיקון נוצרו כאן חמישה צמתי section בלי מספר ובלי תוכן, וסעיף
+    # 30 עצמו הוצג למשתמש ריק לגמרי. ראו _starred_section_use.
+    shtarot_30 = """{{ח:כותרת|פקודה לדוגמה}}
+{{ח:סעיף|30|סיחור מהו}}
+
+{{ח:סעיף*|עוגן=סעיף 30.א}}
+{{ח:תת|(א)}} משהועבר שטר מאדם לאדם בדרך העושה את הנעבר לאוחז השטר – השטר מסוחר.
+
+{{ח:סעיף*||שטר למוכ״ז|עוגן=סעיף 30.ב}}
+{{ח:תת|(ב)}} שטר בר־פרעון למוכ״ז – סיחורו במסירה.
+
+{{ח:סעיף*||שטר לפקודה|עוגן=סעיף 30.ג}}
+{{ח:תת|(ג)}} שטר בר־פרעון לפקודה – סיחורו בהיסב של האוחז שהוגמר במסירה.
+"""
+    shtarot_tree = parse_wikitext(shtarot_30, law_id="test-shtarot")
+    s30 = shtarot_tree.children[0]
+    checks.append(("סעיף* כסעיף קטן: סעיף 30 הוא הצומת היחיד ברמת החוק", len(shtarot_tree.children) == 1))
+    checks.append(("סעיף* כסעיף קטן: מספר 30 ולא ריק", (s30.number, s30.margin_title) == ("30", "סיחור מהו")))
+    checks.append(("סעיף* כסעיף קטן: שלושה סעיפים קטנים תחתיו", len(s30.children) == 3))
+    checks.append(("סעיף* כסעיף קטן: node_type=subsection לכולם", {c.node_type for c in s30.children} == {"subsection"}))
+    checks.append(("סעיף* כסעיף קטן: המספרים הם (א)(ב)(ג), לא 30.ב", [c.number for c in s30.children] == ["(א)", "(ב)", "(ג)"]))
+    checks.append(("סעיף* כסעיף קטן: כותרת השוליים הגיעה ל-(ב), לא ל-(א)", [c.margin_title for c in s30.children] == [None, 'שטר למוכ"ז', "שטר לפקודה"]))
+    checks.append(("סעיף* כסעיף קטן: התוכן של (ב) נשמר", s30.children[1].text == 'שטר בר-פרעון למוכ"ז – סיחורו במסירה.'))
+    checks.append(("סעיף* כסעיף קטן: אין צומת section בלי מספר", all(c.number for c in shtarot_tree.children)))
+    checks.append(("סעיף* כסעיף קטן: check_unique_ids נקי", check_unique_ids(shtarot_tree) == []))
+
+    # פריט בתוספת שיש לו בעצמו סעיפים קטנים - **המקרה שהפריך את
+    # המבחין הראשון שניסחתי** (10 מופעים בקורפוס). שני הסימנים מסכימים
+    # כאן על list_item; התבנית שבשורה הבאה ({{ח:תת}}) אינה רלוונטית.
+    schedule_item = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:קטע3|תוספת|תוספת ראשונה}}
+{{ח:סעיף*|4|קריאת מדי־לחות|עוגן=תוספת פרט 4}}
+{{ח:תת|(א)}} הקריאה תיעשה אחת לחודש.
+"""
+    schedule_tree = parse_wikitext(schedule_item, law_id="test-schedule")
+    item4 = schedule_tree.children[0].children[0]
+    checks.append(("פרט בתוספת עם סעיפים קטנים: נוצר section", item4.node_type == "section"))
+    checks.append(("פרט בתוספת עם סעיפים קטנים: המספר 4 נשמר", item4.number == "4"))
+    checks.append(("פרט בתוספת עם סעיפים קטנים: הכותרת על הפרט עצמו", item4.margin_title == "קריאת מדי-לחות"))
+    checks.append(("פרט בתוספת עם סעיפים קטנים: הסעיף הקטן תחתיו", [c.number for c in item4.children] == ["(א)"]))
+    checks.append(("פרט בתוספת עם סעיפים קטנים: כותרת השוליים לא דלפה לסעיף הקטן", item4.children[0].margin_title is None))
+
+    # שני המבחינים סותרים -> עצירה ברעש, לא ניחוש לפי סימן יחיד
+    # (דרישה 1 של ברק, 2026-09-19).
+    contradiction = """{{ח:כותרת|חוק לדוגמה}}
+{{ח:סעיף*|4|כותרת כלשהי|עוגן=סעיף 30.ב}}
+{{ח:תת|(ב)}} תוכן.
+"""
+    raised = False
+    try:
+        parse_wikitext(contradiction, law_id="test-contradiction")
+    except StarredSectionAmbiguity:
+        raised = True
+    checks.append(("סתירה בין המבחינים: StarredSectionAmbiguity, לא ניחוש", raised))
 
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
