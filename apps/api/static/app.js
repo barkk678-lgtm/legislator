@@ -336,6 +336,7 @@ function renderNode(node, depth) {
       titleSpan.textContent = node.margin_title || "";
       titleSpan.dataset.plainValue = node.margin_title || "";
       titleSpan.addEventListener("focus", onFieldFocus);
+      titleSpan.addEventListener("input", onFieldInput);
       titleSpan.addEventListener("blur", onFieldBlur);
       header.appendChild(titleSpan);
       fieldElements[`${node.id}:margin_title`] = titleSpan;
@@ -373,6 +374,7 @@ function renderNode(node, depth) {
       textEl.textContent = node.text;
       textEl.dataset.plainValue = node.text;
       textEl.addEventListener("focus", onFieldFocus);
+      textEl.addEventListener("input", onFieldInput);
       textEl.addEventListener("blur", onFieldBlur);
       bodyRow.appendChild(textEl);
       fieldElements[`${node.id}:text`] = textEl;
@@ -434,8 +436,9 @@ function onFieldFocus(ev) {
   el.classList.remove("edit-unsupported");
 }
 
-async function onFieldBlur(ev) {
-  const el = ev.target;
+/* רושם את מצב השדה ב-edits/insertions. מופרד מ-onFieldBlur כדי
+ * שגם הקלדה חיה תוכל לקרוא לו, לא רק יציאה מהשדה. */
+function recordField(el) {
   const nodeId = el.dataset.nodeId;
   const field = el.dataset.field;
   const currentText = el.textContent;
@@ -447,7 +450,6 @@ async function onFieldBlur(ev) {
   if (ins) {
     if (field === "margin_title") ins.margin_title = currentText;
     else ins.text = currentText;
-    await refreshPreview();
     return;
   }
 
@@ -459,6 +461,44 @@ async function onFieldBlur(ev) {
     edits[key] = { node_id: nodeId, field, text: currentText };
     everEditedFieldKeys.add(key);
   }
+}
+
+/* **הצעת החוק מתעדכנת תוך כדי הקלדה** (ברק, 2026-09-21: "ערכתי שני
+ * סעיפים ובמשך דקות ארוכות לא הופיע כלום").
+ *
+ * עד כאן refreshPreview() רצה אך ורק ב-blur. מי שהקליד והסתכל על צד
+ * ההצעה בלי ללחוץ מחוץ לשדה לא ראה דבר - לנצח. שוחזר בפרודקשן: 15
+ * שניות הקלדה, אפס בקשות, והצד עדיין "אין עדיין שינויים".
+ *
+ * **למה זה בטוח:** refreshPreview כבר מדלגת על rebuildTree ועל
+ * applyDecoration כשהפוקוס בתוך שדה ניתן-לעריכה (המנגנון נבנה בדיוק
+ * מפני שרינדור-מחדש מוחק את התו שהמשתמש הרגע הקליד), ומעדכנת רק את
+ * צד ההצעה. כלומר הסמן אינו זז.
+ *
+ * ההשהיה קיימת כדי לא לשלוח בקשה לכל תו. renderGeneration כבר מבטל
+ * תשובות שהוקדמו על ידי בקשה מאוחרת יותר. */
+const LIVE_PREVIEW_DELAY_MS = 600;
+let livePreviewTimer = null;
+
+function setPreviewPending(on) {
+  // חיווי קטן בראש צד ההצעה. בלעדיו יש כשתי שניות (השהיה + הבקשה)
+  // שבהן המשתמש מקליד ולא קורה כלום על המסך - וזו בדיוק התחושה
+  // שדווחה כ"תקוע".
+  const el = document.getElementById("preview-pending");
+  if (el) el.hidden = !on;
+}
+
+function onFieldInput(ev) {
+  recordField(ev.target);
+  setPreviewPending(true);
+  clearTimeout(livePreviewTimer);
+  livePreviewTimer = setTimeout(() => { refreshPreview(); }, LIVE_PREVIEW_DELAY_MS);
+}
+
+async function onFieldBlur(ev) {
+  // יציאה מהשדה מרעננת מיד - אין טעם להמתין להשהיה שכבר לא רלוונטית.
+  clearTimeout(livePreviewTimer);
+  recordField(ev.target);
   await refreshPreview();
 }
 
@@ -557,6 +597,7 @@ async function refreshPreview() {
     for (const key of everEditedFieldKeys) applyDecoration(key, statusByKey[key]);
   }
 
+  setPreviewPending(false);
   renderInsertionErrors(data.insertion_errors);
   renderDocxApprox(data.lines);
   document.getElementById("download-hint").textContent = data.insertion_errors.length
