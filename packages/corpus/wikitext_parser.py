@@ -38,6 +38,7 @@ import hashlib
 import re
 from typing import NamedTuple
 
+from render_templates import render
 from node import LegislativeNode
 from text_normalize import normalize_text
 
@@ -327,7 +328,17 @@ def _flatten(text: str) -> str:
             elif call.name == "ח:הערה":
                 out.append(_flatten(call.args[0]))
             else:
-                out.append(text[i : call.end])
+                # **תבניות עיצוב של ויקיפדיה שדלפו לנוסח החוק**
+                # ({{מוקטן}}, {{טורים שווים}}, {{ש}}...) - 2,157
+                # מופעים ב-133 חוקים. עד 21.9 הן הוצגו למשתמש
+                # כפי שהן, כלומר נוסח חוק שנראה כמו זבל.
+                #
+                # `render` מחזירה את הטקסט **ללא שינוי** כשהתבנית
+                # אינה מוכרת לה, וזה התנאי לחזרה ל-_flatten: בלי
+                # ההשוואה הזו הייתה כאן רקורסיה אינסופית.
+                raw = text[i : call.end]
+                rendered = render(raw)
+                out.append(_flatten(rendered) if rendered != raw else raw)
             i = call.end
         else:
             out.append(text[i])
