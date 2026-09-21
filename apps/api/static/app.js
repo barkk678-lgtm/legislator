@@ -24,6 +24,20 @@ let everEditedFieldKeys = new Set(); // "node_id:field" שנערך אי-פעם (
 let edits = {}; // "node_id:field" -> {node_id, field, text}
 let insertions = []; // [{clientId, kind, anchor_node_id, text, margin_title?, label}]
 
+/* **תאריך בעברית: 30.12.2026, עם נקודות.** ISO עם מקפים
+ * ("2026-12-30") בתוך משפט עברי נשבר בכיוון הקריאה של הדפדפן -
+ * המקף הוא תו ניטרלי, והשנה קופצת לצד השני. הנקודה אינה מפרידה
+ * כיוון, ולכן הפורמט הזה נקרא נכון בלי לעטוף ב-LRM/RLM.
+ *
+ * מחזירה את המחרוזת כפי שהיא אם אינה תאריך ISO - לא ממציאה. */
+function formatHebrewDate(value) {
+  if (!value) return "";
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(value);
+  return `${Number(m[3])}.${Number(m[2])}.${m[1]}`;
+}
+
+
 /* הערות "צריך להיות" (צ״ל) - תיקוני נוסח שמנסחי ויקיטקסט סימנו בגוף
  * החוק, למשל {{ח:סעיף|27|תקנות {{ח:הערה|[צ״ל: עונשין]}}}} בחוק
  * השימוש בהיפנוזה, שם כותרות השוליים של סעיפים 27 ו-28 הוחלפו במקור.
@@ -67,14 +81,15 @@ function escapeHtml(s) {
 }
 
 function billMeta() {
+  // **אין עוד שדות "שם היוזם" ו"דברי הסבר" בממשק** (ברק,
+  // 2026-09-21): סנהדרין ממלאת את היוזם בעצמה, ודברי ההסבר
+  // נכתבים על ידי המערכת לתוך קובץ הוורד לפי השינויים בפועל -
+  // מי שירוצה לערוך, יערוך בקובץ. הסכימה בשרת לא השתנתה; שולחים
+  // ערכים ריקים, והשרת בונה את שניהם כשהם ריקים.
   return {
     title: document.getElementById("bill-title-input").value,
-    initiator: document.getElementById("bill-initiator-input").value,
-    explanatory: document
-      .getElementById("explanatory-input")
-      .value.split("\n")
-      .map((s) => s.trim())
-      .filter((s) => s),
+    initiator: "",
+    explanatory: [],
   };
 }
 
@@ -247,10 +262,15 @@ async function onLawChange(lawId) {
     loadCitations(lawId);  // לא await: הפיד חיצוני, אסור שיעכב את הצגת החוק
 
     document.getElementById("law-panels").hidden = false;
-    document.getElementById("as-of-note").textContent = law.as_of_display || "";
-    document.getElementById("source-ref-note").textContent = law.known_source_ref
-      ? `מראה מקום: ${law.known_source_ref}`
-      : "מראה מקום: לא ידוע לחוק זה - הוולידטור יתריע (בדיקה 2).";
+    // הפריסה מוצגת כבר מהכניסה ללשונית (ברק, 2026-09-21: "המסך צריך
+    // להיראות כאילו כבר נבחר חוק"). כאן רק מסתירים את הודעת הריק.
+    const emptyHint = document.getElementById("law-tree-empty");
+    if (emptyHint) emptyHint.hidden = true;
+    // **אין כאן עוד "נוסח כפי שהופיע בוויקיטקסט ביום X" ואין "מראה
+    // מקום: לא ידוע... (בדיקה 2)"** (ברק, 2026-09-21). הראשון הוא
+    // פרט פנימי, והשני הודעה למפתח. `as_of` ו-`known_source_ref`
+    // ממשיכים לחזור מה-API ולהישמר ב-DB - הם נדרשים לבדיקה היומית,
+    // להערות השוליים ולשחזור; רק התצוגה הוסרה.
 
     const billTitleInput = document.getElementById("bill-title-input");
     if (!billTitleInput.value) billTitleInput.value = "";
@@ -394,7 +414,7 @@ function renderNode(node, depth) {
       const addBtn = document.createElement("button");
       addBtn.className = "node-add-btn subtle";
       addBtn.textContent = "+";
-      addBtn.title = "הוספת תוכן חדש אחרי צומת זה";
+      addBtn.title = "הוספת סעיף, סעיף קטן או פסקה מתחת לכאן";
       addBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         toggleInsertMenu(node, wrapper);
@@ -607,7 +627,6 @@ async function refreshPreview() {
 
 function renderDocxApprox(lines) {
   document.getElementById("docx-title-line").textContent = billMeta().title;
-  document.getElementById("docx-initiator-line").textContent = "יוזם: " + billMeta().initiator;
   const container = document.getElementById("docx-lines");
   container.innerHTML = "";
   if (!lines.length) {
@@ -751,10 +770,7 @@ document.getElementById("download-btn").addEventListener("click", async () => {
   URL.revokeObjectURL(url);
 });
 
-for (const inputId of ["bill-title-input", "bill-initiator-input"]) {
-  document.getElementById(inputId).addEventListener("blur", refreshPreview);
-}
-document.getElementById("explanatory-input").addEventListener("blur", refreshPreview);
+document.getElementById("bill-title-input").addEventListener("blur", refreshPreview);
 
 initLawSearch();
 
@@ -1072,7 +1088,7 @@ async function loadCitations(lawId) {
   const body = document.getElementById("citations-body");
   if (!box || !lawId) return;
   box.hidden = false;
-  body.innerHTML = `<div class="hint">טוען מראי מקום…</div>`;
+  body.innerHTML = `<div class="hint">טוען את פרסומי החוק…</div>`;
   try {
     const resp = await fetch(`/api/laws/${encodeURIComponent(lawId)}/citations`);
     if (!resp.ok) throw new Error("feed");
@@ -1081,22 +1097,22 @@ async function loadCitations(lawId) {
     if (!data.in_knesset_db) {
       // ההבחנה בין "אין תיקונים" ל"לא קיים במאגר" - ופתוח כברירת
       // מחדל, אחרת ההסבר חבוי מאחורי אקורדיון מקופל ונראה כמו כלום.
-      summary.textContent = "מראי מקום מהכנסת — אין רשומה";
+      summary.textContent = "פרסומי החוק ותיקוניו — אין רשומה";
       box.open = true;
       body.innerHTML = `<div class="hint">${escapeHtml(data.note || "אין רשומה במאגר הכנסת.")}</div>`;
       return;
     }
-    summary.textContent = `מראי מקום מהכנסת (${data.citations.length})`;
+    summary.textContent = `פרסומי החוק ותיקוניו (${data.citations.length})`;
     box.open = false;
     const rows = data.citations
       .map((c) => `<div class="citation-row">
           <b>${c.is_original ? "הפרסום המקורי" : escapeHtml(c.kind || "תיקון")}</b>
           <span class="citation-ref">${escapeHtml(c.reference)}</span>
-          <span class="citation-date">${escapeHtml(c.published_at || "")}</span>
+          <span class="citation-date">${escapeHtml(formatHebrewDate(c.published_at))}</span>
           <div class="citation-title">${escapeHtml(c.title || "")}</div>
         </div>`)
       .join("");
-    body.innerHTML = rows || `<div class="hint">לא נמצאו מראי מקום.</div>`;
+    body.innerHTML = rows || `<div class="hint">לא נמצאו פרסומים.</div>`;
   } catch {
     body.innerHTML = `<div class="hint">מאגר הכנסת אינו זמין כרגע.</div>`;
   }
@@ -1187,6 +1203,7 @@ function renderResearchTable(data) {
         let v = r[c];
         if (typeof v === "boolean") v = v ? "כן" : "—";
         if (c === "pass_rate_pct") v = `${v}%`;
+        if (c === "published_at" && v) v = formatHebrewDate(v);
         return `<td>${escapeHtml(String(v ?? "—"))}</td>`;
       })
       .join("");

@@ -423,3 +423,14 @@ select { font-weight: 600; max-width: 420px; }
   50%  { content: "··"; }
   75%  { content: "···"; }
 }
+
+/* לשונית "הצעות חוק" מוצגת במלואה עוד לפני בחירת חוק (ברק,
+   2026-09-21) - רק תיבת נוסח החוק ריקה, עם ההסבר הזה בתוכה. */
+.tree-empty {
+  color: var(--faint);
+  font-size: 14px;
+  padding: 28px 8px;
+  text-align: center;
+}
+/* שדה "שם ההצעה" ברוחב שדה רגיל, לא על כל רוחב הדף. */
+.fld-title { max-width: 520px; }

@@ -37,7 +37,6 @@
       <div class="law-loading" id="law-loading" hidden>
         <span class="spinner"></span>טוען את נוסח החוק…
       </div>
-      <div class="asof" id="as-of-note"></div>
       <div class="grow"></div>
       <button id="download-btn" class="primary">הורדת docx</button>
     </div>
@@ -71,26 +70,23 @@
 
     <div class="stage">
       <div class="tab on" id="bills">
-        <div id="law-panels" hidden>
-          <div class="source-ref-note" id="source-ref-note"></div>
+        <div id="law-panels">
           <div id="similar-bills-notice"></div>
 
           <div class="meta">
-            <div class="fld">
+            <div class="fld fld-title">
               <label for="bill-title-input">שם ההצעה</label>
               <input id="bill-title-input" class="inp" type="text" />
-              <div class="hint">אם נשאר ריק - תיבנה כותרת ברירת מחדל אוטומטית.</div>
-            </div>
-            <div class="fld">
-              <label for="bill-initiator-input">שם היוזם</label>
-              <input id="bill-initiator-input" class="inp" type="text" />
             </div>
           </div>
 
           <div class="cols">
             <section class="card">
               <header><h2>נוסח החוק</h2><span>לחצו לעריכה</span></header>
-              <div class="body"><div id="law-tree"></div></div>
+              <div class="body">
+                <div id="law-tree-empty" class="tree-empty">בחרו חוק בשורת החיפוש שלמעלה, והנוסח שלו יופיע כאן לעריכה.</div>
+                <div id="law-tree"></div>
+              </div>
             </section>
 
             <section class="card">
@@ -98,19 +94,13 @@
               <div id="docx-approx">
                 <div class="sheet">
                   <div class="docx-title" id="docx-title-line"></div>
-                  <div class="docx-initiator" id="docx-initiator-line"></div>
                   <div id="preview-pending" class="preview-pending" hidden>מעדכן…</div>
-                  <div id="docx-lines"></div>
+                  <div id="docx-lines"><div class="hint">אין עדיין שינויים - התחילו לערוך את הנוסח מימין.</div></div>
                 </div>
                 <div class="docx-extra">
-                  <div class="fld">
-                    <label for="explanatory-input">דברי הסבר</label>
-                    <textarea id="explanatory-input" rows="4"
-                      placeholder="אם נשאר ריק - תיבנה טיוטה אוטומטית לפי סעיפים שנגעתם בהם."></textarea>
-                  </div>
                   <div class="hint" id="download-hint"></div>
                   <details id="citations-box" hidden>
-                    <summary>מראי מקום מהכנסת</summary>
+                    <summary>פרסומי החוק ותיקוניו</summary>
                     <div id="citations-body"></div>
                   </details>
                 </div>
