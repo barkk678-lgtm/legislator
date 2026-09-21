@@ -443,3 +443,34 @@ select { font-weight: 600; max-width: 420px; }
   line-height: 1.85;
   padding: 2px 0;
 }
+
+/* בועת "חושב" בכלי הצ'אט - סימן § פועם ושלוש שורות נוסח
+   שמתמלאות. ראו appendThinking ב-app.js. */
+.msg.thinking {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--faint); font-size: 13.5px;
+}
+.thinking-mark {
+  font-size: 19px; font-weight: 700; color: var(--flag);
+  animation: think-pulse 1.4s ease-in-out infinite;
+}
+@keyframes think-pulse {
+  0%, 100% { opacity: .35; transform: scale(.92); }
+  50%      { opacity: 1;   transform: scale(1.06); }
+}
+.thinking-lines { display: inline-flex; flex-direction: column; gap: 3px; }
+.thinking-lines i {
+  display: block; height: 3px; border-radius: 2px;
+  background: var(--flag); opacity: .3;
+  animation: think-fill 1.8s ease-in-out infinite;
+}
+.thinking-lines i:nth-child(1) { width: 34px; animation-delay: 0s; }
+.thinking-lines i:nth-child(2) { width: 52px; animation-delay: .22s; }
+.thinking-lines i:nth-child(3) { width: 22px; animation-delay: .44s; }
+@keyframes think-fill {
+  0%, 100% { opacity: .22; transform: scaleX(.45); transform-origin: right; }
+  45%      { opacity: .85; transform: scaleX(1);   transform-origin: right; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-mark, .thinking-lines i { animation: none; opacity: .6; }
+}

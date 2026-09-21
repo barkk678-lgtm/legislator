@@ -808,6 +808,33 @@ for (const btn of document.querySelectorAll(".nav button[data-t]")) {
  * כל הודעת משתמש נוספת ל-topicHistory ונשלחת מחדש כמכלול (השרת אינו
  * שומר state, ראו 10ב) - כך ש"קצר את זה"/"שנה ניסוח" עובדים כהמשך
  * שיחה טבעי, לא רק כפנייה ראשונה. */
+
+/* **אנימציית המתנה בכלי הצ'אט** (ברק, 2026-09-21: "כרגע זה מרגיש
+ * תקוע... משהו שקשור לנושא של המערכת").
+ *
+ * שלוש אפשרויות נשקלו:
+ *   א. פטיש יושב-ראש שמקיש - מזוהה, אבל שייך לבית משפט יותר
+ *      מאשר לכנסת, ומרמז על הכרעה שלא התקבלה.
+ *   ב. ארבע הקריאות (טרומית → ראשונה → שנייה → שלישית) נדלקות
+ *      בזו אחר זו - הכי "כנסת" שיש, אבל **מטעה**: זה נראה כמו
+ *      מעקב אחרי שלב אמיתי בהליך, והבוט אינו נמצא בשום שלב כזה.
+ *   ג. **סעיף חוק שנכתב** - סימן § שפועם, ושלוש שורות נוסח
+ *      שמתמלאות אחת אחרי השנייה. מה שהמערכת באמת עושה, בלי
+ *      להתחזות למצב שאינו קיים.
+ *
+ * נבחרה ג'. מכובדת ל-prefers-reduced-motion (ראו style.css). */
+function appendThinking(container, label) {
+  const div = document.createElement("div");
+  div.className = "msg a thinking";
+  div.innerHTML =
+    '<span class="thinking-mark">§</span>' +
+    '<span class="thinking-lines"><i></i><i></i><i></i></span>' +
+    `<span class="thinking-label">${escapeHtml(label)}</span>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
 function appendMsg(container, cls, html) {
   const div = document.createElement("div");
   div.className = `msg ${cls}`;
@@ -846,6 +873,7 @@ async function sendQueryMessage() {
   input.value = "";
   input.disabled = true;
 
+  const thinking = appendThinking(chat, "מנסח את השאילתה…");
   try {
     const resp = await fetch("/api/query/draft", {
       method: "POST",
@@ -872,6 +900,7 @@ async function sendQueryMessage() {
         `${escapeHtml(currentQueryDraft.body)}${wordCountHtml(currentQueryDraft.word_count, currentQueryDraft.word_limit)}${currentQueryDraft.removed_addressee ? `<div class="word-count">הוסרה פנייה לנמען מתחילת הגוף (${escapeHtml(currentQueryDraft.removed_addressee)}) — הנמען נקבע בשדה ומוזרק למסמך</div>` : ""}</div>`
     );
   } finally {
+    thinking.remove();
     input.disabled = false;
     input.focus();
   }
@@ -922,6 +951,7 @@ async function sendAgendaMessage() {
   input.value = "";
   input.disabled = true;
 
+  const thinking = appendThinking(chat, "מנסח את ההצעה לסדר…");
   try {
     const resp = await fetch("/api/agenda/draft", {
       method: "POST",
@@ -944,6 +974,7 @@ async function sendAgendaMessage() {
         `${escapeHtml(currentAgendaDraft.reasoning)}<br><br>${escapeHtml(currentAgendaDraft.request_text)}</div>`
     );
   } finally {
+    thinking.remove();
     input.disabled = false;
     input.focus();
   }
@@ -981,6 +1012,7 @@ async function sendRulesMessage() {
   input.value = "";
   input.disabled = true;
 
+  const thinking = appendThinking(chat, "מחפש בתקנון…");
   try {
     const resp = await fetch("/api/rules/ask", {
       method: "POST",
@@ -1002,6 +1034,7 @@ async function sendRulesMessage() {
       : "";
     appendMsg(chat, "a", `${escapeHtml(result.text)}${citedHtml}`);
   } finally {
+    thinking.remove();
     input.disabled = false;
     input.focus();
   }
@@ -1232,7 +1265,8 @@ async function askResearch() {
   if (!question) return;
 
   input.disabled = true;
-  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>מנתח את השאלה…</div>`;
+  out.innerHTML = "";
+  const thinking = appendThinking(out, "מחפש בנתוני הכנסת…");
   try {
     const resp = await fetch("/api/research/ask", {
       method: "POST",
@@ -1271,6 +1305,7 @@ async function askResearch() {
       ${data.summary ? `<div class="hint">${escapeHtml(data.summary)}</div>` : ""}
       ${renderResearchTable(data)}`;
   } finally {
+    thinking.remove();
     input.disabled = false;
     input.focus();
   }
