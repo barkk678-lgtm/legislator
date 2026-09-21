@@ -393,3 +393,11 @@ select { font-weight: 600; max-width: 420px; }
   margin-inline-start: 8px;
   white-space: nowrap;
 }
+
+/* הערת "צריך להיות" בגוף החוק - ראו scrivenerNotes ב-app.js.
+   כתום ולא אדום: זו הערה של מנסחי הנוסח, לא שגיאה של המערכת. */
+.scrivener-note-badge {
+  flex: none; margin-inline-start: 8px; font-size: 11.5px; padding: 1px 7px;
+  border-radius: 999px; background: var(--warn); color: #fff; cursor: help;
+  white-space: nowrap;
+}

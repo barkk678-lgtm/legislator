@@ -23,6 +23,37 @@ let originalMarginTitleById = {}; // node_id -> כותרת שוליים מקור
 let everEditedFieldKeys = new Set(); // "node_id:field" שנערך אי-פעם (גם אם חזר למקור)
 let edits = {}; // "node_id:field" -> {node_id, field, text}
 let insertions = []; // [{clientId, kind, anchor_node_id, text, margin_title?, label}]
+
+/* הערות "צריך להיות" (צ״ל) - תיקוני נוסח שמנסחי ויקיטקסט סימנו בגוף
+ * החוק, למשל {{ח:סעיף|27|תקנות {{ח:הערה|[צ״ל: עונשין]}}}} בחוק
+ * השימוש בהיפנוזה, שם כותרות השוליים של סעיפים 27 ו-28 הוחלפו במקור.
+ * 219 מופעים ב-102 חוקים (נמדד 21.9.2026, זהות מול ה-DB).
+ *
+ * **אזהרה ולא שינוי טקסט:** הנוסח עצמו נשאר בדיוק כפי שהוא. הוא
+ * contentEditable ונקרא על ידי צינור העריכה וה-diff, ולכן עטיפת חלק
+ * ממנו ב-<span> הייתה נכנסת להוראת התיקון. החיווי יושב בכותרת הצומת,
+ * מחוץ לשדות הנערכים.
+ *
+ * שלוש הצורות שקיימות בקורפוס: "[צ״ל: X]" (236), "[צ״ל X]" (9)
+ * ו-"[צ״ל, X]" (1). הסוגר הפותח **חובה** - בלעדיו נתפסים גם אצ״ל,
+ * זצ״ל ודצ״ל, שאינם הערות; הם נבדקו במפורש ואינם נתפסים.
+ *
+ * **בלי תקרת אורך, והסוגר הסוגר אופציונלי.** בחוק מס מינימלי גלובלי
+ * (law-2238756) יש שבע הערות שבהן ההערה היא כל הצומת - עד 670 תווים,
+ * ואחת בלי "]" כלל. תקרה של 200 תווים החמיצה את כולן. מה שמדייק כאן
+ * הוא העוגן הפותח, לא האורך. */
+const SCRIVENER_NOTE_RE = /\[\s*צ["\u05f4\u2033\u201d']ל[:,\s][^\]]*\]?/g;
+
+function scrivenerNotes(node) {
+  const found = [];
+  for (const field of [node.margin_title, node.text]) {
+    if (!field) continue;
+    const matches = field.match(SCRIVENER_NOTE_RE);
+    if (matches) found.push(...matches);
+  }
+  return found;
+}
+
 let insertionCounter = 0;
 let insertionClientIds = new Set(); // clientId-ים של הוספות ממתינות/שהתבצעו
 let fieldElements = {}; // "node_id:field" -> אלמנט ה-DOM הניתן לעריכה
@@ -273,6 +304,18 @@ function renderNode(node, depth) {
      * עד כאן הוא נראה תקין ופשוט לא הגיב: הכישלון השקט הגרוע ביותר
      * בממשק. הסיבה היא סעיף בלי מספר, ש-find_sections לא מוצאת
      * ו-amend() לא רואה - 429 בקורפוס, 111 בפקודת מס הכנסה לבדה. */
+    /* חיווי הערת צ״ל - ראו scrivenerNotes למעלה. */
+    const notes = scrivenerNotes(node);
+    if (notes.length) {
+      const noteBadge = document.createElement("span");
+      noteBadge.className = "scrivener-note-badge";
+      noteBadge.textContent = notes.length > 1 ? `צ״ל ×${notes.length}` : "צ״ל";
+      noteBadge.title = "הערת נוסח בגוף החוק (\"צריך להיות\"):\n" +
+        notes.join("\n") +
+        "\n\nההערה היא חלק מהנוסח המוצג ואינה תיקון שבוצע.";
+      header.appendChild(noteBadge);
+    }
+
     const notEditable = node.node_type === "section" && node.editable === false;
     if (notEditable) {
       wrapper.classList.add("not-editable");
