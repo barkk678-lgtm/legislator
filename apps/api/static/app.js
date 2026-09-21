@@ -318,7 +318,17 @@ function renderNode(node, depth) {
     const numberSpan = document.createElement("span");
     numberSpan.className = "node-number";
     numberSpan.textContent = node.number || "";
-    header.appendChild(numberSpan);
+
+    /* **תווית של סעיף קטן/פסקה צמודה לטקסט שלה, לא בשורה נפרדת
+     * מעליו** (ברק, 2026-09-21: "התווית (1), (2) מופיעה בשורה
+     * נפרדת מעל הטקסט שלה, במקום צמודה אליו כמו בנוסח החוק").
+     *
+     * ההבחנה: בסעיף, המספר וכותרת השוליים הם כותרת בפני עצמה -
+     * כך זה גם בספר החוקים. אבל "(א)" או "(1)" הם פתיח של השורה
+     * עצמה, ולכן הם נכנסים לשורת הגוף ולא לכותרת. */
+    const inlineLabel = node.node_type !== "section" && Boolean(node.number);
+    if (inlineLabel) numberSpan.classList.add("node-number-inline");
+    else header.appendChild(numberSpan);
 
     /* סעיף שאי אפשר לערוך - חייב להיראות אחרת (ברק, 2026-09-18).
      * עד כאן הוא נראה תקין ופשוט לא הגיב: הכישלון השקט הגרוע ביותר
@@ -380,10 +390,12 @@ function renderNode(node, depth) {
       header.appendChild(removeBtn);
     }
 
-    wrapper.appendChild(header);
+    // כותרת נפרדת רק כשיש בה משהו - אחרת נשארת שורה ריקה מעל הטקסט.
+    if (header.childElementCount > 0) wrapper.appendChild(header);
 
     const bodyRow = document.createElement("div");
     bodyRow.className = "node-body-row";
+    if (inlineLabel) bodyRow.appendChild(numberSpan);
 
     if (node.text) {
       const textEl = document.createElement("div");

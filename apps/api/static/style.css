@@ -434,3 +434,12 @@ select { font-weight: 600; max-width: 420px; }
 }
 /* שדה "שם ההצעה" ברוחב שדה רגיל, לא על כל רוחב הדף. */
 .fld-title { max-width: 520px; }
+
+/* תווית סעיף קטן/פסקה - "(א)", "(1)" - בשורת הטקסט עצמה ולא
+   בשורה נפרדת מעליה (ברק, 2026-09-21). ראו inlineLabel ב-app.js. */
+.node-number-inline {
+  align-self: flex-start;
+  flex: none;
+  line-height: 1.85;
+  padding: 2px 0;
+}
