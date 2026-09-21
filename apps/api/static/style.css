@@ -474,3 +474,26 @@ select { font-weight: 600; max-width: 420px; }
 @media (prefers-reduced-motion: reduce) {
   .thinking-mark, .thinking-lines i { animation: none; opacity: .6; }
 }
+
+/* היסטוריית הצעות - ראו הבלוק בראש הקטע ב-app.js. */
+.drafts-panel {
+  background: #fff; border: 1px solid var(--rule); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 14px;
+}
+.drafts-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.draft-row { display: flex; align-items: stretch; gap: 6px; border-top: 1px solid var(--rule); }
+.draft-row:first-child { border-top: 0; }
+.draft-row.current { background: var(--tint); }
+.draft-open {
+  flex: 1; text-align: start; background: none; border: 0; cursor: pointer;
+  padding: 9px 4px; display: flex; flex-direction: column; gap: 2px; font: inherit;
+}
+.draft-open:hover { background: var(--tint-2); border-radius: 6px; }
+.draft-title { font-weight: 700; font-size: 14px; color: var(--navy); }
+.draft-meta { font-size: 12px; color: var(--faint); }
+.draft-delete { align-self: center; }
+.draft-notice {
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+  font-size: 13.5px; line-height: 1.6;
+}
+.draft-notice.warn { background: var(--del-bg); border: 1px solid var(--warn); }

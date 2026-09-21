@@ -198,11 +198,14 @@ function renderLawSearchResults() {
   resultsEl.hidden = false;
 }
 
-function selectLaw(law) {
-  if (!law.amendable) return;
+let currentLawTitle = null;
+
+async function selectLaw(law) {
+  if (law.amendable === false) return;
+  currentLawTitle = law.title;
   document.getElementById("law-search-input").value = law.title;
   document.getElementById("law-search-results").hidden = true;
-  onLawChange(law.id);
+  await onLawChange(law.id);
 }
 
 function initLawSearch() {
@@ -258,6 +261,9 @@ async function onLawChange(lawId) {
     originalMarginTitleById = {};
 
     const law = await (await fetch(`/api/laws/${lawId}`)).json();
+    // מזהה הגרסה נשמר לצד הטיוטה - ראו היסטוריית ההצעות למטה.
+    currentLawVersionId = law.version_id ?? null;
+    currentLawTitle = law.title || currentLawTitle;
     buildOriginalIndex(law.tree);
     loadCitations(lawId);  // לא await: הפיד חיצוני, אסור שיעכב את הצגת החוק
 
@@ -631,10 +637,12 @@ async function refreshPreview() {
 
   setPreviewPending(false);
   renderInsertionErrors(data.insertion_errors);
+  scheduleDraftSave();
   renderDocxApprox(data.lines);
   document.getElementById("download-hint").textContent = data.insertion_errors.length
     ? `שים לב: ${data.insertion_errors.length} הוספות לא בוצעו (ראו כרטיסי השגיאה בעץ)`
     : "";
+  return data;
 }
 
 function renderDocxApprox(lines) {
@@ -784,7 +792,191 @@ document.getElementById("download-btn").addEventListener("click", async () => {
 
 document.getElementById("bill-title-input").addEventListener("blur", refreshPreview);
 
+/* ===================================================================
+ * היסטוריית הצעות (ברק, 2026-09-21, משימה 11)
+ *
+ * **למה בדפדפן ולא בדאטהבייס:** אין עדיין הרשמה. טבלה משותפת
+ * בלי מזהה משתמש הייתה מערבבת בין אנשים. כשההרשמה תגיע, המבנה
+ * כאן (draft_id, law_id, version_id, edits, insertions) עובר
+ * לטבלה כמו שהוא.
+ *
+ * **מה שחייב להישמר עם הטיוטה: על איזו גרסת חוק היא נבנתה.**
+ * הריצה היומית (tools/check_for_update.py) טוענת חוקים מחדש
+ * אוטומטית, וגם תיקון פרסור מחליף גרסה. `version_id` הוא
+ * law_versions.id ומשתנה בשני המקרים - כלומר בדיוק כשהטקסט
+ * שמתחת לטיוטה זז. כשפותחים טיוטה והמזהה שונה, המשתמש מקבל
+ * אזהרה.
+ *
+ * **אין דריסה של העריכות.** העריכות נטענות כפי שהן גם כשהחוק
+ * התעדכן. עריכה שהעוגן שלה נעלם מהנוסח החדש מדווחת בנפרד -
+ * השרת מחזיר edit_statuses, ואנחנו סופרים כמה לא התקבלו.
+ *
+ * **הגנת הטיוטות של הריצה היומית לא רואה את אלה** - היא מחפשת
+ * טבלת drafts בדאטהבייס, וטיוטה בדפדפן אינה שם. זה מתועד
+ * ב-open-gaps ונפתר עם המעבר ל-DB.
+ * =================================================================== */
+
+const DRAFTS_KEY = "legislator.drafts.v1";
+const DRAFTS_LIMIT = 40;
+let currentDraftId = null;
+let currentLawVersionId = null;
+let draftSaveTimer = null;
+
+function readDrafts() {
+  // אחסון הדפדפן יכול לזרוק (מצב פרטי, חסימת אתר) או להחזיר זבל.
+  // כישלון כאן לא ישבור את המסך - פשוט אין היסטוריה.
+  try {
+    const raw = localStorage.getItem(DRAFTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDrafts(list) {
+  try {
+    localStorage.setItem(DRAFTS_KEY, JSON.stringify(list.slice(0, DRAFTS_LIMIT)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function draftHasContent() {
+  return Object.keys(edits).length > 0 || insertions.length > 0;
+}
+
+function saveCurrentDraft() {
+  if (!currentLawId || !draftHasContent()) return;
+  if (!currentDraftId) currentDraftId = `d${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
+  const list = readDrafts().filter((d) => d.id !== currentDraftId);
+  list.unshift({
+    id: currentDraftId,
+    law_id: currentLawId,
+    law_title: currentLawTitle || currentLawId,
+    version_id: currentLawVersionId,
+    saved_at: new Date().toISOString(),
+    title: document.getElementById("bill-title-input").value || "",
+    edits: Object.values(edits),
+    insertions: insertionsPayload(),
+  });
+  writeDrafts(list);
+  renderDraftList();
+}
+
+function scheduleDraftSave() {
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(saveCurrentDraft, 900);
+}
+
+function deleteDraft(id) {
+  writeDrafts(readDrafts().filter((d) => d.id !== id));
+  if (currentDraftId === id) currentDraftId = null;
+  renderDraftList();
+}
+
+function draftSummary(d) {
+  const n = (d.edits || []).length + (d.insertions || []).length;
+  return `${n} ${n === 1 ? "שינוי" : "שינויים"}`;
+}
+
+function renderDraftList() {
+  const box = document.getElementById("drafts-list");
+  if (!box) return;
+  const list = readDrafts();
+  document.getElementById("drafts-count").textContent = list.length ? `(${list.length})` : "";
+  if (!list.length) {
+    box.innerHTML = '<div class="hint">עוד לא שמרתם הצעות. כל עריכה נשמרת כאן אוטומטית.</div>';
+    return;
+  }
+  box.innerHTML = list
+    .map((d) => `<div class="draft-row${d.id === currentDraftId ? " current" : ""}">
+        <button class="draft-open" data-draft="${escapeHtml(d.id)}">
+          <span class="draft-title">${escapeHtml(d.title || d.law_title)}</span>
+          <span class="draft-meta">${escapeHtml(d.law_title)} · ${draftSummary(d)} ·
+            ${escapeHtml(formatHebrewDate(d.saved_at))}</span>
+        </button>
+        <button class="subtle draft-delete" data-draft="${escapeHtml(d.id)}"
+                title="מחיקת ההצעה מההיסטוריה">✕</button>
+      </div>`)
+    .join("");
+  for (const b of box.querySelectorAll(".draft-open")) {
+    b.addEventListener("click", () => openDraft(b.dataset.draft));
+  }
+  for (const b of box.querySelectorAll(".draft-delete")) {
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); deleteDraft(b.dataset.draft); });
+  }
+}
+
+function showDraftNotice(html, kind) {
+  const el = document.getElementById("draft-notice");
+  if (!el) return;
+  el.className = `draft-notice ${kind}`;
+  el.innerHTML = html;
+  el.hidden = !html;
+}
+
+async function openDraft(draftId) {
+  const draft = readDrafts().find((d) => d.id === draftId);
+  if (!draft) return;
+  showDraftNotice("", "");
+
+  // טוענים את החוק מחדש - תמיד את הנוסח **הנוכחי**, לא נוסח שמור.
+  // טיוטה אינה מקפיאה חוק; היא מחזיקה את העריכות ואת המזהה שעליו
+  // הן נעשו.
+  await selectLaw({ id: draft.law_id, title: draft.law_title });
+
+  currentDraftId = draft.id;
+  document.getElementById("bill-title-input").value = draft.title || "";
+
+  edits = {};
+  for (const e of draft.edits || []) {
+    const key = `${e.node_id}:${e.field}`;
+    edits[key] = e;
+    everEditedFieldKeys.add(key);
+  }
+  insertions = (draft.insertions || []).map((i) => ({ ...i }));
+  insertionClientIds = new Set(insertions.map((i) => i.clientId));
+
+  const data = await refreshPreview();
+  const failed = (data && data.edit_statuses || []).filter((s) => !s.ok).length;
+
+  if (draft.version_id && currentLawVersionId && draft.version_id !== currentLawVersionId) {
+    showDraftNotice(
+      "<b>נוסח החוק התעדכן מאז ששמרתם את ההצעה.</b> העריכות שלכם נטענו " +
+      "כפי שהן ולא נדרסו — אבל הן מנוסחות מול הנוסח הקודם. כדאי לעבור " +
+      "עליהן מול הנוסח שמוצג עכשיו." +
+      (failed ? ` <b>${failed} מהעריכות לא ניתנות ליישום על הנוסח הנוכחי</b> ` +
+                "(הטקסט שעליו הן נשענו השתנה); הן מסומנות בעץ." : ""),
+      "warn");
+  } else if (failed) {
+    showDraftNotice(
+      `<b>${failed} מהעריכות לא ניתנות ליישום</b> — הן מסומנות בעץ.`, "warn");
+  }
+  renderDraftList();
+}
+
+function newDraft() {
+  currentDraftId = null;
+  edits = {};
+  insertions = [];
+  insertionClientIds = new Set();
+  everEditedFieldKeys = new Set();
+  document.getElementById("bill-title-input").value = "";
+  showDraftNotice("", "");
+  if (currentLawId) refreshPreview();
+  renderDraftList();
+}
+
 initLawSearch();
+renderDraftList();
+document.getElementById("drafts-toggle").addEventListener("click", () => {
+  const panel = document.getElementById("drafts-panel");
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) renderDraftList();
+});
+document.getElementById("draft-new-btn").addEventListener("click", newDraft);
 
 /* ═══ ניווט לשוניות (משימה ח, 2026-09-16) - בלי state בשרת, כל
  * לשונית מסתירה/מציגה DOM בלבד. bills נשארת ברירת המחדל. ═══ */

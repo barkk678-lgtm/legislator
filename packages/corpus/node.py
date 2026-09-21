@@ -100,6 +100,11 @@ class LegislativeNode:
     text_raw: str = ""  # הטקסט לפני normalize_text
     full_title: str | None = None  # רק לצומת law - שם החוק המלא, מ-{{ח:כותרת}}
     as_of: str | None = None  # יושב בשורש בלבד - ראו effective_as_of()
+    version_id: int | None = None  # יושב בשורש בלבד - law_versions.id שממנו
+    # נטען העץ. None ל-fixtures ולעצים שנבנו מוויקיטקסט ישירות. נדרש כדי
+    # שטיוטה שמורה תדע על איזה נוסח בדיוק היא נבנתה: המזהה משתנה גם
+    # כשנטענת גרסה חדשה וגם כשגרסה קיימת הוחלפה בתיקון פרסור, וזה בדיוק
+    # מה שקובע אם הטקסט שמתחת לטיוטה זז.
     id_collisions: list[str] = field(default_factory=list)  # יושב בשורש בלבד -
     # כל מקרה שבו wikitext_parser._unique_child_id נאלצה להוסיף סיומת סידורית
     # (id "טבעי" כבר תפוס בין האחים - ראו חוק החוזים סעיף 25). לא שגיאת פרסור

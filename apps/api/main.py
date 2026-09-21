@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "valid
 from bill_title import default_bill_title  # noqa: E402
 from embeddings import EmbeddingConfigError, EmbeddingRequestError, embed_one  # noqa: E402
 from engine import amend  # noqa: E402
-from node import LegislativeNode  # noqa: E402
+from node import LegislativeNode, find_sections  # noqa: E402
 from render_bill import Bill, write_docx  # noqa: E402
 from validator import validate  # noqa: E402
 
@@ -734,7 +734,13 @@ def api_law(law_id: str) -> dict:
     except LawNotFoundError:
         raise HTTPException(404, f"חוק לא מוכר: {law_id}")
     cfg = get_law_config(law_id, root)
-    amendable = any(c.node_type == "section" for c in root.children)
+    # **find_sections ולא root.children** - זו הייתה השארית האחרונה
+    # של הבאג מ-2026-09-16: חוק עם מבנה חלק/פרק/סימן (פקודת הנזיקין,
+    # העונשין, התכנון והבניה) הוחזר כאן "לא ניתן לעריכה" בעוד
+    # ש-amend() וה-view ב-DB כבר מצאו את סעיפיו ועבדו עליהם. התוצאה
+    # הייתה סתירה בתוך ה-API עצמו: /api/laws/search אמר amendable=true
+    # ו-/api/laws/{id} אמר false על אותו חוק בדיוק.
+    amendable = bool(find_sections(root))
     return {
         "id": law_id,
         "title": root.full_title or law_id,
@@ -742,6 +748,10 @@ def api_law(law_id: str) -> dict:
         "amendable": amendable,
         "known_source_ref": cfg.known_source_ref,
         "footnote_key": cfg.footnote_key,
+        # מזהה הגרסה שממנה נטען העץ. נדרש להיסטוריית ההצעות: טיוטה
+        # שמורה מחזיקה אותו, וכשפותחים אותה מחדש והמזהה השתנה -
+        # המשתמש מקבל אזהרה במקום לגלות בשקט שהנוסח מתחתיו זז.
+        "version_id": root.version_id,
         "tree": node_view(root),
     }
 

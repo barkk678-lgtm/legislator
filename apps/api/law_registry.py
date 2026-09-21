@@ -268,6 +268,7 @@ def _load_db_law(law_id: str) -> LegislativeNode:
     root.full_title = law_row["full_title"]
     root.source_ref = version.get("source_ref") or ""
     root.as_of = version.get("as_of")
+    root.version_id = version.get("id")
     return root
 
 

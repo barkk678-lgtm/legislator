@@ -38,6 +38,7 @@
         <span class="spinner"></span>טוען את נוסח החוק…
       </div>
       <div class="grow"></div>
+      <button id="drafts-toggle" class="subtle">ההצעות שלי <span id="drafts-count"></span></button>
       <button id="download-btn" class="primary">הורדת docx</button>
     </div>
     <div class="topbar" data-bar="merge" hidden>
@@ -70,7 +71,18 @@
 
     <div class="stage">
       <div class="tab on" id="bills">
+        <div id="drafts-panel" class="drafts-panel" hidden>
+          <div class="drafts-head">
+            <b>ההצעות שלי</b>
+            <span class="hint">נשמרות בדפדפן הזה בלבד, אוטומטית בכל עריכה.</span>
+            <div class="grow"></div>
+            <button id="draft-new-btn" class="subtle">הצעה חדשה</button>
+          </div>
+          <div id="drafts-list"></div>
+        </div>
+
         <div id="law-panels">
+          <div id="draft-notice" class="draft-notice" hidden></div>
           <div id="similar-bills-notice"></div>
 
           <div class="meta">
