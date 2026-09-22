@@ -1127,7 +1127,12 @@ function wordCountHtml(wordCount, wordLimit) {
 }
 
 // --- שאילתות ---
-let queryTopicHistory = [];
+// **שיחה אמיתית, לא הדבקה.** עד 2026-09-22 כל הודעות המשתמש
+// הודבקו ב-"\n" ונשלחו כתיאור אחד - ולכן סירוב על שאלה אחת נדבק
+// לכל הבאות: המודל קיבל גוש שעדיין הכיל את השאלה שנדחתה, וסירב
+// שוב בצדק. עכשיו כל הודעה היא תור, כולל תשובות המודל - מה שגם
+// מאפשר "תקצר את זה" לעבוד על הטיוטה הקודמת ולא על הנושא מחדש.
+let queryTurns = [];
 let currentQueryDraft = null;
 
 async function sendQueryMessage() {
@@ -1145,7 +1150,7 @@ async function sendQueryMessage() {
   }
 
   appendMsg(chat, "u", escapeHtml(text));
-  queryTopicHistory.push(text);
+  queryTurns.push({ role: "user", content: text });
   input.value = "";
   input.disabled = true;
 
@@ -1155,7 +1160,7 @@ async function sendQueryMessage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        topic_description: queryTopicHistory.join("\n"),
+        turns: queryTurns,
         kind,
         minister,
         mk_name: mkName,
@@ -1163,10 +1168,24 @@ async function sendQueryMessage() {
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      appendMsg(chat, "err", escapeHtml(err.detail || "שגיאה בניסוח השאילתה."));
+      const detail = err.detail || "שגיאה בניסוח השאילתה.";
+      // **הסירוב נכנס להיסטוריה כתור של המודל.** כך הוא נשאר חלק
+      // מהשיחה - המודל יודע שכבר סירב - בלי להיות חלק מהשאלה הבאה.
+      if (String(detail).startsWith("לא ניתן לנסח שאילתה")) {
+        queryTurns.push({ role: "assistant", content: detail });
+      } else {
+        // תקלת תשתית אינה חלק מהשיחה. משאירים אותה בהיסטוריה
+        // היה גורם למודל להתייחס אליה כאילו אמר אותה.
+        queryTurns.pop();
+      }
+      appendMsg(chat, "err", escapeHtml(detail));
       return;
     }
     currentQueryDraft = await resp.json();
+    queryTurns.push({
+      role: "assistant",
+      content: `נושא: ${currentQueryDraft.subject}\nגוף: ${currentQueryDraft.body}`,
+    });
     document.getElementById("query-export-btn").disabled = false;
     appendMsg(
       chat,

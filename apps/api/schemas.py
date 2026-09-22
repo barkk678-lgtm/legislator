@@ -102,10 +102,22 @@ class DraftRequestIn(BaseModel):
     insertions: list[InsertionIn] = []
 
 
-class QueryDraftRequestIn(BaseModel):
-    """בקשה לניסוח שאילתה (משימה ו, 2026-09-16) - ראו query_tool.py."""
+class QueryTurnIn(BaseModel):
+    """תור אחד בשיחת ניסוח השאילתה."""
 
-    topic_description: str
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class QueryDraftRequestIn(BaseModel):
+    """בקשה לניסוח שאילתה (משימה ו, 2026-09-16) - ראו query_tool.py.
+
+    **turns הוא המסלול הנכון; topic_description נשאר לתאימות לאחור.**
+    הדבקת ההיסטוריה למחרוזת אחת היא בדיוק הבאג שתוקן (ברק,
+    2026-09-22): סירוב על שאלה אחת נדבק לשאלות הבאות."""
+
+    topic_description: str = ""
+    turns: list[QueryTurnIn] = []
     kind: Literal["רגילה", "דחופה", "ישירה"] = "רגילה"
     minister: str
     mk_name: str

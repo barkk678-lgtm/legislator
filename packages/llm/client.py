@@ -70,7 +70,8 @@ def _api_key() -> str:
 def complete(
     *,
     system: str,
-    user_message: str,
+    user_message: str | None = None,
+    messages: list[dict] | None = None,
     max_tokens: int = 1500,
     model: str = DEFAULT_MODEL,
 ) -> RawCompletion:
@@ -83,12 +84,18 @@ def complete(
     דוחה את הפרמטר לגמרי (HTTP 400 "`temperature` is deprecated for
     this model") - לא רק לא-נתמך בערך המסוים, השדה עצמו אסור."""
     key = _api_key()
+    # **תור שיחה, לא הדבקה של ההיסטוריה למחרוזת אחת.** עד 2026-09-22
+    # כלי השאילתא הדביק את כל הודעות המשתמש ב-"\n" ושלח אותן כהודעה
+    # אחת; התוצאה הייתה שסירוב על שאלה אחת "נדבק" לשאלות הבאות -
+    # המודל ראה גוש אחד שמכיל גם את מה שנדחה, וסירב שוב בצדק.
+    if (user_message is None) == (messages is None):
+        raise ValueError("יש לספק user_message או messages - בדיוק אחד מהם.")
     body = {
         "model": model,
         "max_tokens": max_tokens,
         "thinking": {"type": "disabled"},
         "system": system,
-        "messages": [{"role": "user", "content": user_message}],
+        "messages": messages or [{"role": "user", "content": user_message}],
     }
     headers = {
         "x-api-key": key,

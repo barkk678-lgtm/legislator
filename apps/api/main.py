@@ -1010,9 +1010,12 @@ def api_docx(law_id: str, req: RenderRequest):
 @app.post("/api/query/draft")
 def api_query_draft(req: QueryDraftRequestIn) -> dict:
     try:
-        return draft_query(
-            topic_description=req.topic_description, kind=req.kind, minister=req.minister, mk_name=req.mk_name
-        )
+        # תמיכה לאחור: לקוח ישן ששולח topic_description בלבד מקבל
+        # שיחה בת תור אחד. הלקוח שלנו שולח turns.
+        turns = ([tn.model_dump() for tn in req.turns]
+                 or [{"role": "user", "content": req.topic_description}])
+        return draft_query(turns=turns, kind=req.kind,
+                           minister=req.minister, mk_name=req.mk_name)
     except QueryDraftError as e:
         raise HTTPException(422, str(e))
 

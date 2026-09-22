@@ -30,7 +30,12 @@ from typing import Literal
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "render"))
-from service import LLMConfigError, LLMRequestError, draft  # noqa: E402
+from service import (  # noqa: E402
+    LLMConfigError,
+    LLMRequestError,
+    draft,
+    draft_conversation,
+)
 from simple_doc import write_simple_docx  # noqa: E402
 
 QueryKind = Literal["רגילה", "דחופה", "ישירה"]
@@ -118,15 +123,25 @@ def _word_count(text: str) -> int:
     return len(text.split())
 
 
-def draft_query(*, topic_description: str, kind: QueryKind, minister: str, mk_name: str) -> dict:
-    """topic_description: תיאור חופשי של המשתמש (על מה לשאול). מחזירה
-    dict עם subject/body/word_count/within_limit - **לא** חוסמת אם
-    חורג מהמגבלה (המשתמש רואה ועורך), רק מסמנת within_limit=False כדי
-    שהממשק יתריע במפורש, לא ינחש/יחתוך מילים בשקט."""
+def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: str) -> dict:
+    """turns: השיחה עד כה, [{"role": "user"|"assistant", "content": ...}],
+    כשהאחרון הוא ההודעה החדשה של המשתמש. מחזירה dict עם
+    subject/body/word_count/within_limit - **לא** חוסמת אם חורג
+    מהמגבלה (המשתמש רואה ועורך), רק מסמנת within_limit=False כדי
+    שהממשק יתריע במפורש, לא ינחש/יחתוך מילים בשקט.
+
+    **שיחה ולא מחרוזת מודבקת (ברק, ממצא 2026-09-22).** קודם כל
+    הודעות המשתמש הודבקו ב-"\n" ונשלחו כתיאור אחד. התוצאה: המשתמש
+    שאל שאלה לא תקינה, קיבל סירוב מוצדק, ואז שאל שאלה תקינה לגמרי -
+    וקיבל שוב סירוב שמתייחס ל"חלק הראשון", כי הגוש עדיין הכיל אותו.
+    גם בקשה מפורשת לענות רק על השנייה לא עזרה, מאותה סיבה בדיוק.
+    בתורים נפרדים הסירוב הוא תור בהיסטוריה, לא חלק מהשאלה."""
     try:
-        raw = draft(instructions=_instructions(kind), content=topic_description, max_tokens=400)
+        raw = draft_conversation(instructions=_instructions(kind), turns=turns, max_tokens=400)
     except (LLMConfigError, LLMRequestError) as e:
         raise QueryDraftError(f"שכבת ה-LLM לא זמינה: {e}") from None
+    except ValueError as e:
+        raise QueryDraftError(str(e)) from None
 
     if raw.startswith("לא ניתן לנסח שאילתה"):
         raise QueryDraftError(raw)

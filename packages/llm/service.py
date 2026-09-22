@@ -72,6 +72,26 @@ def draft(*, instructions: str, content: str, max_tokens: int = 1500, complete_f
     return result.text.strip()
 
 
+def draft_conversation(*, instructions: str, turns: list[dict], max_tokens: int = 1500,
+                       complete_fn=complete) -> str:
+    """כמו draft(), אבל על **שיחה** ולא על מחרוזת אחת.
+
+    turns: [{"role": "user"|"assistant", "content": str}, ...] לפי
+    הסדר. ההנחיות נשארות ב-system, כך שהן אינן חלק מהשיחה ואי אפשר
+    "לדבר" איתן החוצה.
+
+    **למה זה קיים:** הדבקת ההיסטוריה למחרוזת אחת הפכה כל סירוב
+    לדביק - שאלה תקינה אחרי שאלה שנדחתה עדיין הכילה את הנדחית, והמודל
+    סירב שוב. בתורים נפרדים, סירוב הוא תור אחד בהיסטוריה ולא חלק
+    מהשאלה הנוכחית."""
+    if not turns:
+        raise ValueError("draft_conversation נקראה בלי אף תור.")
+    if turns[-1].get("role") != "user":
+        raise ValueError("התור האחרון חייב להיות של המשתמש.")
+    result = complete_fn(system=instructions, messages=turns, max_tokens=max_tokens)
+    return result.text.strip()
+
+
 def answer_with_sources(
     *,
     question: str,
