@@ -434,6 +434,66 @@ _STRAY_PUNCTUATION_RE = re.compile(r"^[.,;:]$")
 # לא תוכן (אותה סריקה, אותה החלטה).
 
 
+
+# תגית HTML שלמה. משמש לפיצול בלוק גולמי לקטעי-תגית וקטעי-טקסט.
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_TEMPLATE_OPEN = "{{"
+
+
+def _render_raw_block(raw: str) -> str:
+    """מרנדרת תבניות ויקי **בתוך** בלוק גולמי, בלי לגעת בשלד ה-HTML.
+
+    **הבעיה** (נמדד 21.9.2026): בלוק <table> נשמר verbatim ואינו
+    עובר ב-_flatten בכלל, ולכן כל תבנית בתוכו שורדת עד המסך - 320
+    צמתים ב-102 חוקים, ובהם תוספות ולוחות תעריפים, כלומר בדיוק
+    המקומות שבהם יושבים סכומים ומועדים. המשתמש רואה
+    "{{ח:פנימי|סעיף 5|סעיף 5}}" בתוך תא בטבלה.
+
+    **ההכרעה** (ברק, 22.9.2026): "נקה את הטקסט בתוך התאים בלי
+    לגעת בשלד ה-HTML." התגיות עצמן (<table>, <tr>, <td>, וכל
+    המאפיינים שלהן) הן מה שמחזיק את המבנה ועוברות כפי שהן; רק
+    הטקסט שביניהן עובר _flatten.
+
+    בלוק בלי שום תגית HTML - למשל נספח מילון בתוך {{עמודות}} -
+    עובר _flatten במלואו, כי אין בו שלד לשמור עליו."""
+    if not _HTML_TAG_RE.search(raw):
+        return _flatten(raw)
+    # **{{ש}} בתוך טבלה הוא <br>, לא שורה חדשה.** מחוץ ל-HTML
+    # שורה חדשה היא בדיוק הדבר הנכון, אבל בתוך תא טבלה הדפדפן
+    # מקפל רווחים והמעבר נעלם - וב-{{ש}} מפרידים בין ערכים
+    # מספריים בלוחות (למשל לוח הלחות בפקודת הבטיחות בעבודה),
+    # כך שאיבוד המעבר מדביק שני מספרים זה לזה.
+    raw = re.sub(r"\{\{\s*ש\s*\}\}", "<br>", raw)
+
+    # **הולכים לפי התבניות, לא לפי התגיות.** הגרסה הראשונה פיצלה
+    # את הבלוק על כל `<...>` והריצה _flatten על הקטעים שביניהן -
+    # וזה קרס על שבעה חוקים, כי **תבנית יכולה להימתח מעבר לתגית**
+    # (`{{מוקטן|כינוי התחום</th>...}}` בחוק התקשורת,
+    # `{{דוכיווני|...|ALPHA-BHC<br>...}}` בפקודת הרוקחים). הפיצול
+    # חתך תבניות באמצע ושני החצאים נכשלו בפרסור.
+    #
+    # כאן סורקים את הבלוק ומטפלים רק במה שמתחיל ב-"{{": כל היתר,
+    # ובכלל זה כל תגית HTML, מועתק תו-בתו בלי שינוי. תבנית שאינה
+    # נסגרת בתוך הבלוק נשארת גולמית ואינה מפילה - "תוכנה שקורסת
+    # על קלט פגום היא באג בתוכנה" (CLAUDE.md).
+    out: list[str] = []
+    i = 0
+    while i < len(raw):
+        if raw.startswith(_TEMPLATE_OPEN, i):
+            try:
+                call = _find_template(raw, i)
+            except ValueError:
+                out.append(raw[i])
+                i += 1
+                continue
+            out.append(_flatten(raw[i:call.end]))
+            i = call.end
+        else:
+            out.append(raw[i])
+            i += 1
+    return "".join(out)
+
+
 def _consume_html_table(first_chunk: str, lines: list[str], next_index: int) -> tuple[str, int]:
     """אוספת בלוק <table>...</table> גולמי (HTML, לא MediaWiki) - ראו
     TASKS.md משימה 7: 97/1,021 חוקים בקורפוס, ולא רק "לוח השוואה"
@@ -558,7 +618,7 @@ def parse_wikitext(
                     node_type="raw_block",
                     number="",
                     margin_title=None,
-                    text=html,
+                    text=_render_raw_block(html),
                     text_raw=html,
                     is_normative=True,
                     numbering_space=numbering_space,
@@ -762,7 +822,7 @@ def parse_wikitext(
                     node_type="raw_block",
                     number=label or "",
                     margin_title=None,
-                    text=html,
+                    text=_render_raw_block(html),
                     text_raw=html,
                     is_normative=True,
                     numbering_space=numbering_space,
@@ -814,7 +874,7 @@ def parse_wikitext(
                 node_type="raw_block",
                 number="",
                 margin_title=None,
-                text=line,
+                text=_render_raw_block(line),
                 text_raw=line,
                 is_normative=True,
                 numbering_space=stack[-1][2],

@@ -50,6 +50,17 @@ _STRUCTURE = {"טורים שווים", "טורים שווים ממורכז", "ע
 # מונח דו-לשוני: "עברית (English)". שני הערכים תוכן, לא עיצוב.
 _BILINGUAL = {"דוכיווני", "דוכיווני שווה", "דוכיווני ממורכז"}
 
+# **שבר מתמטי - מוצג כ-a/b, לא מוסר** (ברק, 22.9.2026: "3 4 במקום
+# 3/4 הוא שינוי משמעות"). מופיע בנוסחאות חישוב דמי הבראה (חוקי
+# ההקפאה 2024 ו-2025) ובחוק מס חברות מזערי. הארגומנטים הממוקמים
+# הם מונה ומכנה; ארגומנטים בשם (`כיוון=rtl`, `גודל=100%`) הם
+# עיצוב ויורדים.
+_FRACTION = {"שבר", "sfrac"}
+
+# ארגומנט בשם - "שם=ערך". אותה משפחה בדיוק כמו _NAMED_ARG_RE
+# ב-wikitext_parser: רשימת שמות הייתה נשברת על השם הבא.
+_NAMED_ARG_RE = re.compile(r"^[^=|{}]+=")
+
 # **שורות ממש, לא `|`** (ברק, 2026-09-19): הטקסט מוצג למשתמש
 # בלשונית החוק, ו-`|` באמצע נוסח נראה כמו תקלה.
 _CELL_SEP = "\n"
@@ -110,6 +121,9 @@ def render(text: str) -> str:
             out.append("=")
         elif name in _FORMATTING:
             out.append(" ".join(a for a in args if a))
+        elif name in _FRACTION:
+            positional = [a for a in args if a and not _NAMED_ARG_RE.match(a)]
+            out.append(" / ".join(positional) if positional else "")
         elif name in _BILINGUAL:
             kept = [a for a in args if a]
             out.append(f"{kept[0]} ({kept[1]})" if len(kept) > 1
