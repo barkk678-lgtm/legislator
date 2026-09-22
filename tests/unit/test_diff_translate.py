@@ -10,7 +10,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps" / "api"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 
-from diff_translate import (  # noqa: E402
+from diff_translate import (
+    SupportedAppendAtEnd,
+    SupportedDeleteWords,
+    SupportedInsertAtStart,  # noqa: E402
     SupportedInsertWords,
     SupportedReplaceWords,
     Unsupported,
@@ -42,32 +45,57 @@ def main():
             ok = ok and consistent
             print(("OK  " if consistent else "FAIL"), f"  {name}: שחזור מדויק")
 
-    # הוספה טהורה, עוגן מיידי ייחודי מיד.
+    # הוספה טהורה **באמצע** היחידה, עוגן מיידי ייחודי מיד.
+    # **עודכן (באג ניסוח 1+2, 22.9):** עד אז הדוגמה כאן הוסיפה בסוף
+    # היחידה, וזה דפוס נפרד - `בסופו יבוא "X"` (§7.10.2, עמ' 28).
+    # הדוגמה הוזזה לאמצע כדי להמשיך לבדוק את הדפוס שהיא נכתבה
+    # בשבילו; הוספה בסוף נבדקת בנפרד למטה.
     check(
         "הוספה פשוטה, עוגן ייחודי",
+        "לא ינהל אדם קייטנה בלי רשיון.",
+        "לא ינהל אדם קייטנה מפוקחת בלי רשיון.",
+        # החלוקה בין העוגן לתוספת נופלת על הרווח: כשההוספה באמצע,
+        # נקודת ההוספה היא אחרי "קייטנה ". שני הפיצולים משחזרים את
+        # אותו נוסח, והניסוח עצמו מנוקה ב-engine._diff_text.
+        SupportedInsertWords(anchor_substring="קייטנה ", inserted_text="מפוקחת "),
+    )
+
+    # הוספה בסוף היחידה - דפוס משלה (§7.10.2, עמ' 28).
+    check(
+        "הוספה בסוף היחידה",
         "לא ינהל אדם קייטנה.",
         "לא ינהל אדם קייטנה מפוקחת.",
-        SupportedInsertWords(anchor_substring="קייטנה", inserted_text=" מפוקחת"),
+        SupportedAppendAtEnd(inserted_text="מפוקחת"),
+    )
+
+    # מחיקה - דפוס משלה (§7.10.3, עמ' 28), לא החלפה בריק.
+    check(
+        "מחיקת מילים",
+        "לא ינהל אדם קייטנה בלי רשיון תקף.",
+        "לא ינהל אדם קייטנה בלי רשיון.",
+        SupportedDeleteWords(phrase="תקף"),
     )
 
     # הוספה בתחילת הטקסט (prefix ריק) - אין מילה קודמת לעגן עליה; פער
     # ידוע (דפוס "לפני X יבוא Y", §7.10.2, לא ממומש כ-transform עדיין).
-    result_start = translate_text_edit(
+    # **עודכן (באג ניסוח 1, 22.9):** עד אז הוספה בתחילת היחידה
+    # הוחזרה כ-Unsupported ("אין מילה קודמת לעגן עליה"), וזה היה
+    # החצי הראשון של הבאג שהמשתמש דיווח עליו. הדפוס קיים במדריך:
+    # `לפני "X" יבוא "Y"` (§7.10.2, עמ' 27), והוא ממומש עכשיו.
+    check(
+        "הוספה בתחילת היחידה",
         "ילד הוא מי שטרם מלאו לו שמונה עשרה שנים.",
         "כל ילד הוא מי שטרם מלאו לו שמונה עשרה שנים.",
+        SupportedInsertAtStart(before_phrase="ילד", inserted_text="כל"),
     )
-    passed_start = isinstance(result_start, Unsupported)
-    ok = ok and passed_start
-    print(("OK  " if passed_start else "FAIL"), "הוספה בתחילת הטקסט -> Unsupported",
-          "" if passed_start else f"-> {result_start!r}")
 
     # "קייטנה" חוזרת פעמיים, וגם "מפעיל קייטנה" חוזר פעמיים - רק בהרחבה
     # לשלוש מילים ("אחר מפעיל קייטנה") מגיעים לייחודיות.
     check(
         "הוספה - עוגן מיידי לא ייחודי, נדרש להרחיב",
-        "ארגון נוער מפעיל קייטנה בקיץ, וגם ארגון ותיק אחר מפעיל קייטנה.",
-        "ארגון נוער מפעיל קייטנה בקיץ, וגם ארגון ותיק אחר מפעיל קייטנה מפוקחת.",
-        SupportedInsertWords(anchor_substring="אחר מפעיל קייטנה", inserted_text=" מפוקחת"),
+        "ארגון נוער מפעיל קייטנה בקיץ, וגם ארגון ותיק אחר מפעיל קייטנה גדולה.",
+        "ארגון נוער מפעיל קייטנה בקיץ, וגם ארגון ותיק אחר מפעיל קייטנה מפוקחת גדולה.",
+        SupportedInsertWords(anchor_substring="אחר מפעיל קייטנה ", inserted_text="מפוקחת "),
     )
 
     # החלפה פשוטה.
@@ -97,7 +125,7 @@ def main():
     # האמיתית של InsertWordsAfter/ReplaceWords (הופעה יחידה בדיוק וכו').
     node = LegislativeNode(
         id="law/s1/p0", node_type="paragraph", number="", margin_title=None,
-        text="לא ינהל אדם קייטנה.",
+        text="לא ינהל אדם קייטנה בלי רשיון.",
     )
     law = LegislativeNode(
         id="law", node_type="law", number="", margin_title=None, text="",
@@ -106,8 +134,14 @@ def main():
                              margin_title="כותרת", text="", children=[node]),
         ],
     )
-    result_ins = translate_text_edit("לא ינהל אדם קייטנה.", "לא ינהל אדם קייטנה מפוקחת.")
-    assert isinstance(result_ins, SupportedInsertWords)
+    # **עודכן (באג ניסוח 1+2, 22.9):** הוספה בסוף היחידה היא דפוס
+    # משלה - `בסופו יבוא "X"` (§7.10.2, עמ' 28) - ולא עיגון על
+    # המילה האחרונה, שהיה מייצר טקסט אחרי הנקודה הסוגרת. הבדיקה
+    # כאן ממשיכה לבדוק את InsertWordsAfter, ולכן ההוספה הוזזה
+    # ל**אמצע** הטקסט, שם הדפוס הזה באמת חל.
+    result_ins = translate_text_edit(
+        "לא ינהל אדם קייטנה בלי רשיון.", "לא ינהל אדם קייטנה מפוקחת בלי רשיון.")
+    assert isinstance(result_ins, SupportedInsertWords), result_ins
     after_tree, _ = apply(law, [
         InsertWordsAfter(
             target_id="law/s1/p0",
@@ -116,7 +150,7 @@ def main():
         ),
     ])
     got_text = after_tree.children[0].children[0].text
-    passed_integration1 = got_text == "לא ינהל אדם קייטנה מפוקחת."
+    passed_integration1 = got_text == "לא ינהל אדם קייטנה מפוקחת בלי רשיון."
     ok = ok and passed_integration1
     print(("OK  " if passed_integration1 else "FAIL"),
           "אינטגרציה: InsertWordsAfter אמיתי מקבל את התוצאה בלי שגיאה")

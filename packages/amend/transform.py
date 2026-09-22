@@ -19,6 +19,7 @@ FootnoteAnnotation) שמצביעות על צמתים לפי id - ערוץ נפר
 """
 
 import copy
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -141,6 +142,40 @@ class ReplaceMarginTitleWords:
 
 
 @dataclass
+class DeleteWords:
+    """מוחק ביטוי מתוך הטקסט של הצומת - `המילים "X" – יימחקו`
+    (מדריך משפטים §7.10.3, עמ' 28). **דפוס נפרד מהחלפה בריק**:
+    עד שנוסף, מחיקה יצאה כ-`במקום "X" יבוא ""` - ניסוח שאינו קיים.
+
+    phrase חייב להופיע פעם אחת בדיוק, כמו בכל שאר פעולות המילים."""
+
+    target_id: str
+    phrase: str
+
+
+@dataclass
+class InsertWordsBefore:
+    """מוסיף מילים **לפני** ביטוי קיים - `לפני "X" יבוא "Y"`
+    (§7.10.2, "בתחילת הסעיף")."""
+
+    target_id: str
+    before_phrase: str
+    inserted_text: str
+
+
+@dataclass
+class AppendWordsAtEnd:
+    """מוסיף מילים בסוף היחידה - `בסופו יבוא "Y"` (§7.10.2).
+
+    **לא עוגן על המילה האחרונה**: זה היה מייצר טקסט אחרי הנקודה
+    הסוגרת. התוספת נכנסת לפני סימן הפיסוק הסוגר, מאותו טעם
+    שמתועד ב-merge._apply_append."""
+
+    target_id: str
+    inserted_text: str
+
+
+@dataclass
 class ReplacementAnnotation:
     """מצביעה על צומת (node_id) שעבר ReplaceWords, עם שני הביטויים
     כפי שנבחרו במפורש - ערוץ נפרד מ-.text, לא סמן מוטבע בתוכו (ראו
@@ -149,6 +184,10 @@ class ReplacementAnnotation:
     node_id: str
     old_phrase: str
     new_phrase: str
+    # "replace" (ברירת מחדל, תאימות לאחור) | "delete" | "before" | "append".
+    # engine._render_mutation בוחר לפי זה את הניסוח; בלי השדה הזה כל
+    # פעולת-מילים הייתה מנוסחת כהחלפה.
+    kind: str = "replace"
 
 
 @dataclass
@@ -190,6 +229,9 @@ def apply(
     transformations: list[
         InsertAfter
         | InsertSectionAfter
+        | DeleteWords
+        | InsertWordsBefore
+        | AppendWordsAtEnd
         | AddFirstSubsection
         | InsertWordsAfter
         | ReplaceWords
@@ -351,6 +393,60 @@ def apply(
             pos = target.text.find(t.anchor_substring)
             insert_at = pos + len(t.anchor_substring)
             target.text = target.text[:insert_at] + t.inserted_text + target.text[insert_at:]
+            # **האנוטציה נדרשת כדי לשמור את העוגן המינימלי.** בלעדיה
+            # engine.amend() נופל ל-_diff_text, שמחשב את העוגן מחדש
+            # כ*כל* הטקסט שלפני נקודת ההוספה - ומייצר
+            # `אחרי "לא ינהל אדם קייטנה אלא אם כן יש בידו" יבוא "כדין"`
+            # במקום `אחרי "בידו" יבוא "כדין"`. diff_translate כבר
+            # חישב עוגן ייחודי מינימלי, והוא נזרק.
+            annotations.append(ReplacementAnnotation(
+                node_id=target.id, old_phrase=t.anchor_substring.strip(),
+                new_phrase=t.inserted_text.strip(), kind="after"))
+        elif isinstance(t, DeleteWords):
+            target = _find_by_id(after, t.target_id)
+            if target is None:
+                raise ValueError(f"צומת {t.target_id} לא נמצא")
+            count = target.text.count(t.phrase)
+            if count != 1:
+                raise ValueError(
+                    f"'{t.phrase}' מופיע {count} פעמים בטקסט {t.target_id} - "
+                    "מחיקה דורשת הופעה אחת בדיוק, בלי ניחוש."
+                )
+            # תיקון הרווחים אחרי ההסרה הוא מכני: רווח כפול או רווח
+            # שנשאר לפני סימן פיסוק אינם נוסח חוק.
+            remaining = target.text.replace(t.phrase, "", 1)
+            remaining = re.sub(r"\s{2,}", " ", remaining)
+            remaining = re.sub(r"\s+([.,;:])", r"\1", remaining)
+            target.text = remaining.strip()
+            annotations.append(ReplacementAnnotation(
+                node_id=target.id, old_phrase=t.phrase, new_phrase="", kind="delete"))
+        elif isinstance(t, InsertWordsBefore):
+            target = _find_by_id(after, t.target_id)
+            if target is None:
+                raise ValueError(f"צומת {t.target_id} לא נמצא")
+            count = target.text.count(t.before_phrase)
+            if count != 1:
+                raise ValueError(
+                    f"'{t.before_phrase}' מופיע {count} פעמים בטקסט "
+                    f"{t.target_id} - דו-משמעי, בלי ניחוש."
+                )
+            pos = target.text.find(t.before_phrase)
+            target.text = target.text[:pos] + t.inserted_text + " " + target.text[pos:]
+            annotations.append(ReplacementAnnotation(
+                node_id=target.id, old_phrase=t.before_phrase,
+                new_phrase=t.inserted_text, kind="before"))
+        elif isinstance(t, AppendWordsAtEnd):
+            target = _find_by_id(after, t.target_id)
+            if target is None:
+                raise ValueError(f"צומת {t.target_id} לא נמצא")
+            existing = target.text.rstrip()
+            if existing and existing[-1] in ".;,:":
+                target.text = f"{existing[:-1].rstrip()} {t.inserted_text}{existing[-1]}"
+            else:
+                target.text = f"{existing} {t.inserted_text}"
+            annotations.append(ReplacementAnnotation(
+                node_id=target.id, old_phrase="", new_phrase=t.inserted_text,
+                kind="append"))
         elif isinstance(t, ReplaceWords):
             target = _find_by_id(after, t.target_id)
             if target is None:

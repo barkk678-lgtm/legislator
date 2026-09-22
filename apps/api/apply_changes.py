@@ -23,15 +23,22 @@ from transform import (  # noqa: E402
     Annotation,
     InsertWordsAfter,
     ReplaceMarginTitleWords,
+    AppendWordsAtEnd,
+    DeleteWords,
+    InsertWordsBefore,
     ReplaceWords,
     apply,
 )
 
 from diff_translate import (  # noqa: E402
+    SupportedAppendAtEnd,
+    SupportedDeleteWords,
+    SupportedInsertAtStart,
     SupportedInsertWords,
     SupportedReplaceWords,
     Unsupported,
     translate_text_edit,
+    translate_text_edits,
 )
 from insert_preview import build_insertion_transform  # noqa: E402
 
@@ -102,54 +109,122 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
             continue
 
         original_text = (original_node.margin_title or "") if is_title else original_node.text
-        result = translate_text_edit(original_text, edit.text)
-        if isinstance(result, Unsupported):
+        # **כמה אזורי שינוי בצומת אחד = כמה הוראות.** עריכה חופשית
+        # שמוסיפה מילה בתחילת הסעיף ומילה בסופו היא שני תיקונים
+        # (מדריך §7.10.8), ולא החלפה של הסעיף כולו - הבאג שהמשתמש
+        # דיווח עליו ב-22.9. כותרת שוליים נשארת פעולה יחידה: אין
+        # דפוס של שתי פעולות על אותה כותרת.
+        if is_title:
+            results = [translate_text_edit(original_text, edit.text)]
+        else:
+            results = translate_text_edits(original_text, edit.text)
+
+        # אזור שאי אפשר לתרגם פוסל את **כל** העריכה בצומת, ואינו
+        # מושמט בשקט: עריכה שחלקה הוחל וחלקה לא היא בדיוק הנוסח
+        # החלקי שנראה אמין.
+        unsupported = next((r for r in results if isinstance(r, Unsupported)), None)
+        if unsupported is not None:
             edit_statuses.append(
-                EditStatus(node_id=edit.node_id, ok=False, field=field, reason=result.reason)
+                EditStatus(node_id=edit.node_id, ok=False, field=field,
+                           reason=unsupported.reason)
             )
             continue
 
-        if is_title:
-            # §7.8: אין דפוס "הוספת מילים" נפרד לכותרת שוליים, רק
-            # "במקום X יבוא Y" - הוספה טהורה מתורגמת ל-old=anchor,
-            # new=anchor+inserted (עדיין ReplaceMarginTitleWords יחיד).
-            if isinstance(result, SupportedInsertWords):
-                old_phrase = result.anchor_substring
-                new_phrase = result.anchor_substring + result.inserted_text
-            else:
-                old_phrase, new_phrase = result.old_phrase, result.new_phrase
-            t = ReplaceMarginTitleWords(
-                section_number=original_node.number, old_phrase=old_phrase, new_phrase=new_phrase,
+        for result in results:
+            current, annotations, edit_statuses = _apply_one_operation(
+                current, result, edit, field, is_title, original_node,
+                annotations, edit_statuses,
             )
-            current, ann = apply(current, [t])
-            annotations.extend(ann)
-            edit_statuses.append(EditStatus(
-                node_id=edit.node_id, ok=True, field=field,
-                old_phrase=old_phrase, new_phrase=new_phrase,
-            ))
-        elif isinstance(result, SupportedInsertWords):
-            t = InsertWordsAfter(
-                target_id=edit.node_id,
-                anchor_substring=result.anchor_substring,
-                inserted_text=result.inserted_text,
-            )
-            current, ann = apply(current, [t])
-            annotations.extend(ann)
-            edit_statuses.append(EditStatus(
-                node_id=edit.node_id, ok=True, field=field,
-                anchor_substring=result.anchor_substring, inserted_text=result.inserted_text,
-            ))
-        elif isinstance(result, SupportedReplaceWords):
-            t = ReplaceWords(
-                target_id=edit.node_id, old_phrase=result.old_phrase, new_phrase=result.new_phrase,
-            )
-            current, ann = apply(current, [t])
-            annotations.extend(ann)
-            edit_statuses.append(EditStatus(
-                node_id=edit.node_id, ok=True, field=field,
-                old_phrase=result.old_phrase, new_phrase=result.new_phrase,
-            ))
+        continue
 
+    return _finish(before, current, annotations, edit_statuses, insertions)
+
+
+def _apply_one_operation(current, result, edit, field, is_title, original_node,
+                         annotations, edit_statuses):
+    """פעולה אחת (מתוך אחת או יותר על אותו צומת) -> transform + סטטוס."""
+    if is_title:
+        # §7.8: אין דפוס "הוספת מילים" נפרד לכותרת שוליים, רק
+        # "במקום X יבוא Y" - הוספה טהורה מתורגמת ל-old=anchor,
+        # new=anchor+inserted (עדיין ReplaceMarginTitleWords יחיד).
+        # §7.8 מגדיר לכותרת שוליים דפוס אחד בלבד - "במקום X יבוא Y".
+        # כל שאר הדפוסים (הוספה בתחילה/בסוף, מחיקה) ממופים אליו,
+        # ואינם מקבלים ניסוח משלהם: אין להם מקור לכותרת שוליים.
+        if isinstance(result, SupportedInsertWords):
+            old_phrase = result.anchor_substring
+            new_phrase = result.anchor_substring + result.inserted_text
+        elif isinstance(result, SupportedInsertAtStart):
+            old_phrase = result.before_phrase
+            new_phrase = f"{result.inserted_text} {result.before_phrase}"
+        elif isinstance(result, SupportedAppendAtEnd):
+            title = original_node.margin_title or ""
+            old_phrase = title.split()[-1] if title.split() else title
+            new_phrase = f"{old_phrase} {result.inserted_text}"
+        elif isinstance(result, SupportedDeleteWords):
+            old_phrase, new_phrase = result.phrase, ""
+        else:
+            old_phrase, new_phrase = result.old_phrase, result.new_phrase
+        t = ReplaceMarginTitleWords(
+            section_number=original_node.number, old_phrase=old_phrase, new_phrase=new_phrase,
+        )
+        current, ann = apply(current, [t])
+        annotations.extend(ann)
+        edit_statuses.append(EditStatus(
+            node_id=edit.node_id, ok=True, field=field,
+            old_phrase=old_phrase, new_phrase=new_phrase,
+        ))
+    elif isinstance(result, SupportedInsertWords):
+        t = InsertWordsAfter(
+            target_id=edit.node_id,
+            anchor_substring=result.anchor_substring,
+            inserted_text=result.inserted_text,
+        )
+        current, ann = apply(current, [t])
+        annotations.extend(ann)
+        edit_statuses.append(EditStatus(
+            node_id=edit.node_id, ok=True, field=field,
+            anchor_substring=result.anchor_substring, inserted_text=result.inserted_text,
+        ))
+    elif isinstance(result, SupportedReplaceWords):
+        t = ReplaceWords(
+            target_id=edit.node_id, old_phrase=result.old_phrase, new_phrase=result.new_phrase,
+        )
+        current, ann = apply(current, [t])
+        annotations.extend(ann)
+        edit_statuses.append(EditStatus(
+            node_id=edit.node_id, ok=True, field=field,
+            old_phrase=result.old_phrase, new_phrase=result.new_phrase,
+        ))
+    elif isinstance(result, SupportedDeleteWords):
+        # `המילים "X" – יימחקו` (§7.10.3), ולא החלפה בריק.
+        current, ann = apply(current, [DeleteWords(
+            target_id=edit.node_id, phrase=result.phrase)])
+        annotations.extend(ann)
+        edit_statuses.append(EditStatus(
+            node_id=edit.node_id, ok=True, field=field,
+            old_phrase=result.phrase, new_phrase="",
+        ))
+    elif isinstance(result, SupportedInsertAtStart):
+        current, ann = apply(current, [InsertWordsBefore(
+            target_id=edit.node_id, before_phrase=result.before_phrase,
+            inserted_text=result.inserted_text)])
+        annotations.extend(ann)
+        edit_statuses.append(EditStatus(
+            node_id=edit.node_id, ok=True, field=field,
+            old_phrase=result.before_phrase, new_phrase=result.inserted_text,
+        ))
+    elif isinstance(result, SupportedAppendAtEnd):
+        current, ann = apply(current, [AppendWordsAtEnd(
+            target_id=edit.node_id, inserted_text=result.inserted_text)])
+        annotations.extend(ann)
+        edit_statuses.append(EditStatus(
+            node_id=edit.node_id, ok=True, field=field,
+            inserted_text=result.inserted_text,
+        ))
+    return current, annotations, edit_statuses
+
+
+def _finish(before, current, annotations, edit_statuses, insertions):
     insertion_errors: list[InsertionError] = []
     for ins in insertions:
         margin_title = getattr(ins, "margin_title", None)

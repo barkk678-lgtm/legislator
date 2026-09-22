@@ -599,6 +599,39 @@ def _container_suffix(section: LegislativeNode, node: LegislativeNode, *, inclus
 
 
 
+
+def _render_word_operation(annotation: ReplacementAnnotation) -> str:
+    """ניסוח פעולת-מילים אחת, **בלי הנקודה הסוגרת** - היא נוספת פעם
+    אחת בסוף, אחרי חיבור כל הפעולות.
+
+    | kind | הניסוח | מקור |
+    |---|---|---|
+    | `replace` | `במקום "X" יבוא "Y"` | §7.10.1, עמ' 27 |
+    | `delete` | `המילים "X" – יימחקו` | §7.10.3, עמ' 28 |
+    | `before` | `לפני "X" יבוא "Y"` | §7.10.2, עמ' 27 |
+    | `append` | `בסופו יבוא "Y"` | §7.10.2, עמ' 28 |
+
+    **"המילים" מופיעה רק במחיקה** - שם היא הנושא הדקדוקי של הפועל.
+    בתפקיד עוגן היא נעדרת. ראו drafting-rules.md §8.7.1.
+    """
+    if annotation.kind == "delete":
+        # התאמת מין ומספר. תבנית המדריך (§7.10.3) כתובה על ביטוי
+        # רב-מילים - `המילים "ציטוט מהסעיף הקיים" – יימחקו` - ואין
+        # בו תבנית למילה יחידה. המדריך עצמו כותב "המילה" ביחיד
+        # בגוף הטקסט (עמ' 23: 'אם המילה "המנהל" מופיעה בסעיף'),
+        # ולכן ההטיה נגזרת מהדקדוק ולא מומצאת.
+        if len(annotation.old_phrase.split()) == 1:
+            return f'המילה "{annotation.old_phrase}" – תימחק'
+        return f'המילים "{annotation.old_phrase}" – יימחקו'
+    if annotation.kind == "before":
+        return f'לפני "{annotation.old_phrase}" יבוא "{annotation.new_phrase}"'
+    if annotation.kind == "append":
+        return f'בסופו יבוא "{annotation.new_phrase}"'
+    if annotation.kind == "after":
+        return f'אחרי "{annotation.old_phrase}" יבוא "{annotation.new_phrase}"'
+    return f'במקום "{annotation.old_phrase}" יבוא "{annotation.new_phrase}"'
+
+
 def _definition_clause(section: LegislativeNode, node: LegislativeNode, *, inclusive: bool) -> str:
     """פסוקית ההגדרה בכתובת ההוראה: `בהגדרה "המונח", `.
 
@@ -629,7 +662,7 @@ def _definition_clause(section: LegislativeNode, node: LegislativeNode, *, inclu
 def _render_mutation(
     section_number: str,
     mutation: _Mutation,
-    replacement: ReplacementAnnotation | None,
+    replacements: list[ReplacementAnnotation],
     *,
     full_title: str | None = None,
     law_footnote_key: str | None = None,
@@ -647,11 +680,21 @@ def _render_mutation(
 
     כשהקיצור "(להלן – החוק העיקרי)" מוגדר באותה שורה, הוא לא משמש שוב
     בה: "בסעיף N," ולא "בסעיף N לחוק העיקרי," (ראו מקרה הזהב, סעיף 5)."""
-    if replacement is not None:
-        # דפוס "החלפת מילים" (drafting-rules.md §1.1 שורה 1) - הביטויים
-        # מגיעים מ-ReplacementAnnotation, לא נגזרים מדיף.
-        _validate_replacement(mutation.before_text, mutation.after_text, replacement)
-        body = f'במקום "{replacement.old_phrase}" יבוא "{replacement.new_phrase}".'
+    if replacements:
+        # דפוס "החלפת מילים" ואחיו - הביטויים מגיעים מ-
+        # ReplacementAnnotation, לא נגזרים מדיף.
+        #
+        # **כמה פעולות על אותו צומת מחוברות ב-ו', לא נבלעות.** מדריך
+        # משפטים §7.10.8, עמ' 30 [PDF 59] "תיקונים שלובים בסעיף אחד":
+        # `בסעיף 5, במקום "שבהם" יבוא "שלגביהם" ובכל מקום, במקום
+        # "ייקבעו" יבוא "יחושבו".` עד לתיקון הזה שני שינויים באותו
+        # צומת פרשו חלון דיף יחיד שהשתרע על כל הטקסט, והתוצאה הייתה
+        # **החלפה של הסעיף כולו** - נמצא על ידי המשתמש ב-22.9.
+        if len(replacements) == 1 and replacements[0].kind == "replace":
+            _validate_replacement(
+                mutation.before_text, mutation.after_text, replacements[0]
+            )
+        body = " ו".join(_render_word_operation(r) for r in replacements) + "."
     else:
         anchor, inserted = _diff_text(mutation.before_text, mutation.after_text)
         anchor, inserted = anchor.strip(), inserted.strip()
@@ -756,9 +799,13 @@ def amend(
     לא נגזר מהעץ עצמו.
     """
     annotations = annotations or []
-    replacements_by_id = {
-        a.node_id: a for a in annotations if isinstance(a, ReplacementAnnotation)
-    }
+    # **רשימה לכל צומת, לא אנוטציה אחת.** צומת יכול לעבור כמה
+    # פעולות מילים נפרדות (מדריך §7.10.8 "תיקונים שלובים בסעיף
+    # אחד"), ומילון שמור-אחרון היה בולע את כל הפעולות פרט לאחרונה.
+    replacements_by_id: dict[str, list[ReplacementAnnotation]] = {}
+    for a in annotations:
+        if isinstance(a, ReplacementAnnotation):
+            replacements_by_id.setdefault(a.node_id, []).append(a)
     footnotes_by_id = {a.node_id: a for a in annotations if isinstance(a, FootnoteAnnotation)}
 
     # תוקן (2026-09-16): רקורסיבי בכל עומק, לא רק before.children/
@@ -859,7 +906,11 @@ def amend(
         if len(instructions) == 1 and isinstance(instructions[0], _MarginTitleMutation):
             # מוסק מדפוס _Mutation: שינוי כותרת שוליים בודד מתלכד לשורה
             # אחת, באותו אופן בדיוק שמוטציית טקסט בודדת מתלכדת.
-            replacement = replacements_by_id.get(instructions[0].node_id)
+            # **כותרת שוליים נשארת פעולה יחידה:** "תיקונים שלובים"
+            # (§7.10.8) מדבר על תוכן הסעיף, ואין דפוס של שתי פעולות
+            # על אותה כותרת. לכן נלקחת הראשונה ולא נבנית רשימה.
+            title_annotations = replacements_by_id.get(instructions[0].node_id) or []
+            replacement = title_annotations[0] if title_annotations else None
             if touched_count == 1:
                 title_line = _render_margin_title_mutation(
                     number, instructions[0], replacement,
@@ -880,7 +931,7 @@ def amend(
             # או "סעיף שאינו הראשון שנוגעים בו"? בקייטנות שני התנאים
             # חופפים (סעיף 2 הוא גם מוטציה יחידה וגם לא-ראשון) ואי אפשר
             # להפריד ביניהם ממקרה אחד.
-            replacement = replacements_by_id.get(instructions[0].node_id)
+            replacement = replacements_by_id.get(instructions[0].node_id) or []
             # המכולה: הטקסט שמשתנה הוא של before_node עצמו, ולכן הוא
             # נכלל בשרשרת - `בסעיף 30(ב), במקום "..." יבוא`. ראו
             # _container_suffix ו-drafting-rules.md §8.7. כותרת השוליים
@@ -1041,12 +1092,13 @@ def amend(
                     _stamp_provenance(insertion_line, before_anchor, before)
                 lines.extend(insertion_lines)
             elif isinstance(instruction, _MarginTitleMutation):
-                replacement = replacements_by_id.get(instruction.node_id)
-                title_line = _render_margin_title_mutation(number, instruction, replacement)
+                found = replacements_by_id.get(instruction.node_id) or []
+                title_line = _render_margin_title_mutation(
+                    number, instruction, found[0] if found else None)
                 _stamp_provenance(title_line, instruction.before_node, before)
                 lines.append(title_line)
             else:
-                replacement = replacements_by_id.get(instruction.node_id)
+                replacement = replacements_by_id.get(instruction.node_id) or []
                 mutation_line = _render_mutation(number, instruction, replacement)
                 _stamp_provenance(mutation_line, instruction.before_node, before)
                 lines.append(mutation_line)
