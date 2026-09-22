@@ -21,6 +21,8 @@ import sys
 import time
 from dataclasses import dataclass
 
+import json
+
 import httpx
 
 # ── מקור יחיד למפתחות ──────────────────────────────────────────────
@@ -34,6 +36,9 @@ from env_file import MissingSecret, require, require_supabase  # noqa: E402
 
 _API_URL = "https://api.anthropic.com/v1/messages"
 _API_VERSION = "2023-06-01"
+# מטמון של שעה במקום חמש דקות - נדרש header ניסיוני, נבדק בפועל
+# (2026-09-22): התשובה חזרה עם ephemeral_1h_input_tokens=154,230.
+_CACHE_1H_BETA = "extended-cache-ttl-2025-04-11"
 DEFAULT_MODEL = "claude-sonnet-5"
 
 
@@ -120,3 +125,87 @@ def complete(
         output_tokens=usage.get("output_tokens", 0),
         stop_reason=data.get("stop_reason", ""),
     )
+
+
+def complete_stream(
+    *,
+    system: str | list[dict],
+    user_message: str,
+    max_tokens: int = 1500,
+    model: str = DEFAULT_MODEL,
+    cache_system: bool = False,
+):
+    """גרסת הזרמה של complete(). מחזירה generator שמניב מחרוזות טקסט
+    ככל שהן מגיעות, ובסופו **מניבה אובייקט RawCompletion אחד** עם
+    הטקסט המלא וספירת הטוקנים - כדי שהקורא יוכל להריץ את אותן
+    בדיקות בדיוק על הטקסט המוגמר.
+
+    **למה הזרמה ולא complete():** נמדד (2026-09-22) שעם כל מאגר
+    התקנון בהקשר (154K טוקנים) התשובה המלאה לוקחת 17.5 שניות -
+    17 שניות של מסך ריק, גרוע מהמצב שהיא מחליפה. בהזרמה עם מטמון
+    חם המילה הראשונה מגיעה ב-**0.6 שניות**. ההזרמה אינה נוחות כאן
+    אלא תנאי לכך שהשינוי לא יהיה נסיגה.
+
+    cache_system=True מסמן את גוש ה-system למטמון של שעה. הערך נבחר
+    כי השימוש בכלי מגיע בפרצים (ברק: "עשרים דקות, עשר שאלות, ואז לא
+    נוגע בו יום") - מטמון של חמש דקות היה נכתב מחדש בכל פרץ.
+
+    **בלי ניסיונות חוזרים, בניגוד ל-complete().** ברגע שהתחלנו
+    להזרים טקסט למשתמש אי אפשר "לנסות שוב" בלי להציג לו תשובה
+    שנייה על גבי הראשונה; וכשל לפני התו הראשון מדווח מיד ובגלוי.
+    """
+    key = _api_key()
+    blocks = [{"type": "text", "text": system}] if isinstance(system, str) else list(system)
+    if cache_system and blocks:
+        blocks[-1] = {**blocks[-1], "cache_control": {"type": "ephemeral", "ttl": "1h"}}
+    body = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "thinking": {"type": "disabled"},
+        "stream": True,
+        "system": blocks,
+        "messages": [{"role": "user", "content": user_message}],
+    }
+    headers = {
+        "x-api-key": key,
+        "anthropic-version": _API_VERSION,
+        "content-type": "application/json",
+    }
+    if cache_system:
+        headers["anthropic-beta"] = _CACHE_1H_BETA
+
+    parts: list[str] = []
+    usage_in = usage_out = 0
+    stop_reason = ""
+    try:
+        with httpx.Client(timeout=300.0) as client:
+            with client.stream("POST", _API_URL, json=body, headers=headers) as resp:
+                if resp.status_code >= 400:
+                    resp.read()
+                    raise LLMRequestError(
+                        f"HTTP {resp.status_code} מ-Anthropic: {resp.text[:300]}")
+                for line in resp.iter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    event = json.loads(line[6:])
+                    kind = event.get("type")
+                    if kind == "message_start":
+                        u = event["message"].get("usage", {})
+                        # טוקנים שנקראו מהמטמון הם קלט לכל דבר מבחינת
+                        # מה שהמודל ראה - נספרים, אחרת המדידה משקרת.
+                        usage_in = (u.get("input_tokens", 0)
+                                    + u.get("cache_read_input_tokens", 0)
+                                    + u.get("cache_creation_input_tokens", 0))
+                    elif kind == "content_block_delta":
+                        piece = event.get("delta", {}).get("text", "")
+                        if piece:
+                            parts.append(piece)
+                            yield piece
+                    elif kind == "message_delta":
+                        usage_out = event.get("usage", {}).get("output_tokens", usage_out)
+                        stop_reason = event.get("delta", {}).get("stop_reason", stop_reason)
+    except httpx.TransportError as e:
+        raise LLMRequestError(f"קריאה מוזרמת ל-Anthropic נכשלה: {e}") from None
+
+    yield RawCompletion(text="".join(parts), input_tokens=usage_in,
+                        output_tokens=usage_out, stop_reason=stop_reason)

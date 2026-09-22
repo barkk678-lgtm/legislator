@@ -1277,7 +1277,46 @@ document.getElementById("agenda-copy-btn").addEventListener("click", async () =>
   }
 });
 
+// --- מומחה התקנון: עזרי ניסוח ---
+// השאלה לדוגמה היא ה-placeholder של תיבת הקלט, ולכן היא **חוזרת
+// אחרי כל שליחה** כשהתיבה מתרוקנת - וכך היא הופיעה באמצע שיחה.
+// אחרי ההודעה הראשונה היא מוחלפת בניסוח ניטרלי.
+function hideRulesExamples() {
+  const input = document.getElementById("rules-composer-input");
+  input.placeholder = "שאלה נוספת על התקנון…";
+}
+
+// **ניסוח הסירוב הוא מה שהמשתמש רואה, לא מה שהמערכת חשבה.**
+// "נדחתה כהפרת-עיגון" ו"לא-מעוגנת" הן הודעות פנימיות שדלפו.
+// המודל מסמן את המצב בתחילת ההסבר ([דעה] / [מחוץ לתחום]), ולכן
+// אין כאן רשימת מילות-מפתח שמנחשת מה נשאל.
+function rulesRefusalText(question, reason) {
+  const r = reason || "";
+  if (r.includes("[דעה]")) {
+    return "דעות זה לא המחלקה שלי — אני לא בן אדם, ואין לי העדפות. " +
+      "מה שכן יש לי זה את תקנון הכנסת, חוק הכנסת וחוק-יסוד: הכנסת, " +
+      "ואת אלה אני מכיר היטב. שאלו אותי עליהם.";
+  }
+  if (r.includes("[מחוץ לתחום]")) {
+    return "השאלה הזו מחוץ למה שהכלי מכסה. אני עונה רק על סמך תקנון " +
+      "הכנסת, חוק הכנסת וחוק-יסוד: הכנסת — סדרי הדיון והישיבות, הליך " +
+      "החקיקה, ועדות, הצבעות, הסתייגויות, חסינות וכהונת חברי הכנסת.";
+  }
+  return "לא מצאתי תשובה חד-משמעית ואני לא רוצה להטעות — אולי תנסה " +
+    "לדייק את השאלה.";
+}
+
 // --- מומחה התקנון (ברק, 2026-09-17) ---
+// **התשובה מוזרמת, וזה תנאי ולא נוחות.** כל מאגר התקנון (154K
+// טוקנים) נכנס לכל שאלה, ולכן התשובה המלאה לוקחת ~17 שניות. בלי
+// הזרמה זה 17 שניות של מסך ריק - גרוע מהמצב שהוחלף. עם הזרמה
+// ומטמון חם המילה הראשונה מגיעה ב-0.6 שניות, ולכן אין כאן גם
+// אנימציית המתנה אחרי התו הראשון: הטקסט עצמו הוא החיווי.
+//
+// **ושומר הציטוט מגיע בסוף, אחרי שהטקסט כבר על המסך.** זה ההבדל
+// היחיד מהמצב הקודם, והוא מטופל במפורש: כשהפסק הוא refused,
+// הבועה שהוזרמה **מוחלפת** בהודעה - אסור להשאיר על המסך תשובה
+// שהשומר פסל.
 async function sendRulesMessage() {
   const input = document.getElementById("rules-composer-input");
   const text = input.value.trim();
@@ -1287,28 +1326,87 @@ async function sendRulesMessage() {
   appendMsg(chat, "u", escapeHtml(text));
   input.value = "";
   input.disabled = true;
+  hideRulesExamples();
 
-  const thinking = appendThinking(chat, "מחפש בתקנון…");
+  const thinking = appendThinking(chat, "קורא את התקנון…");
+  let bubble = null, body = null, acc = "";
+  const ensureBubble = () => {
+    if (bubble) return;
+    thinking.remove();
+    bubble = appendMsg(chat, "a", "");
+    body = document.createElement("span");
+    bubble.appendChild(body);
+  };
+
   try {
-    const resp = await fetch("/api/rules/ask", {
+    const resp = await fetch("/api/rules/ask/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: text }),
     });
-    if (!resp.ok) {
+    if (!resp.ok || !resp.body) {
       const err = await resp.json().catch(() => ({}));
       appendMsg(chat, "err", escapeHtml(err.detail || "שגיאה במענה."));
       return;
     }
-    const result = await resp.json();
-    if (result.refused) {
-      appendMsg(chat, "a", `לא ניתן לענות על סמך תקנון הכנסת/חוק הכנסת/חוק-יסוד: הכנסת בלבד.<br><span style="color:var(--soft);font-size:12.5px">${escapeHtml(result.refusal_reason || "")}</span>`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", done = null, streamError = null;
+    for (;;) {
+      const { value, done: finished } = await reader.read();
+      if (finished) break;
+      buf += decoder.decode(value, { stream: true });
+      // NDJSON: שורה שלמה בלבד. שורה חלקית נשארת בחוצץ - פענוח
+      // שלה היה זורק, ומאבד את שאר התשובה.
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line); } catch { continue; }
+        if (ev.delta) {
+          ensureBubble();
+          acc += ev.delta;
+          body.textContent = acc;
+          chat.scrollTop = chat.scrollHeight;
+        } else if (ev.done) {
+          done = ev.done;
+        } else if (ev.error) {
+          streamError = ev.error;
+        }
+      }
+    }
+
+    if (streamError) {
+      // כשל שהתרחש אחרי שה-200 כבר יצא. אם כבר הוזרם טקסט - הוא
+      // חלקי, ואסור להשאיר אותו כאילו הוא תשובה שלמה.
+      if (bubble) bubble.remove();
+      appendMsg(chat, "err", escapeHtml(streamError));
       return;
     }
-    const citedHtml = result.cited_source_ids.length
-      ? `<div class="word-count">מקורות: ${result.cited_source_ids.map(escapeHtml).join(", ")}</div>`
-      : "";
-    appendMsg(chat, "a", `${escapeHtml(result.text)}${citedHtml}`);
+    if (!done) {
+      if (bubble) bubble.remove();
+      appendMsg(chat, "err", "התשובה נקטעה באמצע ואינה שלמה. נסו שוב.");
+      return;
+    }
+    if (done.refused) {
+      if (bubble) bubble.remove();
+      appendMsg(chat, "a", escapeHtml(rulesRefusalText(text, done.refusal_reason)));
+      return;
+    }
+    ensureBubble();
+    body.textContent = done.text || acc;
+    if ((done.cited_sources || []).length) {
+      const cites = document.createElement("div");
+      cites.className = "word-count";
+      cites.textContent = `מקורות: ${done.cited_sources.join(" · ")}`;
+      bubble.appendChild(cites);
+    }
+  } catch {
+    if (bubble) bubble.remove();
+    appendMsg(chat, "err", "החיבור נקטע לפני שהתשובה הושלמה. נסו שוב.");
   } finally {
     thinking.remove();
     input.disabled = false;

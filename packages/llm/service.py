@@ -27,7 +27,13 @@
 import re
 from dataclasses import dataclass
 
-from client import LLMConfigError, LLMRequestError, complete  # noqa: F401 (re-exported)
+from client import (  # noqa: F401 (re-exported)
+    LLMConfigError,
+    LLMRequestError,
+    RawCompletion,
+    complete,
+    complete_stream,
+)
 
 _CITATION_RE = re.compile(r"\[מקור:([^\]]+)\]")
 _NO_SOURCES_REFUSAL = "אין מקורות רלוונטיים סופקו - לא ניתן לענות בלי עיגון בקורפוס."
@@ -141,3 +147,75 @@ def answer_with_sources(
         input_tokens=completion.input_tokens,
         output_tokens=completion.output_tokens,
     )
+
+
+def _grounding_verdict(text: str, known_ids: set[str]) -> tuple[bool, str | None, list[str]]:
+    """**שומר הציטוט, מופרד מההרכבה של התשובה.** בדיוק אותן שלוש
+    בדיקות של answer_with_sources - סירוב מפורש של המודל, ציטוט
+    למזהה לא מוכר, ותשובה בלי אף ציטוט - כדי שגרסת ההזרמה לא תהיה
+    עותק שני שנסחף. מחזיר (refused, reason, cited)."""
+    if text.startswith(_MODEL_REFUSAL_PREFIX):
+        return True, text[len(_MODEL_REFUSAL_PREFIX):].strip() or "המודל דיווח שאין מספיק מידע במקורות.", []
+    cited = _CITATION_RE.findall(text)
+    unknown = [c for c in cited if c not in known_ids]
+    if unknown:
+        return True, f"התשובה ציטטה מזהי מקור לא מוכרים: {unknown} - נדחתה כהפרת-עיגון, לא הוצגה כתקינה.", []
+    if not cited:
+        return True, "התשובה לא כללה אף ציטוט מקור, למרות שסופקו מקורות - נדחתה כלא-מעוגנת.", []
+    return False, None, sorted(set(cited))
+
+
+def answer_with_sources_stream(
+    *,
+    question: str,
+    sources: list[SourceChunk],
+    extra_instructions: str = "",
+    max_tokens: int = 1500,
+    cache_sources: bool = True,
+    stream_fn=complete_stream,
+):
+    """גרסת הזרמה של answer_with_sources. מניבה מחרוזות טקסט ככל
+    שהן מגיעות, ובסוף **מניבה LLMResult אחד** עם פסק הדין של שומר
+    הציטוט על הטקסט המלא.
+
+    **שומר הציטוט לא נחלש - אבל הוא מגיע אחרי שהטקסט כבר על המסך,
+    וזה שינוי אמיתי שצריך להיות מודע לו.** ב-answer_with_sources
+    תשובה לא-מעוגנת לעולם לא נראתה; כאן היא נראית ואז נמשכת. ולכן
+    הקורא **חייב** לבדוק את ה-LLMResult האחרון ולהחליף את מה שהוצג
+    כשהוא refused - הזרמה שמתעלמת ממנו מציגה תשובה לא-מעוגנת
+    כתקינה, וזה בדיוק מה שהשומר נועד למנוע.
+
+    בלי sources - סירוב בלי קריאת רשת, זהה ל-answer_with_sources."""
+    if not sources:
+        yield LLMResult(text="", refused=True, refusal_reason=_NO_SOURCES_REFUSAL,
+                        cited_source_ids=[], input_tokens=0, output_tokens=0)
+        return
+
+    known_ids = {s.id for s in sources}
+    context_block = "\n\n".join(f"[מקור:{s.id}] ({s.label})\n{s.text}" for s in sources)
+    system = (
+        "אתה עונה אך ורק על סמך המקורות שסופקו למטה, בעברית. "
+        "כל משפט עובדתי בתשובה חייב להסתיים בציטוט בפורמט [מקור:<מזהה>], "
+        "כשה-<מזהה> הוא בדיוק אחד ממזהי המקורות שסופקו - אסור להמציא מזהה. "
+        "מותר וצריך להסיק מצירוף של כמה מקורות; כשהמסקנה נובעת מכמה "
+        "סעיפים - צטט את כולם. אם המקורות שסופקו אינם מכילים מספיק מידע "
+        "לענות על השאלה, אל תנחש ואל תשתמש בידע כללי - השב בדיוק במילים: "
+        f'"{_MODEL_REFUSAL_PREFIX} <הסבר קצר>".\n\n'
+        f"{extra_instructions}\n\nהמקורות:\n{context_block}"
+    )
+
+    completion: RawCompletion | None = None
+    for piece in stream_fn(system=system, user_message=question,
+                           max_tokens=max_tokens, cache_system=cache_sources):
+        if isinstance(piece, RawCompletion):
+            completion = piece
+        else:
+            yield piece
+    if completion is None:
+        raise LLMRequestError("ההזרמה הסתיימה בלי סיכום שימוש - תשובה לא שלמה.")
+
+    text = completion.text.strip()
+    refused, reason, cited = _grounding_verdict(text, known_ids)
+    yield LLMResult(text="" if refused else text, refused=refused, refusal_reason=reason,
+                    cited_source_ids=cited, input_tokens=completion.input_tokens,
+                    output_tokens=completion.output_tokens)

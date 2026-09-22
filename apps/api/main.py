@@ -12,6 +12,7 @@ uvicorn main:app --reload - ואז http://127.0.0.1:8000/
 """
 
 import dataclasses
+import json
 import io
 import sys
 import tempfile
@@ -58,7 +59,12 @@ from knesset_queries import (  # noqa: E402
     search_queries,
 )
 from research import TEMPLATES as RESEARCH_TEMPLATES, ResearchError, ask as research_ask  # noqa: E402
-from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
+from rules_expert import (  # noqa: E402
+    RulesExpertError,
+    ask as rules_expert_ask,
+    ask_stream as rules_expert_stream,
+    source_labels as rules_source_labels,
+)
 from service import LLMConfigError, LLMRequestError  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "config"))
 from env_file import MissingSecret  # noqa: E402
@@ -1043,8 +1049,9 @@ def api_agenda_draft(req: AgendaDraftRequestIn) -> dict:
 
 
 # ── מומחה התקנון (ברק, 2026-09-17) ──────────────────────────────────────
-# ראו rules_expert.py - חיבור packages/llm.answer_with_sources() +
-# retrieval מילות-מפתח (עד שחיפוש סמנטי, משימה א, יהיה זמין).
+# ראו rules_expert.py - כל שלושת המקורות נכנסים לכל שאלה, עם מטמון
+# של שעה, והתשובה מוזרמת. בלי הזרמה השינוי היה נסיגה (17 שניות של
+# מסך ריק); עם הזרמה המילה הראשונה ב-0.6 שניות.
 
 
 @app.post("/api/rules/ask")
@@ -1057,5 +1064,38 @@ def api_rules_ask(req: RulesAskRequestIn) -> dict:
         "text": result.text,
         "refused": result.refused,
         "refusal_reason": result.refusal_reason,
-        "cited_source_ids": result.cited_source_ids,
+        "cited_sources": rules_source_labels(result.cited_source_ids),
     }
+
+
+@app.post("/api/rules/ask/stream")
+def api_rules_ask_stream(req: RulesAskRequestIn) -> StreamingResponse:
+    """NDJSON: שורת JSON אחת לכל אירוע. {"delta": "..."} לכל קטע
+    טקסט, ובסוף {"done": {...}} עם פסק הדין של שומר הציטוט.
+
+    **הפסק בסוף אינו קישוט.** בהזרמה הטקסט מגיע למסך לפני שהשומר
+    הספיק לבדוק אותו; הלקוח חייב להחליף את מה שהציג כש-refused
+    הוא true. ראו service.answer_with_sources_stream.
+
+    שורת שגיאה ({"error": "..."}) נשלחת בתוך הזרם כשהכשל קורה
+    אחרי שה-200 כבר יצא - אחרת הוא היה נראה כמו תשובה שנגמרה."""
+    def events():
+        try:
+            for piece in rules_expert_stream(req.question):
+                if isinstance(piece, str):
+                    yield json.dumps({"delta": piece}, ensure_ascii=False) + "\n"
+                else:
+                    yield json.dumps({"done": {
+                        "text": piece.text,
+                        "refused": piece.refused,
+                        "refusal_reason": piece.refusal_reason,
+                        # **שמות בעברית, לא מזהים פנימיים.** מזהה
+                        # כמו law-2000325/12 הוא פרט מימוש שדלף.
+                        "cited_sources": rules_source_labels(piece.cited_source_ids),
+                    }}, ensure_ascii=False) + "\n"
+        except RulesExpertError as e:
+            yield json.dumps({"error": str(e)}, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(events(), media_type="application/x-ndjson",
+                             headers={"X-Accel-Buffering": "no",
+                                      "Cache-Control": "no-cache"})
