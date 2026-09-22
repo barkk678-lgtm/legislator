@@ -46,17 +46,40 @@ class Result:
         return ok
 
 
+# **ניסיון חוזר אחד, ורק על תקלה חולפת מוכרת - ומדווח.**
+# הפיד של הכנסת הוא תלות חיצונית אמיתית שכבר החזירה 429 ו-473
+# בעבר, ו-422 חד-פעמי ממנו אינו "האתר שבור". אבל ניסיון חוזר
+# שקט הוא בדיוק הדרך להסתיר תקלה אמיתית, ולכן הוא מודפס: ריצה
+# שעברה אחרי ניסיון חוזר **אינה** נראית כמו ריצה נקייה.
+_RETRYABLE = {408, 422, 429, 502, 503, 504}
+retried: list[str] = []
+
+
+def _request(req_or_url, label):
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(req_or_url, timeout=TIMEOUT) as r:
+                return r.status, r.read()
+        except urllib.error.HTTPError as e:
+            if attempt == 1 and e.code in _RETRYABLE:
+                note = f"{label} -> HTTP {e.code}, מנסה שוב"
+                print(f"  ⟳     {note}")
+                retried.append(note)
+                time.sleep(4)
+                continue
+            raise
+    raise AssertionError("לא אמור להגיע לכאן")
+
+
 def _get(base, path):
-    with urllib.request.urlopen(base + path, timeout=TIMEOUT) as r:
-        return r.status, r.read()
+    return _request(base + path, f"GET {path}")
 
 
 def _post(base, path, payload):
     req = urllib.request.Request(
         base + path, data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-        return r.status, r.read()
+    return _request(req, f"POST {path}")
 
 
 def _find_section(node, number):
@@ -242,6 +265,10 @@ def main():
         res.check("הבדיקה רצה עד הסוף", False, f"{type(e).__name__}: {e}")
 
     print(f"\n{res.count} בדיקות ב-{time.time()-started:.1f} שניות")
+    if retried:
+        print(f"⟳ {len(retried)} בקשות נדרשו ניסיון חוזר (תקלה חולפת, לא כשל מוצר):")
+        for note in retried:
+            print(f"  - {note}")
     if res.failures:
         print(f"נכשלו {len(res.failures)}:")
         for f in res.failures:
