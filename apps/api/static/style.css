@@ -132,7 +132,21 @@ select { font-weight: 600; max-width: 420px; }
    שבתוכו לא מוגבלים לגובה הזמין וגולשים החוצה בלי אפשרות גלילה -
    .stage שמעליו עם overflow:hidden פשוט קוטע אותם (נתפס בבדיקה של
    המשתמש: "אין לי אפשרות לגלילה... תוקע אותי"). */
-#law-panels { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* **חלונית נוסח החוק אינה מתכווצת** (ברק, 22.9): כשחלון ההצעות
+   הדומות נפתח הוא לקח גובה מ-.cols, והחלון העיקרי התכווץ. עכשיו
+   ל-.cols יש גובה מינימלי, והעודף גולל ב-#law-panels עצמו במקום
+   להידחס. `min-height:0` נשאר - בלעדיו שרשרת ה-flex נשברת וחוזרת
+   התקלה המתועדת למעלה ("אין לי אפשרות לגלילה"). */
+#law-panels {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto;
+}
+/* **גובה קבוע, נגזר-מסך.** שתי גרסאות קודמות נכשלו בבדיקה בדפדפן:
+   `min-height` לבדו רק הגביל את ההתכווצות ולא מנע אותה
+   (780px -> 523px), ו-`flex: 1 0 auto` גרם לחלונית לגדול לגובה
+   **כל** עץ החוק (40,398px) במקום לגלול בתוכה. `flex: none` עם
+   גובה מפורש שומר על הגלילה הפנימית של הכרטיסים, ומה שנוסף מעל
+   דוחף את הדף לגלילה במקום לדחוס את החלון העיקרי. */
+#law-panels > .cols { flex: none; height: calc(100vh - 210px); min-height: 420px; }
 
 /* ═══ חלוניות ═══ */
 .cols { flex: 1; display: grid; gap: 16px; min-height: 0; grid-template-columns: 1fr 1fr; }
@@ -525,3 +539,20 @@ select { font-weight: 600; max-width: 420px; }
 .merge-instruction { font-size: 13px; color: #6b7280; margin-top: 2px; }
 .merge-detail { margin-top: 12px; font-size: 14px; }
 .merge-detail ul { margin: 6px 0 0; padding-inline-start: 20px; }
+
+/* ── הצעות דומות ──────────────────────────────────────────────── */
+.similar-notice .similar-toggle {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: inherit; text-align: start;
+}
+.similar-caret { color: #6b7280; font-size: 12px; }
+.similar-notice.is-collapsed .similar-body { display: none; }
+.similar-body { margin-top: 8px; }
+.similar-body ul { margin: 8px 0 6px; padding-inline-start: 20px; }
+.similar-body a { color: #1d4ed8; }
+
+/* חיווי שמירה אוטומטית - קטן, לא צועק, אבל נוכח. */
+.draft-save-status { font-size: 12.5px; color: #6b7280; margin-inline-start: 10px; }
+.draft-save-status.is-saved { color: #15803d; }
+.draft-save-status.is-saving { color: #92400e; }

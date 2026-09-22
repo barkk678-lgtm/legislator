@@ -145,13 +145,22 @@ def _supabase_client() -> httpx.Client:
     )
 
 
-def _db_law_summaries() -> list[dict]:
+def _db_law_summaries(*, with_freshness: bool = True) -> list[dict]:
+    """with_freshness=False מדלג על ה-join ל-law_versions.
+
+    **נמדד (22.9), לא הונח:** אותן 1,109 שורות עולות 2.57 שניות עם
+    ה-join ו-0.74 בלעדיו. ה-join קיים אך ורק בשביל חיווי העדכניות,
+    ולחיפוש שם-חוק אין בו שימוש - ראו search_law_titles. זה מה
+    שהאט את תיבת החיפוש: כל בקשה ראשונה על מופע serverless קר
+    שילמה 1.8 שניות מיותרות.
+    """
+    select = "id,full_title"
+    if with_freshness:
+        select += (",latest_known_revision_id,latest_checked_at,"
+                   "law_versions!laws_current_version_fk(source_ref,wikitext_revision_id)")
     with _supabase_client() as client:
         laws_rows = fetch_all(
-            client, "/laws",
-            {"select": "id,full_title,latest_known_revision_id,latest_checked_at,"
-                       "law_versions!laws_current_version_fk(source_ref,wikitext_revision_id)",
-             "current_version_id": "not.is.null"},
+            client, "/laws", {"select": select, "current_version_id": "not.is.null"},
         )
         # amendable_law_ids: view ב-DB (לא שאילתה על nodes ישירות מכאן) -
         # DISTINCT על 45K+ צמתי section, מסונן ל-parent_id שהוא שורש חוק
@@ -304,11 +313,14 @@ def get_law_config(law_id: str, root: LegislativeNode) -> LawConfig:
 # נשאר תמיד טעינה טרייה. תא בזיכרון-תהליך בלבד: ב-Vercel כל cold
 # start מתחיל מטמון ריק מחדש - לא בעיה, רק אומר שהמטמון "עוזר" בעיקר
 # בתוך instance חם, לא ערובה גלובלית.
-_SUMMARIES_CACHE: dict = {"data": None, "fetched_at": 0.0}
+_SUMMARIES_CACHE: dict = {
+    "data": None, "fetched_at_data": 0.0,   # מלא, עם שדות העדכניות
+    "slim": None, "fetched_at_slim": 0.0,   # לחיפוש - בלי ה-join
+}
 _SUMMARIES_CACHE_TTL_SECONDS = 15 * 60
 
 
-def law_summaries() -> list[dict]:
+def law_summaries(*, with_freshness: bool = True) -> list[dict]:
     """שני ה-fixtures תמיד מופיעים (dev/test offline). חוקי ה-DB
     מתווספים **רק אם Supabase מוגדר** - זה מצב תקין (למשל dev מקומי
     בלי DB), לא שגיאה: הרשימה היא "מה זמין", לא ניסיון-חובה לגעת
@@ -316,8 +328,11 @@ def law_summaries() -> list[dict]:
     כן נכשל ברעש (ראו _supabase_config) - שם יש כוונה מפורשת לגשת
     ל-DB, כאן זו רק שאלת-זמינות."""
     now = time.monotonic()
-    cached = _SUMMARIES_CACHE["data"]
-    if cached is not None and (now - _SUMMARIES_CACHE["fetched_at"]) < _SUMMARIES_CACHE_TTL_SECONDS:
+    # **שני מטמונים נפרדים.** גרסה מצומצמת שנשמרת תחת אותו מפתח
+    # הייתה מגישה לרשימת החוקים תשובה בלי שדות העדכניות - באג שקט.
+    key = "data" if with_freshness else "slim"
+    cached = _SUMMARIES_CACHE.get(key)
+    if cached is not None and (now - _SUMMARIES_CACHE["fetched_at_" + key]) < _SUMMARIES_CACHE_TTL_SECONDS:
         return cached
 
     summaries = [
@@ -330,12 +345,12 @@ def law_summaries() -> list[dict]:
         for law_id, cfg in FIXTURE_LAWS.items()
     ]
     try:
-        summaries.extend(_db_law_summaries())
+        summaries.extend(_db_law_summaries(with_freshness=with_freshness))
     except MissingSecret:
         pass  # Supabase לא מוגדר - מצב תקין, ראו דוקסטרינג
 
-    _SUMMARIES_CACHE["data"] = summaries
-    _SUMMARIES_CACHE["fetched_at"] = now
+    _SUMMARIES_CACHE[key] = summaries
+    _SUMMARIES_CACHE["fetched_at_" + key] = now
     return summaries
 
 
@@ -350,5 +365,10 @@ def search_law_titles(query: str, limit: int = 20) -> list[dict]:
     לשלוף שוב את הרשימה המלאה. search_laws מחזירה בדיוק את ה-dict
     שקיבלה (ראו law_search.py) - אם לא מעבירים amendable כאן, הוא
     פשוט נעלם מהתשובה."""
-    laws = [{"id": s["id"], "title": s["title"], "amendable": s["amendable"]} for s in law_summaries()]
+    # **בלי שדות העדכניות**: החיפוש אינו משתמש בהם, וה-join שמביא
+    # אותם עלה 1.8 שניות בכל בקשה על מופע קר (נמדד 22.9).
+    laws = [
+        {"id": s["id"], "title": s["title"], "amendable": s["amendable"]}
+        for s in law_summaries(with_freshness=False)
+    ]
     return search_laws(query, laws, limit=limit)

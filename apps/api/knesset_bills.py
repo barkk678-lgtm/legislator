@@ -40,6 +40,58 @@ def _core_terms(title: str) -> list[str]:
     return sorted(_words(title), key=len, reverse=True)[:2]
 
 
+
+def _attach_initiators(bills: list[dict]) -> None:
+    """מוסיפה `initiators` לכל הצעה, במקום.
+
+    **שתי קריאות בסך הכול, לא אחת לכל הצעה:** הראשונה מביאה את כל
+    שיוכי-היוזמים של ההצעות שכבר נבחרו, והשנייה את שמות האנשים.
+    הסינון הוא `BillID eq A or BillID eq B ...` כי ל-OData של הכנסת
+    אין `in`.
+
+    **כישלון כאן אינו מפיל את התוצאה.** שמות היוזמים הם תוספת נוחות;
+    אם הפיד לא החזיר אותם, ההצעות הדומות עדיין מוצגות עם כל השאר.
+    """
+    if not bills:
+        return
+    for bill in bills:
+        bill["initiators"] = []
+    try:
+        ids = [b["bill_id"] for b in bills if b.get("bill_id")]
+        if not ids:
+            return
+        clause = " or ".join(f"BillID eq {int(i)}" for i in ids)
+        links = fetch("KNS_BillInitiator", filter=f"({clause}) and IsInitiator eq true",
+                      select="BillID,PersonID,Ordinal", top=200)
+        if not links:
+            return
+        person_ids = sorted({row["PersonID"] for row in links if row.get("PersonID")})
+        people: dict[int, str] = {}
+        # חלוקה למנות - שאילתה עם מאות תנאי `or` נדחית על ידי השרת.
+        for start in range(0, len(person_ids), 40):
+            chunk = person_ids[start:start + 40]
+            # **המפתח ב-KNS_Person הוא `Id`, לא `PersonID`** - זה
+            # השם ב-KNS_BillInitiator בלבד. `$select=PersonID` על
+            # KNS_Person מחזיר 400, והשגיאה נבלעה ב-except שלמטה
+            # והתבטאה כ"אין יוזמים" בלי שום סימן. אומת מול הפיד.
+            person_clause = " or ".join(f"Id eq {int(p)}" for p in chunk)
+            for row in fetch("KNS_Person", filter=person_clause,
+                             select="Id,FirstName,LastName", top=200):
+                name = f"{row.get('FirstName') or ''} {row.get('LastName') or ''}".strip()
+                if name:
+                    people[row["Id"]] = name
+        by_bill: dict[int, list[tuple[int, str]]] = {}
+        for row in links:
+            name = people.get(row.get("PersonID"))
+            if name:
+                by_bill.setdefault(row["BillID"], []).append((row.get("Ordinal") or 0, name))
+        for bill in bills:
+            ordered = sorted(by_bill.get(bill["bill_id"], []))
+            bill["initiators"] = [name for _, name in ordered]
+    except OdataError:
+        return  # ראו דוקסטרינג - תוספת נוחות, לא תנאי לתוצאה
+
+
 def similar_bills(title: str, *, knesset_num: int | None = None, limit: int = 10) -> dict:
     """הצעות קיימות שדומות בשמן לכותרת שהוקלדה."""
     title = title.strip()
@@ -86,10 +138,12 @@ def similar_bills(title: str, *, knesset_num: int | None = None, limit: int = 10
             "shared_words": sorted(shared),
         })
     scored.sort(key=lambda r: (-r["similarity"], -(r["knesset"] or 0)))
+    scored = scored[:limit]
+    _attach_initiators(scored)
     return {
         "query": title,
         "terms": terms,
-        "results": scored[:limit],
+        "results": scored,
         "total_examined": len(seen),
         "note": "השוואת שמות בלבד - הצעה באותו נושא בשם שונה לא תיתפס כאן.",
     }

@@ -181,12 +181,12 @@ function renderLawSearchResults() {
       stale.textContent = "● נוסח חדש יותר בוויקיטקסט";
       stale.title = "הנוסח הטעון אינו העדכני. פנו לברק לרענון.";
       item.appendChild(stale);
-    } else if (!law.freshness_checked_at) {
-      const unknown = document.createElement("span");
-      unknown.className = "law-result-note";
-      unknown.textContent = "(עדכניות לא נבדקה)";
-      item.appendChild(unknown);
     }
+    // **החיווי על עדכניות שלא נבדקה הוסר** (ברק, 22.9): הוא לא אמר
+    // למשתמש דבר שהוא יכול לפעול לפיו. מה שנשאר הוא רק המקרה שבו
+    // **ידוע** שיש נוסח חדש יותר - שם יש מה לעשות.
+    // הטקסט עצמו אינו מופיע כאן אפילו בהערה: בדיקה נועלת את זה
+    // על המקור (tests/unit/test_corpus_freshness.py).
     // mousedown לא click - כדי שהבחירה תתפוס לפני שה-blur של השדה
     // סוגר את תיבת התוצאות (מרוץ אירועים סטנדרטי ב-autocomplete).
     item.addEventListener("mousedown", (ev) => {
@@ -202,6 +202,8 @@ let currentLawTitle = null;
 
 async function selectLaw(law) {
   if (law.amendable === false) return;
+  clearSimilarBills();   // ההצעות הדומות שייכות להצעה הקודמת
+  flushDraftSave();      // לשמור לפני שהמצב מתאפס
   currentLawTitle = law.title;
   document.getElementById("law-search-input").value = law.title;
   document.getElementById("law-search-results").hidden = true;
@@ -848,7 +850,8 @@ function draftHasContent() {
 }
 
 function saveCurrentDraft() {
-  if (!currentLawId || !draftHasContent()) return;
+  // מחזירה האם נשמר בפועל - החיווי לא יכול להסתמך על "נקראה".
+  if (!currentLawId || !draftHasContent()) return false;
   if (!currentDraftId) currentDraftId = `d${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
   const list = readDrafts().filter((d) => d.id !== currentDraftId);
   list.unshift({
@@ -863,11 +866,52 @@ function saveCurrentDraft() {
   });
   writeDrafts(list);
   renderDraftList();
+  return true;
 }
 
 function scheduleDraftSave() {
   clearTimeout(draftSaveTimer);
-  draftSaveTimer = setTimeout(saveCurrentDraft, 900);
+  setSaveStatus("saving");
+  draftSaveTimer = setTimeout(() => {
+    draftSaveTimer = null;
+    // **"שומר…" שנתקע הוא שקר.** אם לא היה מה לשמור, החיווי מתנקה
+    // ולא נשאר תלוי (נתפס בבדיקה בדפדפן).
+    setSaveStatus(saveCurrentDraft() ? "saved" : "");
+  }, 900);
+}
+
+/** שומרת **מיד** אם יש שמירה ממתינה.
+ *
+ *  **זו אבדן-העבודה שברק דיווח עליו (22.9):** השמירה האוטומטית
+ *  הייתה בהשהיה של 900ms, ומעבר לחוק אחר מאפס את `edits` לפני
+ *  שהטיימר נורה. כשהוא כן נורה, `draftHasContent()` כבר החזיר
+ *  false - ולא נשמר דבר, בלי שום סימן. כל מעבר חייב להקדים
+ *  flush, ולא רק לבטל את הטיימר. */
+function flushDraftSave() {
+  if (!draftSaveTimer) return;
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = null;
+  setSaveStatus(saveCurrentDraft() ? "saved" : "");
+}
+
+/** חיווי השמירה. **בלעדיו המשתמש לא יכול לדעת שנשמר** - וזו
+ *  הייתה התלונה: "לא ברור מתי הצעה נשמרת". */
+function setSaveStatus(state) {
+  const el = document.getElementById("draft-save-status");
+  if (!el) return;
+  if (state === "saving") {
+    if (!currentLawId || !draftHasContent()) { el.textContent = ""; return; }
+    el.textContent = "שומר…";
+    el.className = "draft-save-status is-saving";
+    return;
+  }
+  if (state === "saved" && currentDraftId) {
+    el.textContent = "נשמר אוטומטית";
+    el.className = "draft-save-status is-saved";
+    return;
+  }
+  el.textContent = "";
+  el.className = "draft-save-status";
 }
 
 function deleteDraft(id) {
@@ -920,6 +964,8 @@ function showDraftNotice(html, kind) {
 async function openDraft(draftId) {
   const draft = readDrafts().find((d) => d.id === draftId);
   if (!draft) return;
+  clearSimilarBills();   // ההצעות הדומות שייכות להצעה הקודמת
+  flushDraftSave();      // לשמור לפני שהמצב מתאפס
   showDraftNotice("", "");
 
   // טוענים את החוק מחדש - תמיד את הנוסח **הנוכחי**, לא נוסח שמור.
@@ -958,6 +1004,8 @@ async function openDraft(draftId) {
 }
 
 function newDraft() {
+  clearSimilarBills();   // ההצעות הדומות שייכות להצעה הקודמת
+  flushDraftSave();      // לשמור לפני שהמצב מתאפס
   currentDraftId = null;
   edits = {};
   insertions = [];
@@ -977,6 +1025,8 @@ document.getElementById("drafts-toggle").addEventListener("click", () => {
   if (!panel.hidden) renderDraftList();
 });
 document.getElementById("draft-new-btn").addEventListener("click", newDraft);
+// גם יציאה מהדף היא "מעבר" - שמירה ממתינה חייבת להיסגר לפניה.
+window.addEventListener("beforeunload", flushDraftSave);
 
 /* ═══ ניווט לשוניות (משימה ח, 2026-09-16) - בלי state בשרת, כל
  * לשונית מסתירה/מציגה DOM בלבד. bills נשארת ברירת המחדל. ═══ */
@@ -1355,6 +1405,19 @@ async function loadCitations(lawId) {
   }
 }
 
+const SIMILAR_COLLAPSED_KEY = "legislator.similar.collapsed";
+const KNESSET_BILL_URL =
+  "https://main.knesset.gov.il/Activity/Legislation/Laws/Pages/LawBill.aspx" +
+  "?t=lawsuggestionssearch&lawitemid=";
+
+/** מנקה את חלון ההצעות הדומות. נקרא בכל מעבר בין הצעות/חוקים -
+ *  בלעדיו נשארות על המסך ההצעות הדומות של ההצעה **הקודמת**, מצב
+ *  ישן שמוצג כאילו הוא של הנוכחית (ברק, 22.9). */
+function clearSimilarBills() {
+  const el = document.getElementById("similar-bills-notice");
+  if (el) el.innerHTML = "";
+}
+
 async function checkSimilarBills(title) {
   const el = document.getElementById("similar-bills-notice");
   if (!el) return;
@@ -1371,15 +1434,46 @@ async function checkSimilarBills(title) {
       return;
     }
     const items = data.results
-      .map((b) => `<li>${escapeHtml(b.title)}
-          <span class="citation-date">כנסת ${b.knesset}${b.became_law ? " · התקבל כחוק" : ""}</span></li>`)
+      .map((b) => {
+        const link = b.bill_id
+          ? `<a href="${KNESSET_BILL_URL}${encodeURIComponent(b.bill_id)}"
+                target="_blank" rel="noopener">${escapeHtml(b.private_number || String(b.bill_id))}</a>`
+          : escapeHtml(b.private_number || "");
+        // הצעות ממשלתיות אינן מופיעות ב-KNS_BillInitiator כלל -
+        // היוזמת היא הממשלה, לא חברי כנסת. אומת מול הפיד. במקרה
+        // כזה מוצג סוג ההצעה, כדי שהשורה לא תישאר חסרת הקשר.
+        const who = (b.initiators || []).length
+          ? ` · ${escapeHtml(b.initiators.slice(0, 3).join(", "))}` +
+            (b.initiators.length > 3 ? ` ועוד ${b.initiators.length - 3}` : "")
+          : (b.kind ? ` · ${escapeHtml(b.kind)}` : "");
+        return `<li>${escapeHtml(b.title)}
+          <span class="citation-date">${link ? link + " · " : ""}כנסת ${b.knesset}${
+            b.became_law ? " · התקבל כחוק" : ""}${who}</span></li>`;
+      })
       .join("");
-    el.innerHTML = `<div class="notice notice-coverage">
-        <b>נמצאו הצעות דומות בשמן (${data.results.length}).</b>
-        החוברת הסגולה מחייבת לבדוק הצעות זהות או דומות לפני הנחה.
-        <ul>${items}</ul>
-        <span class="citation-date">${escapeHtml(data.note)}</span>
+    // מצב הקיפול נשמר בין הצעות: מי שסגר את החלון לא רוצה שייפתח
+    // מחדש בכל שינוי שם.
+    let collapsed = false;
+    try { collapsed = localStorage.getItem(SIMILAR_COLLAPSED_KEY) === "1"; } catch { /* ignore */ }
+    el.innerHTML = `<div class="notice notice-coverage similar-notice${collapsed ? " is-collapsed" : ""}">
+        <button type="button" class="similar-toggle" aria-expanded="${!collapsed}">
+          <span class="similar-caret">${collapsed ? "▸" : "▾"}</span>
+          <b>נמצאו הצעות דומות בשמן (${data.results.length}).</b>
+        </button>
+        <div class="similar-body">
+          החוברת הסגולה מחייבת לבדוק הצעות זהות או דומות לפני הנחה.
+          <ul>${items}</ul>
+          <span class="citation-date">${escapeHtml(data.note)}</span>
+        </div>
       </div>`;
+    const box = el.querySelector(".similar-notice");
+    el.querySelector(".similar-toggle").addEventListener("click", () => {
+      const nowCollapsed = !box.classList.contains("is-collapsed");
+      box.classList.toggle("is-collapsed", nowCollapsed);
+      box.querySelector(".similar-caret").textContent = nowCollapsed ? "▸" : "▾";
+      box.querySelector(".similar-toggle").setAttribute("aria-expanded", String(!nowCollapsed));
+      try { localStorage.setItem(SIMILAR_COLLAPSED_KEY, nowCollapsed ? "1" : "0"); } catch { /* ignore */ }
+    });
   } catch {
     el.innerHTML = "";  // הפיד לא זמין - לא מציקים למשתמש, הכלי ממשיך לעבוד
   }

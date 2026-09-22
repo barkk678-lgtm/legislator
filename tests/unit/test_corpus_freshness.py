@@ -77,8 +77,14 @@ def main() -> int:
 
     js = (ROOT / "apps" / "api" / "static" / "app.js").read_text(encoding="utf-8")
     checks.append(("הממשק מציג חיווי כשיש נוסח חדש", "law.outdated" in js))
-    checks.append(("הממשק מבדיל 'לא נבדק' מ'עדכני'",
-                   "law.freshness_checked_at" in js))
+    # **עודכן (ברק, 22.9):** ההבחנה בין "לא נבדק" ל"עדכני" נשארת
+    # בשכבת הנתונים - `law_registry` עדיין מחזיר את שני השדות, ושתי
+    # הבדיקות שמעל נועלות זאת. מה שהוסר הוא רק **הצגת** "(עדכניות
+    # לא נבדקה)" בתוצאות החיפוש: היא לא אמרה למשתמש דבר שהוא יכול
+    # לפעול לפיו. מה שנשאר בממשק הוא המקרה שיש בו מה לעשות - ידוע
+    # שקיים נוסח חדש יותר.
+    checks.append(("הממשק מציג רק את המקרה שניתן לפעול לפיו",
+                   "law.outdated" in js and "(עדכניות לא נבדקה)" not in js))
     css = (ROOT / "apps" / "api" / "static" / "style.css").read_text(encoding="utf-8")
     checks.append(("יש סגנון לחיווי", ".law-result-stale" in css))
 
