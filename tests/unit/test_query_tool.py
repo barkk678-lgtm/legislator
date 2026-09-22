@@ -20,15 +20,21 @@ SKELETON = REPO_ROOT / "reference" / "skeleton-pshia.docx"
 
 def main():
     ok = True
-    original_draft = query_tool.draft
+    # **התפר הוא draft_conversation, לא draft.** מאז ב1 (2026-09-22)
+    # draft_query מנסחת על שיחה ולא על מחרוזת אחת. כשהתפר נשאר על
+    # השם הישן ההחלפה פשוט לא תפסה - והבדיקה יצאה לרשת ודיברה עם
+    # המודל האמיתי בלי שאיש ביקש. זה גם הפך אותה לבדיקה שתוצאתה
+    # תלויה בתשובת המודל (CLAUDE.md), ולכן השם כאן חייב להישאר
+    # מסונכרן עם מה ש-draft_query קוראת לו בפועל.
+    original_draft = query_tool.draft_conversation
 
     def _set(reply):
-        query_tool.draft = lambda **kw: reply
+        query_tool.draft_conversation = lambda **kw: reply
 
     # --- פרסור תקין: נושא: + גוף:, ספירת מילים נכונה, within_limit=True ---
     _set("נושא: זמני המתנה במוקד 100\nגוף: האם נבדקו זמני ההמתנה במוקד 100 בשנה האחרונה?")
     try:
-        q = draft_query(topic_description="משהו על מוקד 100", kind="רגילה", minister="לביטחון הפנים", mk_name="ישראל ישראלי")
+        q = draft_query(turns=[{"role": "user", "content": "משהו על מוקד 100"}], kind="רגילה", minister="לביטחון הפנים", mk_name="ישראל ישראלי")
         passed = (
             q["subject"] == "זמני המתנה במוקד 100"
             and q["body"] == "האם נבדקו זמני ההמתנה במוקד 100 בשנה האחרונה?"
@@ -39,54 +45,54 @@ def main():
         ok = ok and passed
         print(("OK " if passed else "FAIL"), "פרסור תקין: נושא/גוף/ספירת מילים/within_limit ->", q if not passed else "")
     finally:
-        query_tool.draft = original_draft
+        query_tool.draft_conversation = original_draft
 
     # --- חריגה ממגבלת המילים (שאילתה דחופה, 40 מילים) -> within_limit=False, לא נחתך בשקט ---
     long_body = " ".join(["מילה"] * 45)
     _set(f"נושא: נושא כלשהו\nגוף: {long_body}")
     try:
-        q = draft_query(topic_description="תיאור", kind="דחופה", minister="הבריאות", mk_name="פלונית")
+        q = draft_query(turns=[{"role": "user", "content": "תיאור"}], kind="דחופה", minister="הבריאות", mk_name="פלונית")
         passed = q["word_count"] == 45 and q["within_limit"] is False and q["word_limit"] == 40 and len(q["body"].split()) == 45
         ok = ok and passed
         print(("OK " if passed else "FAIL"), "חריגה ממגבלת מילים -> within_limit=False, הגוף לא נחתך בשקט")
     finally:
-        query_tool.draft = original_draft
+        query_tool.draft_conversation = original_draft
 
     # --- שאילתה ישירה -> אין מגבלת מילים בכלל ---
     _set(f"נושא: נושא\nגוף: {long_body} עוד כמה מילים נוספות בשביל הבדיקה הזו כדי לוודא שאין הגבלה")
     try:
-        q = draft_query(topic_description="תיאור", kind="ישירה", minister="האוצר", mk_name="פלוני")
+        q = draft_query(turns=[{"role": "user", "content": "תיאור"}], kind="ישירה", minister="האוצר", mk_name="פלוני")
         passed = q["word_limit"] is None and q["within_limit"] is True
         ok = ok and passed
         print(("OK " if passed else "FAIL"), "שאילתה ישירה -> בלי מגבלת מילים, within_limit=True תמיד")
     finally:
-        query_tool.draft = original_draft
+        query_tool.draft_conversation = original_draft
 
     # --- סירוב מפורש מהמודל -> QueryDraftError, לא תשובה מזויפת ---
     _set("לא ניתן לנסח שאילתה: הבקשה מבקשת חוות דעת כללית, לא עניין עובדתי.")
     try:
         threw = False
         try:
-            draft_query(topic_description="מה דעתך על הממשלה?", kind="רגילה", minister="ראש הממשלה", mk_name="פלוני")
+            draft_query(turns=[{"role": "user", "content": "מה דעתך על הממשלה?"}], kind="רגילה", minister="ראש הממשלה", mk_name="פלוני")
         except QueryDraftError as e:
             threw = "חוות דעת כללית" in str(e)
         ok = ok and threw
         print(("OK " if threw else "FAIL"), "סירוב-מודל מפורש -> QueryDraftError עם ההסבר, לא תשובה מזויפת")
     finally:
-        query_tool.draft = original_draft
+        query_tool.draft_conversation = original_draft
 
     # --- פורמט לא תקין מהמודל (בלי נושא:/גוף:) -> QueryDraftError, לא קורס/מנחש ---
     _set("תשובה חופשית בלי הפורמט הנדרש בכלל.")
     try:
         threw = False
         try:
-            draft_query(topic_description="תיאור", kind="רגילה", minister="החינוך", mk_name="פלוני")
+            draft_query(turns=[{"role": "user", "content": "תיאור"}], kind="רגילה", minister="החינוך", mk_name="פלוני")
         except QueryDraftError:
             threw = True
         ok = ok and threw
         print(("OK " if threw else "FAIL"), "פורמט לא תקין מהמודל -> QueryDraftError, לא קורס/מנחש")
     finally:
-        query_tool.draft = original_draft
+        query_tool.draft_conversation = original_draft
 
     # --- write_query_docx: מייצר קובץ תקין (python-docx לבדיקה בלבד) ---
     try:
