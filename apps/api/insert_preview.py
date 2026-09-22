@@ -119,6 +119,22 @@ def _ancestor_of_type(root: LegislativeNode, node_id: str, node_type: str) -> Le
         current_id = parent.id
 
 
+
+def _unnumbered_ancestor(root: LegislativeNode, node_id: str) -> str | None:
+    """מחזירה את סוג הצומת הראשון **בלי מספר** בשרשרת שבין הסעיף לצומת
+    (לא כולל הצומת עצמו ולא כולל הסעיף), או None אם כל השרשרת ממוספרת.
+
+    זה המחסום שמונע כתובת שגויה בשקט: `engine._container_suffix` בונה
+    את המכולה מהמספרים בלבד, ולכן צומת בלי מספר פשוט נעלם מהכתובת -
+    "בסעיף 1, אחרי פסקה (1)" במקום כתובת שמזהה את המקום הנכון."""
+    parent = find_parent(root, node_id)
+    while parent is not None and parent.node_type not in ("section", "law"):
+        if not parent.number:
+            return parent.node_type
+        parent = find_parent(root, parent.id)
+    return None
+
+
 def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
     if _find_by_id(root, node_id) is None:
         return _Resolution(supported=False, reason=f"צומת לא נמצא: {node_id!r}")
@@ -145,7 +161,25 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
         anchor_section = _ancestor_of_type(root, node_id, "section")
         if anchor_section is None:
             return _Resolution(supported=False, reason="לא נמצא סעיף אב")
-        subsections = [c for c in anchor_section.children if c.is_normative and c.node_type == "subsection"]
+        current_node = _find_by_id(root, node_id)
+        # תוקן (משימה 61): המספור נגזר מ**האחים בפועל** של העוגן, לא
+        # מהסעיפים הקטנים שברמת הסעיף. סעיף קטן יכול לשבת בעומק - למשל
+        # (א)/(ב) בתוך פסקה (2) בתוך סעיף קטן (א) (30 מופעים בקורפוס
+        # בחוק העונשין לבדו). עד לתיקון, עמידה על סעיף קטן כזה הציעה
+        # תווית שנגזרה מהאחים הלא-נכונים: במאבק בארגוני פשיעה, סעיף
+        # 18(א)(2), האחים בפועל הם (א) ו-(ב) והתווית הנכונה היא (א1),
+        # אבל המערכת הציעה **(ד)** - המשך המספור של (א),(ב),(ג) שברמת
+        # הסעיף. זה לא היה חסום, אלא הוצע בשקט כתווית תקינה - חמור
+        # יותר מחסימה, כי המשתמש לא יכול לדעת שהמספר שגוי.
+        if current_node is not None and current_node.node_type == "subsection":
+            sibling_parent = find_parent(root, node_id)
+        else:
+            sibling_parent = anchor_section
+        if sibling_parent is None:
+            return _Resolution(supported=False, reason="לא נמצא הורה לצומת")
+        subsections = [
+            c for c in sibling_parent.children if c.is_normative and c.node_type == "subsection"
+        ]
         if not subsections:
             # עדיין אין סעיפים קטנים בסעיף הזה - AddFirstSubsection
             # תמיד קובע "(א)" לתוכן הקיים ו-"(ב)" לחדש (§7.10.6(ד)).
@@ -153,7 +187,6 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
                 supported=True, label="(ב)", kind="add_first_subsection",
                 section_number=anchor_section.number,
             )
-        current_node = _find_by_id(root, node_id)
         anchor_subsection = current_node if current_node.node_type == "subsection" else subsections[-1]
         existing_numbers = [_strip_parens(c.number) for c in subsections]
         idx = next((i for i, c in enumerate(subsections) if c.id == anchor_subsection.id), len(subsections) - 1)
@@ -183,12 +216,43 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
                 supported=False,
                 reason="הוספת פסקה זמינה רק כשעומדים על פסקה ממוספרת קיימת",
             )
-        if parent.node_type not in ("section", "subsection"):
+        # הורחב (משימה 61): גם פסקה בתוך פסקה נתמכת - 234 מופעים
+        # בקורפוס, והניסוח קיים ונמדד: `בסעיף 3(1) לחוק העיקרי, במקום
+        # "לחלוטין" יבוא` (13948380.docx). מה שנשאר חסום הוא פסקה בתוך
+        # **הגדרה**, ומטעם מהותי ולא טכני: כתובת ההוראה חייבת לנקוב
+        # בהגדרה עצמה - `בסעיף N, בהגדרה "X", ...` (מדריך משפטים
+        # §7.9.1, עמ' 26) - וזו צורה במילים, לא מכולה בסוגריים.
+        # להגדרה אין מספר, ולכן _container_suffix פשוט מדלגת עליה:
+        # ההוראה שהייתה יוצאת היא `בסעיף 1, אחרי פסקה (1) יבוא:`, בלי
+        # שום אזכור של ההגדרה - הוראת תיקון **שגויה**, לא רק חלקית.
+        # חסימה מוצהרת עדיפה על ניסוח שקט ושגוי.
+        if parent.node_type == "definition":
+            return _Resolution(
+                supported=False,
+                reason=(
+                    "הוספת פסקה בתוך הגדרה אינה נתמכת עדיין - כתובת ההוראה "
+                    'חייבת לנקוב בהגדרה ("בהגדרה \"...\"", מדריך §7.9.1), '
+                    "וצורה זו טרם מומשה"
+                ),
+            )
+        if parent.node_type not in ("section", "subsection", "paragraph"):
             return _Resolution(
                 supported=False,
                 reason=(
                     f"פסקה בתוך {parent.node_type!r} אינה נתמכת - נתמכות פסקאות "
-                    "בתוך סעיף או בתוך סעיף קטן"
+                    "בתוך סעיף, סעיף קטן או פסקה"
+                ),
+            )
+        # מחסום כללי: אם יש בשרשרת שבין הסעיף לעוגן צומת בלי מספר,
+        # הכתובת שתיווצר תדלג עליו בשקט ותצביע על מקום אחר בחוק. אין
+        # ניחוש - חוסמים ואומרים למה.
+        unnumbered = _unnumbered_ancestor(root, node_id)
+        if unnumbered is not None:
+            return _Resolution(
+                supported=False,
+                reason=(
+                    f"בשרשרת שמעל הפסקה יש {unnumbered!r} בלי מספר - כתובת "
+                    "ההוראה הייתה מדלגת עליו ומצביעה על מקום אחר בחוק"
                 ),
             )
         paragraphs = [c for c in parent.children if c.is_normative and c.node_type == "paragraph" and c.number]

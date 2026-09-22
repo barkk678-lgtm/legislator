@@ -92,6 +92,32 @@ def _find_section(node, number):
     return None
 
 
+
+def _find_nested_paragraph(node, section=None):
+    """מוצאת פסקה ממוספרת עם טקסט שיושבת **בתוך סעיף קטן** - עומק 2.
+
+    מחפשת בעץ ולא מקודדת מזהה קשיח, כדי ש-ingest מחדש (שמשנה
+    מזהים) לא ישבור את הבדיקה החיה במקום לדווח על פער אמיתי.
+
+    מחזירה (מספר הסעיף, מספר הסעיף הקטן, צומת הפסקה) או None.
+    """
+    current_section = node if node.get("node_type") == "section" else section
+    for child in node.get("children") or []:
+        if (
+            node.get("node_type") == "subsection"
+            and child.get("node_type") == "paragraph"
+            and child.get("number")
+            and child.get("text")
+            and current_section
+            and current_section.get("number")
+        ):
+            return current_section["number"], node.get("number"), child
+        found = _find_nested_paragraph(child, current_section)
+        if found:
+            return found
+    return None
+
+
 def journey_open_and_edit(base, res):
     """המסלול המרכזי: מוצאים חוק, פותחים, עורכים סעיף, ומקבלים
     הוראת תיקון. **פקודת הנזיקין בכוונה** - חוק עם מבנה
@@ -134,6 +160,45 @@ def journey_open_and_edit(base, res):
         text = (lines[0].get("text") or "") + (lines[0].get("text_after") or "")
         res.check("הוראת התיקון מזכירה את מספר הסעיף", "סעיף 43" in text)
         res.check("הוראת התיקון מכילה את הנוסח החדש", "ובכפוף לכל דין" in text)
+
+    # עומק 2 - הפער של משימה 58, שהיה **שקט**: עריכה של פסקה שיושבת
+    # בתוך סעיף קטן לא הפיקה שום הוראת תיקון, והעריכה "הצליחה".
+    # העריכה של סעיף 43 למעלה לא הייתה תופסת את זה: הפסקאות שלו
+    # יושבות ישירות מתחתיו. אותו סימפטום כמו באג הנזיקין המקורי,
+    # בעומק אחר - ולכן בדיקה נפרדת, לא הרחבה של הקודמת.
+    nested = _find_nested_paragraph(law["tree"])
+    if res.check("נמצאה פסקה בתוך סעיף קטן (עומק 2)", nested is not None):
+        sec_number, sub_number, paragraph = nested
+        deep_edited = paragraph["text"] + " לפי כל דין"
+        deep_payload = {
+            "edits": [{"node_id": paragraph["id"], "field": "text", "text": deep_edited}],
+            "insertions": [],
+            "bill": {"title": "", "initiator": "", "explanatory": []},
+        }
+        status, body = _post(base, f"/api/laws/{law_id}/render", deep_payload)
+        deep = json.loads(body)
+        deep_lines = deep.get("lines") or []
+        res.check(
+            "עריכה בעומק 2 מייצרת הוראת תיקון (לא רשימה ריקה)",
+            status == 200 and len(deep_lines) == 1,
+            f"{len(deep_lines)} שורות",
+        )
+        if deep_lines:
+            deep_text = (deep_lines[0].get("text") or "") + (deep_lines[0].get("text_after") or "")
+            want_container = f"בסעיף {sec_number}{sub_number}"
+            res.check(
+                f'הכתובת כוללת את המכולה ("{want_container}")',
+                want_container in deep_text,
+                deep_text[-90:],
+            )
+            res.check(
+                "הכתובת אינה מדלגת על הסעיף הקטן",
+                f"בסעיף {sec_number}," not in deep_text,
+                deep_text[-90:],
+            )
+            res.check("הוראת התיקון בעומק 2 מכילה את הנוסח החדש",
+                      "לפי כל דין" in deep_text)
+
     return law_id, payload
 
 
