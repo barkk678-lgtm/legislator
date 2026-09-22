@@ -459,6 +459,89 @@ async def api_critique_document(file: UploadFile = File(...)) -> dict:
     }
 
 
+@app.post("/api/merge/build")
+async def api_merge_build(file: UploadFile = File(...)) -> dict:
+    """**נוסח משולב:** הצעת חוק מתקנת (docx) -> נוסח החוק אחרי
+    שההצעה התקבלה, עם הסימון של מה שהשתנה.
+
+    דטרמיניסטי לחלוטין - בלי LLM. נוסח משולב שגוי הוא נוסח חוק
+    שגוי שנראה אמין, ולכן **אין מיזוג חלקי**: כל כשל מחזיר
+    `ok:false` עם `reason` בעברית, ולא עץ שחלק מההוראות הוחלו
+    עליו. ראו packages/amend/merge.py.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "documents"))
+    from extract_docx import DocumentExtractError, extract_bill  # noqa: PLC0415
+
+    from merge import build_merged_text  # noqa: PLC0415
+    from parse_instructions import parse_instructions  # noqa: PLC0415
+
+    payload = await file.read()
+    try:
+        bill = extract_bill(io.BytesIO(payload))
+    except DocumentExtractError as exc:
+        return {"ok": False, "reason": str(exc)}
+
+    plan = parse_instructions([(line.number, line.text) for line in bill.lines])
+    base = {"bill_title": bill.title, "instructions": [
+        {"number": line.number, "text": line.text} for line in bill.lines
+    ]}
+    if not plan.ok:
+        return {**base, "ok": False, "reason": plan.blocking_reason,
+                "extra_laws": plan.extra_laws,
+                "unparsed": [text for _, text in plan.unparsed]}
+
+    # התאמת החוק לפי שמו כפי שההצעה כותבת אותו. **בלי ניחוש**:
+    # אפס התאמות או יותר מאחת - עוצרים ואומרים, ולא בוחרים את
+    # הראשונה.
+    matches = search_law_titles(plan.law.name)
+    if not matches:
+        return {**base, "ok": False,
+                "reason": f"לא מצאתי במאגר את {plan.law.full}."}
+    exact = [m for m in matches if plan.law.name in (m.get("title") or "")]
+    if len(exact) != 1:
+        names = ", ".join((m.get("title") or "") for m in matches[:4])
+        return {**base, "ok": False,
+                "reason": (f"שם החוק בהצעה ({plan.law.full}) מתאים ל-{len(exact) or len(matches)} "
+                           f"חוקים במאגר ({names}) - לא אבחר אחד מהם בניחוש.")}
+
+    law_id = exact[0]["id"]
+    try:
+        root = load_law(law_id)
+    except (LawNotFoundError, KeyError, FileNotFoundError, ValueError) as exc:
+        return {**base, "ok": False, "reason": f"לא ניתן לטעון את החוק: {exc}"}
+
+    result = build_merged_text(root, plan)
+    if not result.ok:
+        return {**base, "ok": False, "reason": result.error,
+                "law_id": law_id, "law_title": root.full_title}
+
+    return {
+        **base,
+        "ok": True,
+        "law_id": law_id,
+        "law_title": root.full_title,
+        "tree": node_view(result.tree),
+        "as_of": as_of_display(result.tree),
+        # לכל שינוי: הצומת שהושפע, וההוראה בהצעה שיצרה אותו - זה
+        # מה שמאפשר ללחוץ על שינוי ולראות מאיפה הוא בא.
+        "changes": [
+            {
+                "kind": change.kind,
+                "node_id": change.node_id,
+                "anchor_id": change.anchor_id,
+                "label": change.label,
+                "text": change.text,
+                "instruction": (bill.lines[change.source_line].text
+                                if change.source_line < len(bill.lines) else ""),
+                "instruction_number": (bill.lines[change.source_line].number
+                                       if change.source_line < len(bill.lines) else ""),
+            }
+            for change in result.applied
+        ],
+        "warnings": bill.warnings,
+    }
+
+
 @app.post("/api/reservations/analyze")
 async def api_reservations_analyze(file: UploadFile = File(...)) -> dict:
     """מדידת הצעה שהועלתה: כמה הסתייגויות אפשר לייצר וכמה עוגנים

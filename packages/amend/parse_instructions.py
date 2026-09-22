@@ -155,7 +155,7 @@ class AmendmentPlan:
     @property
     def blocking_reason(self) -> str:
         if self.extra_laws:
-            others = "، ".join(self.extra_laws)
+            others = ", ".join(self.extra_laws)
             return (f"ההצעה מתקנת יותר מחוק אחד ({others}). בשלב זה "
                     f"נתמכת הצעה שמתקנת חוק אחד בלבד.")
         if not self.law:

@@ -497,3 +497,31 @@ select { font-weight: 600; max-width: 420px; }
   font-size: 13.5px; line-height: 1.6;
 }
 .draft-notice.warn { background: var(--del-bg); border: 1px solid var(--warn); }
+
+/* ── נוסח משולב ───────────────────────────────────────────────── */
+.merge-tree { margin-top: 16px; line-height: 1.75; }
+.merge-children { margin-inline-start: 22px; }
+.merge-line { padding: 3px 6px; border-radius: 4px; }
+.merge-label { color: #6b7280; font-weight: 600; margin-inline-end: 4px; }
+/* ירוק לתוספת, אדום לנמחק - כמו "עקוב אחר שינויים" בכלי ההצעות.
+   מחיקה עדיין אינה דפוס נתמך במיזוג, ולכן .merge-removed מוגדר
+   אך אינו מיוצר; כשהדפוס ייתמך, התצוגה כבר תדע להציג אותו. */
+.merge-added { background: #e8f7ec; border-inline-start: 3px solid #16a34a; cursor: pointer; }
+.merge-added:hover { background: #d7f0de; }
+.merge-removed { background: #fdecec; border-inline-start: 3px solid #dc2626;
+                 text-decoration: line-through; color: #7f1d1d; }
+.merge-line.is-open { box-shadow: 0 0 0 2px rgba(22,163,74,.35); }
+.merge-source { margin-top: 6px; padding: 8px 10px; background: #fff; border: 1px solid #d1d5db;
+                border-radius: 6px; font-size: 13px; color: #374151; cursor: default; }
+.merge-legend { margin-top: 14px; font-size: 13px; color: #4b5563; }
+/* מקרא. **לא משתמש בקלאס .merge-added** אף שהצבע זהה: שיתוף הקלאס
+   נתן לריבוע המקרא גם cursor:pointer וגם :hover, כאילו אפשר ללחוץ
+   עליו - ובבדיקה בדפדפן הוא אף נתפס כ"השינוי הראשון". */
+.merge-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+                vertical-align: -2px; background: #e8f7ec; border-inline-start: 3px solid #16a34a; }
+.merge-changes { margin: 12px 0 0; padding-inline-start: 20px; }
+.merge-changes li { margin-bottom: 8px; cursor: pointer; }
+.merge-changes li:hover .merge-instruction { color: #111827; }
+.merge-instruction { font-size: 13px; color: #6b7280; margin-top: 2px; }
+.merge-detail { margin-top: 12px; font-size: 14px; }
+.merge-detail ul { margin: 6px 0 0; padding-inline-start: 20px; }

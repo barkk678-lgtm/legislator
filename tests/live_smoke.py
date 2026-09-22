@@ -26,6 +26,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from pathlib import Path
 
 DEFAULT_BASE = "https://legislator-tau.vercel.app"
 TIMEOUT = 120
@@ -116,6 +117,26 @@ def _find_nested_paragraph(node, section=None):
         if found:
             return found
     return None
+
+
+
+def _post_file(base, path, file_path):
+    """העלאת קובץ ב-multipart. נכתב ביד ולא דרך ספרייה חיצונית -
+    הבדיקה החיה רצה ב-CI בלי תלויות מעבר לספריית התקן."""
+    boundary = "----legislator-live-smoke"
+    name = Path(file_path).name
+    payload = b"".join([
+        f"--{boundary}\r\n".encode(),
+        f'Content-Disposition: form-data; name="file"; filename="{name}"\r\n'.encode(),
+        b"Content-Type: application/vnd.openxmlformats-officedocument."
+        b"wordprocessingml.document\r\n\r\n",
+        Path(file_path).read_bytes(),
+        f"\r\n--{boundary}--\r\n".encode(),
+    ])
+    req = urllib.request.Request(
+        base + path, data=payload, method="POST",
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    return _request(req, f"POST {path} ({name})")
 
 
 def journey_open_and_edit(base, res):
@@ -300,6 +321,61 @@ def journey_chat(base, res):
               not q.get("removed_addressee"), q.get("removed_addressee") or "נקי")
 
 
+
+def journey_merged_text(base, res):
+    """הלקוח מעלה הצעת חוק מתקנת ומקבל נוסח משולב.
+
+    **שתי הצעות בכוונה:** 13948412 מכסה את הוספת היחידה, ו-13948380
+    את שלושת הדפוסים האחרים (החלפת מילים, הוספה בסוף, מספור מחדש)
+    ואת איתור היחידה מתחת לצומת בלי תווית. הצעה אחת בלבד הייתה
+    מותירה את הדפוס הנפוץ ביותר - החלפת מילים - בלי כיסוי חי.
+
+    נבדקת גם **דחייה**: הוראה שאינה מוכרת חייבת לעצור את המיזוג
+    ולהחזיר סיבה בעברית, ולא נוסח חלקי."""
+    print("\n[5] נוסח משולב")
+    fixtures = Path(__file__).resolve().parent / "fixtures" / "real-bills"
+    cases = [
+        ("13948412", "שוויון ההזדמנויות בעבודה", 1, ["insert"]),
+        ("13948380", "דמי מחלה", 3, ["relabel", "replace", "append"]),
+    ]
+    for bill_id, law_hint, want_changes, want_kinds in cases:
+        path = fixtures / f"{bill_id}.docx"
+        if not res.check(f"{bill_id}: קובץ ההצעה קיים", path.exists(), str(path)):
+            continue
+        status, body = _post_file(base, "/api/merge/build", path)
+        if not res.check(f"{bill_id}: השרת ענה", status == 200, f"HTTP {status}"):
+            continue
+        data = json.loads(body)
+        if not res.check(f"{bill_id}: נבנה נוסח משולב", data.get("ok") is True,
+                         data.get("reason", "")):
+            continue
+        res.check(f"{bill_id}: זוהה החוק הנכון",
+                  law_hint in (data.get("law_title") or ""), data.get("law_title", ""))
+        changes = data.get("changes") or []
+        res.check(f"{bill_id}: {want_changes} שינויים הוחלו",
+                  len(changes) == want_changes, str(len(changes)))
+        res.check(f"{bill_id}: סוגי השינויים",
+                  [c.get("kind") for c in changes] == want_kinds,
+                  str([c.get("kind") for c in changes]))
+        res.check(f"{bill_id}: לכל שינוי מצורפת ההוראה שיצרה אותו",
+                  all((c.get("instruction") or "").strip() for c in changes))
+        res.check(f"{bill_id}: הוחזר עץ החוק המשולב",
+                  bool((data.get("tree") or {}).get("children")))
+
+    # דחייה: מסמך שאינו הצעת חוק מתקנת כלל.
+    other = fixtures / "13948386.docx"
+    if other.exists():
+        status, body = _post_file(base, "/api/merge/build", other)
+        data = json.loads(body) if status == 200 else {}
+        if data.get("ok") is False:
+            res.check("הצעה שלא ניתן לפרש - נעצרת עם סיבה בעברית",
+                      bool((data.get("reason") or "").strip()), data.get("reason", "")[:70])
+        else:
+            res.check("הצעה שלא ניתן לפרש - נעצרת עם סיבה בעברית",
+                      data.get("ok") is True,
+                      "ההצעה הזו דווקא מוזגה במלואה - לא דחייה, וזה תקין")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=DEFAULT_BASE)
@@ -319,6 +395,7 @@ def main():
             law_id, payload = edited
             journey_docx(base, res, law_id, payload)
             journey_citations(base, res, law_id)
+        journey_merged_text(base, res)
         if args.with_llm:
             journey_research(base, res)
             journey_chat(base, res)

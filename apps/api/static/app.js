@@ -1775,3 +1775,124 @@ async function qualityReservations() {
 document.getElementById("res-measure-btn").addEventListener("click", measureReservations);
 document.getElementById("res-generate-btn").addEventListener("click", generateReservations);
 document.getElementById("res-quality-btn").addEventListener("click", qualityReservations);
+
+/* ── נוסח משולב ─────────────────────────────────────────────────
+   מעלים הצעת חוק מתקנת, ורואים את נוסח החוק אחרי שהיא התקבלה.
+   הכול דטרמיניסטי בצד השרת; כאן רק תצוגה.
+
+   **הצגה של דחייה חשובה כמו הצגה של הצלחה**: כשהשרת עוצר, הסיבה
+   שלו מוצגת כלשונה ולא מוחלפת בהודעה כללית - היא נוסחה בדיוק כדי
+   שהמשתמש יבין מה למד המערכת ולמה לא המשיכה. */
+const MERGE_KIND_LABEL = {
+  insert: "יחידה חדשה",
+  replace: "החלפת מילים",
+  append: "הוספה בסוף",
+  relabel: "מספור מחדש",
+};
+
+function mergeNodeHtml(node, changesById) {
+  const change = changesById.get(node.id);
+  const label = node.number ? `<span class="merge-label">${escapeHtml(node.number)}</span> ` : "";
+  const text = escapeHtml(node.text || "");
+  let body = "";
+  if (node.number || (node.text || "").trim()) {
+    const cls = change ? ` merge-added` : "";
+    const attr = change ? ` data-change="${escapeHtml(node.id)}" role="button" tabindex="0"` : "";
+    body = `<div class="merge-line${cls}"${attr}>${label}${text}</div>`;
+  }
+  const kids = (node.children || []).map((c) => mergeNodeHtml(c, changesById)).join("");
+  return body + (kids ? `<div class="merge-children">${kids}</div>` : "");
+}
+
+async function buildMergedText() {
+  const out = document.getElementById("merge-result");
+  const input = document.getElementById("merge-file");
+  const file = input.files && input.files[0];
+  if (!file) {
+    out.innerHTML = `<div class="msg err">בחר קובץ Word של הצעת חוק מתקנת.</div>`;
+    return;
+  }
+  const btn = document.getElementById("merge-btn");
+  btn.disabled = true;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>בונה נוסח משולב…</div>`;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await fetch("/api/merge/build", { method: "POST", body: form });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בבניית הנוסח המשולב.")}</div>`;
+      return;
+    }
+    const d = await resp.json();
+    const head = `<div class="research-title">${escapeHtml(d.bill_title || "(שם ההצעה לא זוהה)")}</div>`;
+
+    if (!d.ok) {
+      // הסיבה כלשונה מהשרת. "כמה חוקים" מקבל גם את רשימת החוקים,
+      // ו"הוראות שלא זוהו" מקבל את השורות עצמן - כדי שהמשתמש יראה
+      // בדיוק איפה נעצרתי ולא רק שנעצרתי.
+      let extra = "";
+      if ((d.extra_laws || []).length) {
+        extra = `<div class="merge-detail"><b>החוקים שזוהו בהצעה:</b><ul>` +
+          d.extra_laws.map((n) => `<li>${escapeHtml(n)}</li>`).join("") + `</ul></div>`;
+      }
+      if ((d.unparsed || []).length) {
+        extra += `<div class="merge-detail"><b>ההוראות שלא זוהו:</b><ul>` +
+          d.unparsed.map((t) => `<li>${escapeHtml(t)}</li>`).join("") + `</ul></div>`;
+      }
+      out.innerHTML = head +
+        `<div class="msg err" style="margin-top:12px">${escapeHtml(d.reason || "המיזוג נעצר.")}</div>` +
+        extra;
+      return;
+    }
+
+    const changesById = new Map((d.changes || []).map((c) => [c.node_id, c]));
+    const summary = (d.changes || []).map((c, i) => `
+      <li data-jump="${escapeHtml(c.node_id)}">
+        <b>${escapeHtml(MERGE_KIND_LABEL[c.kind] || c.kind)}</b>
+        ${c.label ? `<span class="merge-label">${escapeHtml(c.label)}</span>` : ""}
+        <div class="merge-instruction">${escapeHtml(c.instruction_number || "")} ${escapeHtml(c.instruction)}</div>
+      </li>`).join("");
+
+    out.innerHTML = head +
+      `<div class="citation-date">${escapeHtml(d.law_title || "")}${d.as_of ? " · " + escapeHtml(d.as_of) : ""}</div>
+       <div class="msg ok" style="margin-top:12px">${d.changes.length} שינויים הוחלו. כל ההוראות בהצעה זוהו והוחלו — אין מיזוג חלקי.</div>
+       <div class="merge-legend"><span class="merge-swatch"></span> נוסף על ידי ההצעה · לחיצה על שינוי מציגה את ההוראה שיצרה אותו</div>
+       <ol class="merge-changes">${summary}</ol>
+       <div class="merge-tree" id="merge-tree">${mergeNodeHtml(d.tree, changesById)}</div>`;
+
+    const showChange = (nodeId) => {
+      const c = changesById.get(nodeId);
+      if (!c) return;
+      document.querySelectorAll("#merge-result .merge-line.is-open").forEach((el) => {
+        el.classList.remove("is-open");
+        const note = el.querySelector(".merge-source");
+        if (note) note.remove();
+      });
+      const line = document.querySelector(`#merge-result [data-change="${CSS.escape(nodeId)}"]`);
+      if (!line) return;
+      line.classList.add("is-open");
+      const note = document.createElement("div");
+      note.className = "merge-source";
+      note.innerHTML = `<b>ההוראה שיצרה את השינוי:</b> ${escapeHtml(c.instruction_number || "")} ${escapeHtml(c.instruction)}`;
+      line.appendChild(note);
+      line.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+
+    out.querySelectorAll("[data-change]").forEach((el) => {
+      el.addEventListener("click", () => showChange(el.dataset.change));
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showChange(el.dataset.change); }
+      });
+    });
+    out.querySelectorAll("[data-jump]").forEach((el) => {
+      el.addEventListener("click", () => showChange(el.dataset.jump));
+    });
+  } catch (e) {
+    out.innerHTML = `<div class="msg err">שגיאת רשת: ${escapeHtml(String(e))}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("merge-btn").addEventListener("click", buildMergedText);
