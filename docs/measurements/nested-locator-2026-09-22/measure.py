@@ -26,10 +26,15 @@ OPENER = re.compile(rf"^\s*(?:\(\d+\)|\d+\.)?\s*בסעיף\s+\S+(?:\s+לחוק\s
 SUB_ITEM = re.compile(r"^\s*\((?:\d+|[א-ת])\)\s*\S")
 NEXT_ADDRESS = re.compile(HEAD + rf"בסעיף\s+{SECTION}")
 
-AFTER_WORDS = re.compile(r'אחרי\s+המיל(?:ה|ים)\s*["״”″]')
-AFTER_BARE = re.compile(r'אחרי\s+["״”″]')
-INSTEAD_WORDS = re.compile(r'במקום\s+המיל(?:ה|ים)\s*["״”″]')
-INSTEAD_BARE = re.compile(r'במקום\s+["״”″]')
+# "המילים" אינה סגנון אלא תפקיד דקדוקי - ראו drafting-rules.md §8.7.1.
+# בתפקיד עוגן (אחרי/לפני/במקום) היא נעדרת; בתפקיד נושא של פועל המחיקה,
+# ובניב טווח ("החל במילים"/"עד המילים") היא נדרשת.
+Q = r'["\u05f4\u201d\u2033\u05f3]'
+ANCHOR_BARE = re.compile(rf'(?:אחרי|לפני|במקום)\s+{Q}')
+ANCHOR_WORDS = re.compile(rf'(?:אחרי|לפני|במקום)\s+המיל(?:ה|ים)\s*{Q}')
+SUBJECT_WORDS = re.compile(
+    rf'המיל(?:ה|ים)\s+{Q}[^\u0022\u05f4\u201d]*{Q}\s*[\u2013\-\u2014]\s*(?:יימחקו|תימחק|יימחק)')
+RANGE_IDIOM = re.compile(r'(?:החל\s+במיל(?:ה|ים)|עד\s+המיל(?:ה|ים))')
 
 
 def paragraphs(path: str) -> list[str]:
@@ -72,10 +77,14 @@ def main() -> None:
                     break
                 print(f"        {nxt[:130]}")
 
-    print("\nציון מילים מצוטטות:")
-    for label, rx in (('אחרי המילים "..."', AFTER_WORDS), ('אחרי "..."', AFTER_BARE),
-                      ('במקום המילים "..."', INSTEAD_WORDS), ('במקום "..."', INSTEAD_BARE)):
-        print(f"    {label:<22} {sum(1 for _, l in lines if rx.search(l))}")
+    print('\nתפקידה הדקדוקי של "המילים" (§8.7.1):')
+    for label, rx in (
+        ('עוגן: אחרי/לפני/במקום "..."', ANCHOR_BARE),
+        ('עוגן: אחרי/לפני/במקום המילים "..."', ANCHOR_WORDS),
+        ('נושא: המילים "..." - יימחקו', SUBJECT_WORDS),
+        ('ניב טווח: החל במילים / עד המילים', RANGE_IDIOM),
+    ):
+        print(f"    {label:<38} {sum(1 for _, l in lines if rx.search(l))}")
 
 
 if __name__ == "__main__":
