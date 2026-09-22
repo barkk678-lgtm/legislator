@@ -598,6 +598,34 @@ def _container_suffix(section: LegislativeNode, node: LegislativeNode, *, inclus
     return "".join(reversed(chain))
 
 
+
+def _definition_clause(section: LegislativeNode, node: LegislativeNode, *, inclusive: bool) -> str:
+    """פסוקית ההגדרה בכתובת ההוראה: `בהגדרה "המונח", `.
+
+    **למה במילים ולא בסוגריים כמו שאר המכולות:** להגדרה אין מספר,
+    והמדריך מזהה אותה במפורש לפי המונח המוגדר -
+    `בסעיף מס' הסעיף לחוק העיקרי, בהגדרה "המונח המוגדר הקיים",
+    במקום "טקסט קיים" יבוא "טקסט חדש"` (מדריך משפטים §7.9.1,
+    עמ' 26 [PDF 55]). `_container_suffix` בונה את המכולה מהמספרים
+    בלבד, ולכן בלעדי הפסוקית הזו ההגדרה הייתה **נעלמת** מהכתובת
+    וההוראה הייתה מצביעה על מקום אחר בחוק.
+
+    **הרכבה מוצהרת, לא ציטוט:** הצירוף `בהגדרה "X", אחרי פסקה (2)
+    יבוא:` אינו מופיע ככתובת שלמה לא במדריך ולא ב-40 ההצעות. הוא
+    מורכב משני חלקים שכל אחד מהם מתועד - פסוקית ההגדרה (§7.9.1)
+    ועיגון היחידה לפי תווית (§7.10.6(ב)). ראו drafting-rules.md
+    §8.7.3.
+
+    מוחזרת פסוקית אחת לכל היותר: הגדרה בתוך הגדרה אינה דפוס קיים.
+    """
+    current: LegislativeNode | None = node if inclusive else find_parent(section, node.id)
+    while current is not None and current.id != section.id:
+        if current.node_type == "definition":
+            return f'בהגדרה "{_quoted_term(current.text)}", '
+        current = find_parent(section, current.id)
+    return ""
+
+
 def _render_mutation(
     section_number: str,
     mutation: _Mutation,
@@ -605,6 +633,7 @@ def _render_mutation(
     *,
     full_title: str | None = None,
     law_footnote_key: str | None = None,
+    prefix: str = "",
 ) -> Line:
     """full_title/law_footnote_key: מועברים רק כשזו הפעם הראשונה שהחוק
     מוזכר בהצעה (touched_count==1), גם כשמדובר במוטציה בודדת. תוקן ב-
@@ -637,6 +666,7 @@ def _render_mutation(
         # (§7.10.3) ו-`עד המילים`/`החל במילים` (ניב טווח) נשארים כפי
         # שהם - שם "המילים" היא הנושא הדקדוקי או חלק מניב קבוע.
         body = f'אחרי "{anchor}" יבוא "{inserted}".'
+    body = prefix + body
 
     if full_title is not None:
         # ראו הערה מקבילה ב-_render_new_section: מראה המקום חייב לשבת
@@ -859,6 +889,12 @@ def amend(
             locator = number + _container_suffix(
                 before_sec, instructions[0].before_node, inclusive=True
             )
+            # פסוקית ההגדרה נכנסת **אחרי** "לחוק העיקרי," ולא לתוך
+            # מספר הסעיף - `בסעיף 1 לחוק העיקרי, בהגדרה "X", במקום...`
+            # (מדריך §7.9.1). לכן היא מוקדמת לגוף ההוראה, לא למיקום.
+            definition = _definition_clause(
+                before_sec, instructions[0].before_node, inclusive=True
+            )
             if touched_count == 1:
                 # תוקן במשימה 6א: התנאי ל"החוק מוזכר בפעם הראשונה" הוא
                 # touched_count==1, בלי קשר לאיזה ענף מטפל בסעיף - ראו
@@ -867,11 +903,13 @@ def amend(
                     locator,
                     instructions[0],
                     replacement,
+                    prefix=definition,
                     full_title=before.full_title or "",
                     law_footnote_key=law_footnote_key,
                 )
             else:
-                mutation_line = _render_mutation(locator, instructions[0], replacement)
+                mutation_line = _render_mutation(locator, instructions[0], replacement,
+                                                 prefix=definition)
             mutation_line.side_heading = f"תיקון סעיף {number}"
             mutation_line.number = f"{touched_count}."
             _stamp_provenance(mutation_line, instructions[0].before_node, before)
@@ -903,6 +941,7 @@ def amend(
             # inclusive=False: העוגן הוא ה*יעד* ("אחרי פסקה (4)"), לא
             # המכולה. המכולה היא רק אבותיו שמתחת לסעיף - `(א)`.
             locator = number + _container_suffix(before_sec, before_anchor, inclusive=False)
+            definition = _definition_clause(before_sec, before_anchor, inclusive=False)
             footnote = footnotes_by_id.get(item.new_node.id)
             insertion_lines = _render_insertion(item, ".", ordinal=1, footnote=footnote)
             head = insertion_lines[0]
@@ -910,7 +949,7 @@ def amend(
             # (4) יבוא:"), ומוסיף marker="(1)" רק בענף "בסופו יבוא" - שם
             # הוא מספר סידורי בתוך רשימת הוראות. בהוראה יחידה אין רשימה,
             # ולכן אין מספר סידורי: `בסעיף 4 לחוק העיקרי, בסופו יבוא:`.
-            phrase = head.text or ""
+            phrase = definition + (head.text or "")
             head.marker = ""
             if touched_count == 1:
                 # ראו הערה מקבילה ב-_render_new_section: מראה המקום של

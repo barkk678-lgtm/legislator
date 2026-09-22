@@ -112,6 +112,14 @@ def api_laws() -> list[dict]:
     return law_summaries()
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """הדפדפן מבקש /favicon.ico מהשורש גם כשיש <link rel="icon">
+    בדף, ובלי המסלול הזה כל טעינת דף הותירה 404 בקונסולה. מוגש
+    ה-SVG עצמו - דפדפנים מודרניים מקבלים אותו."""
+    return FileResponse(HERE / "static" / "favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/api/laws/search")
 def api_search_laws(q: str = "") -> list[dict]:
     """חיפוש שם-חוק בטקסט חופשי (משימה A) - ראו law_registry.

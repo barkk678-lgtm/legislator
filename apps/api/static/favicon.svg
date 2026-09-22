@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="מנסח החקיקה">
+  <rect width="64" height="64" rx="12" fill="#1f3a5f"/>
+  <!-- גיליון חוק עם שורות טקסט -->
+  <rect x="17" y="12" width="30" height="40" rx="3" fill="#f7f5ef"/>
+  <g fill="#1f3a5f">
+    <rect x="22" y="19" width="20" height="3" rx="1.5"/>
+    <rect x="22" y="26" width="20" height="3" rx="1.5"/>
+    <rect x="22" y="33" width="14" height="3" rx="1.5"/>
+  </g>
+  <!-- הסימון הירוק: מה שהתיקון הוסיף -->
+  <rect x="22" y="40" width="20" height="3" rx="1.5" fill="#16a34a"/>
+</svg>

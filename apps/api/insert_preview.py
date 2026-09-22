@@ -129,7 +129,10 @@ def _unnumbered_ancestor(root: LegislativeNode, node_id: str) -> str | None:
     "בסעיף 1, אחרי פסקה (1)" במקום כתובת שמזהה את המקום הנכון."""
     parent = find_parent(root, node_id)
     while parent is not None and parent.node_type not in ("section", "law"):
-        if not parent.number:
+        # הגדרה אינה "צומת בלי מספר" לעניין הזה: היא מזוהה בכתובת
+        # לפי המונח המוגדר, במילים (engine._definition_clause), ולכן
+        # אינה נעלמת ממנה - ראו §7.9.1.
+        if not parent.number and parent.node_type != "definition":
             return parent.node_type
         parent = find_parent(root, parent.id)
     return None
@@ -226,21 +229,20 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
         # ההוראה שהייתה יוצאת היא `בסעיף 1, אחרי פסקה (1) יבוא:`, בלי
         # שום אזכור של ההגדרה - הוראת תיקון **שגויה**, לא רק חלקית.
         # חסימה מוצהרת עדיפה על ניסוח שקט ושגוי.
-        if parent.node_type == "definition":
-            return _Resolution(
-                supported=False,
-                reason=(
-                    "הוספת פסקה בתוך הגדרה אינה נתמכת עדיין - כתובת ההוראה "
-                    'חייבת לנקוב בהגדרה ("בהגדרה \"...\"", מדריך §7.9.1), '
-                    "וצורה זו טרם מומשה"
-                ),
-            )
-        if parent.node_type not in ("section", "subsection", "paragraph"):
+        # **נפתח (משימה 62).** עד אז הדפוס הזה היה חסום כי המכולה
+        # בסוגריים מדלגת על ההגדרה (אין לה מספר), וההוראה שהייתה
+        # יוצאת - `בסעיף 1, אחרי פסקה (1) יבוא:` - הצביעה על מקום
+        # אחר בחוק. עכשיו `engine._definition_clause` מנסחת את
+        # ההגדרה **במילים**, כפי שהמדריך קובע: `בסעיף N לחוק
+        # העיקרי, בהגדרה "X", ...` (§7.9.1, עמ' 26). תיקון הגדרות
+        # הוא מהדפוסים הנפוצים ביותר בהצעות אמיתיות - 69 מופעים
+        # של פסקה בתוך הגדרה בארבעת הפיקסצ'רים לבדם.
+        if parent.node_type not in ("section", "subsection", "paragraph", "definition"):
             return _Resolution(
                 supported=False,
                 reason=(
                     f"פסקה בתוך {parent.node_type!r} אינה נתמכת - נתמכות פסקאות "
-                    "בתוך סעיף, סעיף קטן או פסקה"
+                    "בתוך סעיף, סעיף קטן, פסקה או הגדרה"
                 ),
             )
         # מחסום כללי: אם יש בשרשרת שבין הסעיף לעוגן צומת בלי מספר,
