@@ -1522,54 +1522,278 @@ async function checkSimilarBills(title) {
   }
 }
 
+// ── שאילתות קודמות: חיפוש הדרגתי ────────────────────────────────
+// החיפוש אינו קריאה אחת אלא כמה (יחידה = צירוף = קריאה אחת לפיד),
+// וכל אחת מסתיימת בזמן אחר. אין סיבה לחכות שכולן יחזרו: כל תשובה
+// מוצגת ברגע שהיא חוזרת.
+//
+// **שתי מגבלות שמכתיבות את כל המבנה כאן:**
+// 1. שורה נוספת **למטה בלבד** ולעולם לא זזה ולא נעלמת - מי שקורא
+//    שורה שלישית לא ימצא שורה אחרת במקומה. ולכן גם אין סידור מחדש
+//    בסוף: הדירוג מוצג כתווית שמתעדכנת במקום, לא כשינוי סדר.
+// 2. כדי לא *להסיר* שורות חלשות בסוף (שזו קפיצה גרועה מסידור מחדש),
+//    תוצאה שהגיעה מיחידה של מילה בודדת **נעצרת בצד** עד סוף החיפוש,
+//    ורק ארבע הטובות שבהן נוספות בסוף, למטה. זה המימוש של "דירוג 1
+//    נחתך לארבעה מקומות" בלי ששום שורה תיעלם מהמסך.
+const PQ_MAX_STRONG_ROWS = 12;   // שורות מיחידות רב-מיליות
+const PQ_MAX_RANK1_ROWS = 4;     // "דירוג 1" - הזנב, נחתך לארבעה
+
+// **מכסה ליחידה, לפי רוחבה** - הכלל שמונע מהצירוף הראשון שחוזר
+// להשתלט על המסך. נמדד (2026-09-22): "זיהום אוויר" (116 תוצאות)
+// מילאה את כל 12 השורות בזיהום אוויר בתל אביב ובאשקלון לפני
+// ש"מפרץ חיפה" (13 תוצאות) חזרה בכלל, והדיוק ירד מ-89% ל-77%.
+// ככל שצירוף מתאים ליותר כותרות כך הוא מלמד פחות. חייב להיות זהה
+// ל-knesset_queries.unit_budget.
+function pqUnitBudget(count) {
+  if (count <= 25) return PQ_MAX_STRONG_ROWS;
+  if (count <= 60) return 6;
+  if (count <= 120) return 3;
+  return 0;                      // רחבה מדי - לדירוג בלבד
+}
+const PQ_CONCURRENCY = 3;        // + בדיקת הפתיחה = 4 בו-זמנית. נמדד: הפיד
+                                 // מחזיר HTTP 473 מעל כך; run_unit מנסה שוב, ומה
+                                 // שנשאר נספר ונאמר, לא נבלע.
+let pqToken = 0;
+
+function pqRowHtml(row) {
+  // שורות ישנות במאגר חסרות תאריך או סוג. מרכיבים את שורת המידע
+  // מהחלקים שקיימים בלבד - מפריד ריק בין שני שדות חסרים נראה כמו
+  // תקלה בתצוגה.
+  const meta = [row.kind, row.knesset ? `כנסת ${row.knesset}` : "", row.submitted_at]
+    .filter(Boolean).map(escapeHtml).join(" · ");
+  // תווית הדירוג מופיעה רק מ-2 ומעלה: "1" אינו מידע, הוא רעש על כל שורה.
+  const rank = `<span class="pq-rank" title="מספר צירופי החיפוש שהתאימו"${
+    row.matched >= 2 ? "" : " hidden"}>${row.matched}</span>`;
+  return `<div class="citation-row" data-qid="${row.query_id}" data-person="${row.person_id || ""}">
+      <div class="citation-title"><span class="pq-title">${escapeHtml(row.title || "")}</span>${rank}</div>
+      <span class="citation-date">${meta}${meta ? " · " : ""}<span class="pq-asked">…</span></span>
+    </div>`;
+}
+
 async function searchPastQueries() {
   const input = document.getElementById("past-queries-input");
   const out = document.getElementById("past-queries-results");
   const q = input.value.trim();
   if (!q) return;
-  out.innerHTML = `<div class="hint">מחפש…</div>`;
-  try {
-    const resp = await fetch(`/api/queries/search?q=${encodeURIComponent(q)}&limit=12`);
-    if (!resp.ok) throw new Error("feed");
-    const data = await resp.json();
-    if (!data.results.length) {
-      // **"לא נמצא" אינו "אין".** החיפוש רץ כהתאמת מחרוזת על כותרות
-      // בלבד; נמדד שחמישה מתוך שישה ניסוחים סבירים מחזירים אפס בעוד
-      // שהמאגר מלא באותו נושא בניסוח אחר. ניסוח שאומר "לא נמצאו
-      // שאילתות בנושא" גורם למשתמש להסיק שהנושא בתולי - וזו מסקנה
-      // שגויה שהכלי עצמו יצר. ראו CLAUDE.md, "לא נמצא" מול
-      // "לא הצלחתי לבדוק".
-      out.innerHTML = `<div class="notice notice-coverage">
-          <b>החיפוש לא מצא כותרת שמכילה את הביטוי הזה.</b>
-          החיפוש רץ על כותרות השאילתות בלבד, כהתאמת מחרוזת מדויקת —
-          שאילתה שעוסקת באותו נושא בניסוח אחר לא תיתפס בו.
-          <b>זו אינה תשובה שהנושא לא נשאל</b>. נסו ביטוי קצר יותר או
-          מילת מפתח אחת.
-        </div>`;
-      return;
+  const token = ++pqToken;
+
+  out.innerHTML = `<div class="pq-status" id="pq-status">
+      <span class="spinner"></span><span>מחפש…</span></div>
+    <div id="pq-rows"></div><div id="pq-done"></div>`;
+  const statusEl = document.getElementById("pq-status");
+  const rowsEl = document.getElementById("pq-rows");
+  const doneEl = document.getElementById("pq-done");
+
+  const rank = new Map();    // query_id -> כמה יחידות התאימו
+  const shown = new Set();   // query_id שכבר על המסך
+  const held = new Map();    // query_id -> שורה שנדחתה במכסה, מועמדת לשלב ההצלבה
+  let strongRows = 0, done = 0, failed = 0, total = 0, planReady = false;
+
+  const setStatus = () => {
+    if (token !== pqToken || !statusEl.isConnected) return;
+    // לפני שהפירוק חזר עוד לא ידוע כמה מקורות יהיו - ואומרים "מחפש…"
+    // במקום להציג מכנה שעוד ישתנה.
+    statusEl.querySelector("span:last-child").textContent = planReady
+      ? `מחפש… ${done + failed} מתוך ${total} מקורות הושלמו`
+      : "מחפש…";
+  };
+  const appendRow = (row) => {
+    shown.add(row.query_id);
+    rowsEl.insertAdjacentHTML("beforeend", pqRowHtml(row));
+  };
+  const bumpBadge = (qid, n) => {
+    const b = rowsEl.querySelector(`[data-qid="${qid}"] .pq-rank`);
+    if (!b) return;
+    b.textContent = n;
+    if (n >= 2) b.removeAttribute("hidden");
+  };
+
+  const absorb = (unit, data) => {
+    // **יחידה של מילה בודדת מדרגת ואינה שולפת.** נמדד (2026-09-22):
+    // "פריפריה" לבדה הכניסה למסך זמני המתנה לרופאים, התחסנות ילדים
+    // לשפעת והנחה בתחבורה ציבורית - ארבע שורות רעש מתוך שש-עשרה.
+    // מילה אחת אינה מזהה נושא, גם כשהיא נושאית בפני עצמה.
+    // מילה בודדת = איבר אחד בלי רווח בתוכו. ["מצוקת הדיור"] הוא
+    // צירוף שנשלח כרצף אחד, לא מילה בודדת.
+    const rankOnly = unit.rankOnly || data.too_broad ||
+      (unit.words.length === 1 && !unit.words[0].trim().includes(" "));
+    const budget = pqUnitBudget(data.count);
+    let used = 0;
+    for (const row of data.rows || []) {
+      const id = row.query_id;
+      const n = (rank.get(id) || 0) + 1;
+      rank.set(id, n);
+      if (shown.has(id)) { bumpBadge(id, n); continue; }
+      const waiting = held.get(id);
+      if (waiting) {
+        waiting.matched = n;
+        // התאמה שנייה מוכיחה שהשורה אינה מקרית - עולה למסך מיד,
+        // ובכל זאת נוספת למטה בלבד.
+        if (n >= 2 && strongRows < PQ_MAX_STRONG_ROWS) {
+          held.delete(id);
+          strongRows += 1;
+          appendRow(waiting);
+        }
+        continue;
+      }
+      if (rankOnly || budget === 0) continue;
+      const candidate = { ...row, matched: n, matched_by: unit.words.join(" "),
+                          unit_count: data.count };
+      if (used < budget && strongRows < PQ_MAX_STRONG_ROWS) {
+        used += 1; strongRows += 1;
+        appendRow(candidate);
+      } else {
+        held.set(id, candidate);   // מחכה להצלבה בסוף
+      }
     }
-    out.innerHTML = data.results
-      .map((r) => {
-        // קישור לקובץ המקורי באתר הכנסת; לא מושכים אותו - ראו
-        // knesset_queries.py. נפתח בלשונית חדשה כדי לא לאבד את הטיוטה.
-        const title = r.document_url
-          ? `<a href="${escapeHtml(r.document_url)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a>`
-          : escapeHtml(r.title);
-        return `<div class="citation-row">
-            <div class="citation-title">${title}</div>
-            <span class="citation-date">${escapeHtml(r.kind || "")} · כנסת ${r.knesset} ·
-              ${escapeHtml(r.submitted_at || "")} · ${escapeHtml(r.asked_by || "לא ידוע")}</span>
-          </div>`;
-      })
-      .join("");
+  };
+
+  const runUnit = async (unit) => {
+    const qs = unit.words.map((w) => `w=${encodeURIComponent(w)}`).join("&");
+    try {
+      const r = await fetch(`/api/queries/unit?${qs}`);
+      if (!r.ok) throw new Error("unit");
+      const data = await r.json();
+      if (token !== pqToken) return;
+      done += 1;
+      absorb(unit, data);
+    } catch {
+      if (token !== pqToken) return;
+      failed += 1;   // **לא נבלע:** נספר ונאמר בשורת הסיום
+    }
+    setStatus();
+  };
+
+  // שלב א' - **צירופי המשתמש עצמו, יוצאים מיד ולא ממתינים למודל.**
+  // קריאת ה-LLM לוקחת ~2.5 שניות, ואחריה עוד ~2.5 לקריאה הראשונה
+  // לפיד - כלומר שורה ראשונה רק ב-5.5 שניות. כל צמד מילים סמוכות
+  // בנושא שהמשתמש הקליד הוא צירוף מועמד ("מצוקת הדיור", "הדיור
+  // בפריפריה"), והוא נשלח כרצף אחד ברגע הלחיצה. אין כאן רשימת
+  // מילים ואין ניחוש שעולה משהו: צירוף שאינו קיים בשום כותרת חוזר
+  // ריק ולא נראה. זה גם מה שמבטיח שהמגביל של הנושא ("במפרץ חיפה")
+  // ייבדק גם כשהמודל לא החזיר אותו כיחידה.
+  //
+  // **רק הצמד הראשון שולף; שאר הצמדים מדרגים.** נמדד: ב"אלימות
+  // במערכת החינוך" הצמד השני ("במערכת החינוך") הציף את ראש הרשימה
+  // במחסור במורים, בפערים טכנולוגיים ובהיערכות למיגון - שישה מתוך
+  // שש-עשרה. הצירוף הפותח של הנושא הוא הנושא; מה שבא אחריו מסייג
+  // אותו ("במפרץ חיפה", "בפריפריה", "בנגב"), וסייג מצמצם - הוא לא
+  // אמור להביא שורות משל עצמו.
+  const qWords = q.split(/\s+/).filter(Boolean);
+  const probeUnits = qWords.slice(0, -1)
+    .map((w, i) => ({ words: [`${w} ${qWords[i + 1]}`], kind: "probe",
+                      probe: true, rankOnly: i > 0 }))
+    .slice(0, 4);
+  total = probeUnits.length;
+  const probeRuns = probeUnits.map(runUnit);
+
+  // שלב ב - פירוק הנושא. כשל כאן אינו עוצר את החיפוש: נופלים חזרה
+  // לחיפוש המילולי בדיוק כפי שהיה, ואומרים שההרחבה לא רצה.
+  let plan;
+  try {
+    const r = await fetch(`/api/queries/plan?q=${encodeURIComponent(q)}`);
+    if (!r.ok) throw new Error("plan");
+    plan = await r.json();
   } catch {
-    // כשל פיד אינו "לא נמצא" - אותה הבחנה בדיוק כמו בהצעות הדומות.
-    out.innerHTML = `<div class="notice notice-coverage">
-        <b>לא הצלחתי לחפש שאילתות קודמות.</b>
-        מאגר הכנסת אינו זמין כרגע. <b>זו אינה תשובה ש"אין" שאילתות
-        קודמות</b> — החיפוש לא רץ. נסו שוב מאוחר יותר.
-      </div>`;
+    plan = { units: [{ words: [q], kind: "literal" }], expanded: false };
   }
+  if (token !== pqToken) return;
+  const probeKeys = new Set(probeUnits.map((u) => u.words.join(" ")));
+  const units = (plan.units || []).filter((u) => !probeKeys.has(u.words.join(" ")));
+  total += units.length;
+  planReady = true;
+  setStatus();
+  if (!total) {
+    statusEl.remove();
+    doneEl.innerHTML = `<div class="hint">מונח חיפוש קצר מדי.</div>`;
+    return;
+  }
+
+  // שלב ג - יחידה אחת = קריאה אחת. רצות במקביל (3), ונקלטות לפי
+  // סדר ההגעה. היחידות ממוינות לפי סגוליות, ולכן הצרות יוצאות ראשונות.
+  let next = 0;
+  const worker = async () => {
+    while (next < units.length) await runUnit(units[next++]);
+  };
+  await Promise.all([
+    ...probeRuns,
+    ...Array.from({ length: Math.min(PQ_CONCURRENCY, units.length) }, worker),
+  ]);
+  if (token !== pqToken) return;
+
+  // שלב ד' - ההצלבה. עכשיו ידוע לכמה צירופים כל שורה התאימה, ושורה
+  // שהתאימה ליותר מאחד היא התוצאה המדויקת ביותר שיש. אם היא נדחתה
+  // קודם במכסה של יחידה רחבה - היא נכנסת עכשיו, ותמיד למטה.
+  [...held.values()]
+    .filter((r) => r.matched >= 2)
+    .sort((a, b) => b.matched - a.matched || a.unit_count - b.unit_count)
+    .slice(0, Math.max(0, PQ_MAX_STRONG_ROWS - strongRows))
+    .forEach((r) => { strongRows += 1; held.delete(r.query_id); appendRow(r); });
+
+  // ואז הזנב: עד ארבע שורות שהתאימו לצירוף אחד בלבד, מהצירוף הצר ביותר.
+  [...held.values()]
+    .filter((r) => r.matched < 2 && !shown.has(r.query_id))
+    .sort((a, b) => a.unit_count - b.unit_count)
+    .slice(0, PQ_MAX_RANK1_ROWS)
+    .forEach(appendRow);
+
+  statusEl.remove();
+  const foundRows = shown.size;
+  const parts = [];
+  if (failed) {
+    parts.push(`<b>${total - failed} מתוך ${total} מקורות נבדקו.</b>
+      ${failed} לא נבדקו בגלל תקלה בפיד — ייתכן שיש תוצאות נוספות.`);
+  } else {
+    parts.push(`<b>זה הכול.</b> ${total} מקורות נבדקו.`);
+  }
+  if (!plan.expanded) {
+    parts.push(`ההרחבה לניסוחים חלופיים לא רצה — החיפוש היה מילולי בלבד.`);
+  }
+  if (foundRows === 0) {
+    // **"לא נמצא" אינו "אין".** ראו CLAUDE.md.
+    doneEl.innerHTML = `<div class="notice notice-coverage">
+        <b>החיפוש לא מצא כותרת שמכילה את הצירופים האלה.</b>
+        החיפוש רץ על כותרות השאילתות בלבד — שאילתה שעוסקת באותו נושא
+        בניסוח אחר לא תיתפס בו. <b>זו אינה תשובה שהנושא לא נשאל</b>.
+        ${parts.join(" ")}
+      </div>`;
+    return;
+  }
+  doneEl.innerHTML = `<div class="pq-done${failed ? " pq-done-partial" : ""}">
+      ${parts.join(" ")} ${foundRows} תוצאות.</div>`;
+
+  // שלב ה' - מי שאל וקישור לקובץ. רץ אחרי התצוגה וממלא שדות במקום:
+  // לא מוסיף שורה, לא מזיז שורה, ולכן אינו יכול לגרום לקפיצה.
+  const ids = [...shown];
+  const persons = ids.map((id) => pqPersonOf(rowsEl, id)).filter(Boolean);
+  try {
+    const r = await fetch(`/api/queries/enrich?ids=${ids.join(",")}&persons=${persons.join(",")}`);
+    if (!r.ok) throw new Error("enrich");
+    const extra = await r.json();
+    if (token !== pqToken) return;
+    for (const id of ids) {
+      const el = rowsEl.querySelector(`[data-qid="${id}"]`);
+      if (!el) continue;
+      const pid = el.dataset.person;
+      const name = extra.names[pid];
+      el.querySelector(".pq-asked").textContent =
+        name || (extra.names_unavailable ? "שם המגיש לא נשלף" : "המגיש אינו רשום במאגר");
+      const url = extra.docs[String(id)];
+      if (url) {
+        const t = el.querySelector(".pq-title");
+        t.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${t.innerHTML}</a>`;
+      }
+    }
+  } catch {
+    if (token !== pqToken) return;
+    // כשל בהשלמה אינו "אין מגיש" - נאמר שלא נשלף.
+    rowsEl.querySelectorAll(".pq-asked").forEach((el) => { el.textContent = "שם המגיש לא נשלף"; });
+  }
+}
+
+function pqPersonOf(rowsEl, id) {
+  const el = rowsEl.querySelector(`[data-qid="${id}"]`);
+  return el ? el.dataset.person : null;
 }
 
 document.getElementById("past-queries-btn").addEventListener("click", searchPastQueries);

@@ -17,7 +17,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile, Form
+from fastapi import FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
@@ -50,7 +50,13 @@ from admin_ingest import (  # noqa: E402
 )
 from knesset_bills import similar_bills  # noqa: E402
 from knesset_citations import OdataError, citations_for_law  # noqa: E402
-from knesset_queries import search_queries  # noqa: E402
+from knesset_queries import (  # noqa: E402
+    GENERIC_CAP as QUERY_GENERIC_CAP,
+    enrich,
+    expand_query,
+    run_unit,
+    search_queries,
+)
 from research import TEMPLATES as RESEARCH_TEMPLATES, ResearchError, ask as research_ask  # noqa: E402
 from rules_expert import RulesExpertError, ask as rules_expert_ask  # noqa: E402
 from service import LLMConfigError, LLMRequestError  # noqa: E402
@@ -811,11 +817,44 @@ def api_similar_bills(title: str = "", knesset: int | None = None, limit: int = 
 
 @app.get("/api/queries/search")
 def api_queries_search(q: str = "", limit: int = 12) -> dict:
-    """שאילתות קודמות באותו נושא, לחיבור לכלי ניסוח השאילתא."""
+    """הצינור המלא בקריאה אחת. הממשק אינו משתמש בו - הוא קורא ל-
+    plan/unit/enrich בנפרד כדי להציג תוצאות בהדרגה (ראו app.js).
+    נשמר ל-API חיצוני ולבדיקת הקצה החיה."""
     try:
         return search_queries(q, limit=limit)
     except OdataError as e:
         raise HTTPException(502, str(e))
+
+
+@app.get("/api/queries/plan")
+def api_queries_plan(q: str = "") -> dict:
+    """שלב א של החיפוש ההדרגתי: קריאת LLM אחת שמפרקת את הנושא
+    ליחידות חיפוש. אינה נוגעת בפיד ולכן חוזרת תוך ~2 שניות."""
+    q = q.strip()
+    if len(q) < 2:
+        return {"units": [], "expanded": False, "note": "מונח חיפוש קצר מדי."}
+    return {**expand_query(q), "generic_cap": QUERY_GENERIC_CAP}
+
+
+@app.get("/api/queries/unit")
+def api_queries_unit(w: list[str] = Query(default=[])) -> dict:
+    """שלב ב: יחידת חיפוש אחת = קריאה אחת לפיד. הלקוח קורא לכאן
+    לכל יחידה בנפרד ומציג כל תשובה ברגע שהיא חוזרת, בלי לחכות
+    לשאר. **הכישלון מוחזר כ-502 ולא כתוצאה ריקה** - הלקוח סופר
+    כמה מקורות לא נבדקו ואומר זאת למשתמש."""
+    try:
+        return run_unit(w)
+    except OdataError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.get("/api/queries/enrich")
+def api_queries_enrich(ids: str = "", persons: str = "") -> dict:
+    """שלב ג: שמות המגישים והקישורים לשורות שכבר על המסך. רץ אחרי
+    התצוגה וממלא שדות במקום - לא מזיז שורות."""
+    def _ints(raw: str) -> list[int]:
+        return [int(x) for x in raw.split(",") if x.strip().isdigit()][:200]
+    return enrich(_ints(ids), _ints(persons))
 
 
 @app.get("/api/laws/{law_id}")
