@@ -14,6 +14,14 @@
 name: בדיקות מול האתר החי
 
 on:
+  # **אחרי כל פריסה, לא רק לפי לוח זמנים** (ברק, 22.9.2026):
+  # "כך היא תופסת פריסה שבורה תוך דקות, לא למחרת."
+  #
+  # `deployment_status` הוא האירוע שמגיע מ-Vercel עצמו כשהפריסה
+  # דיווחה על מצבה. הוא עדיף על `push` כי הוא יורה כשהאתר **כבר
+  # חי**, ולא כשהקוד נדחף - כלומר בלי ניחוש של כמה זמן לחכות,
+  # ובלי לבדוק בטעות את הגרסה הקודמת.
+  deployment_status:
   schedule:
     - cron: "30 5 * * *"   # אחרי העדכון היומי של הקורפוס (04:00)
   workflow_dispatch:
@@ -22,12 +30,18 @@ on:
         description: "לכלול גם את כלי הצ'אט (עולה כסף)"
         type: boolean
         default: false
+  # רשת ביטחון: אם ה-webhook של הפריסה אינו מגיע משום סיבה,
+  # push ל-master עדיין מפעיל בדיקה (עם המתנה, ראו למטה).
   push:
     branches: [master]
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    # פריסה שנכשלה או עדיין רצה - אין מה לבדוק מולה.
+    if: >-
+      github.event_name != 'deployment_status' ||
+      github.event.deployment_status.state == 'success'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,6 +51,8 @@ jobs:
       # **המתנה לפריסה.** push ל-master מפעיל פריסה ב-Vercel,
       # והבדיקה שתרוץ מיד תיבדק מול הגרסה הקודמת ותדווח כשל שווא -
       # או גרוע יותר, תעבור ותסתיר בעיה אמיתית.
+      # רק במסלול ה-push. ב-deployment_status האתר כבר חי, ואין
+      # מה לחכות לו.
       - name: המתנה לפריסת Vercel
         if: github.event_name == 'push'
         run: sleep 120
