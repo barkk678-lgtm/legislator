@@ -556,3 +556,5 @@ select { font-weight: 600; max-width: 420px; }
 .draft-save-status { font-size: 12.5px; color: #6b7280; margin-inline-start: 10px; }
 .draft-save-status.is-saved { color: #15803d; }
 .draft-save-status.is-saving { color: #92400e; }
+.draft-save-status.is-failed { color: #b91c1c; font-weight: 600; }
+.similar-unknown { color: #92400e; }

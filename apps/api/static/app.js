@@ -818,6 +818,7 @@ document.getElementById("bill-title-input").addEventListener("blur", refreshPrev
  * ב-open-gaps ונפתר עם המעבר ל-DB.
  * =================================================================== */
 
+let draftsUnreadable = false;   // ראו readDrafts
 const DRAFTS_KEY = "legislator.drafts.v1";
 const DRAFTS_LIMIT = 40;
 let currentDraftId = null;
@@ -830,8 +831,14 @@ function readDrafts() {
   try {
     const raw = localStorage.getItem(DRAFTS_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
+    draftsUnreadable = false;
     return Array.isArray(parsed) ? parsed : [];
   } catch {
+    // **אחסון פגום אינו "אין הצעות שמורות".** עד לתיקון הזה
+    // JSON.parse שנכשל החזיר רשימה ריקה, והמשתמש ראה בדיוק את
+    // אותו מסך כמו מי שלא שמר מעולם - בזמן שההצעות שלו קיימות
+    // ופשוט לא נקראו.
+    draftsUnreadable = true;
     return [];
   }
 }
@@ -841,6 +848,10 @@ function writeDrafts(list) {
     localStorage.setItem(DRAFTS_KEY, JSON.stringify(list.slice(0, DRAFTS_LIMIT)));
     return true;
   } catch {
+    // **מחזירה false, והקורא חייב לבדוק.** עד לתיקון הזה איש לא
+    // בדק, והחיווי "נשמר אוטומטית" הוצג גם כשהכתיבה נכשלה - למשל
+    // כשמכסת האחסון מלאה. חיווי שמשקר גרוע מהיעדר חיווי, ובמיוחד
+    // זה: הוא נוסף כדי לפתור איבוד עבודה ועלול להסתיר אותו.
     return false;
   }
 }
@@ -864,9 +875,9 @@ function saveCurrentDraft() {
     edits: Object.values(edits),
     insertions: insertionsPayload(),
   });
-  writeDrafts(list);
+  const stored = writeDrafts(list);
   renderDraftList();
-  return true;
+  return stored;
 }
 
 function scheduleDraftSave() {
@@ -874,9 +885,9 @@ function scheduleDraftSave() {
   setSaveStatus("saving");
   draftSaveTimer = setTimeout(() => {
     draftSaveTimer = null;
-    // **"שומר…" שנתקע הוא שקר.** אם לא היה מה לשמור, החיווי מתנקה
-    // ולא נשאר תלוי (נתפס בבדיקה בדפדפן).
-    setSaveStatus(saveCurrentDraft() ? "saved" : "");
+    // שלושה מצבים, לא שניים: נשמר / לא היה מה לשמור / **נכשל**.
+    // "שומר…" שנתקע הוא שקר, ו"נשמר" על כתיבה שנכשלה גרוע ממנו.
+    setSaveStatus(reportSave(saveCurrentDraft()));
   }, 900);
 }
 
@@ -891,7 +902,15 @@ function flushDraftSave() {
   if (!draftSaveTimer) return;
   clearTimeout(draftSaveTimer);
   draftSaveTimer = null;
-  setSaveStatus(saveCurrentDraft() ? "saved" : "");
+  setSaveStatus(reportSave(saveCurrentDraft()));
+}
+
+/** ממירה את תוצאת השמירה למצב חיווי. `false` פירושו **כישלון
+ *  כתיבה**, ולא "לא היה מה לשמור" - את זה `saveCurrentDraft`
+ *  מבדילה בעצמה לפני שהיא מנסה לכתוב. */
+function reportSave(result) {
+  if (result === true) return "saved";
+  return draftHasContent() && currentLawId ? "failed" : "";
 }
 
 /** חיווי השמירה. **בלעדיו המשתמש לא יכול לדעת שנשמר** - וזו
@@ -908,6 +927,15 @@ function setSaveStatus(state) {
   if (state === "saved" && currentDraftId) {
     el.textContent = "נשמר אוטומטית";
     el.className = "draft-save-status is-saved";
+    el.title = "";
+    return;
+  }
+  if (state === "failed") {
+    // לא "לא נשמר" בשקט - הודעה מפורשת, כי זו בדיוק העבודה
+    // שהמשתמש עלול לאבד.
+    el.textContent = "⚠ השמירה נכשלה - העבודה אינה שמורה";
+    el.className = "draft-save-status is-failed";
+    el.title = "האחסון המקומי של הדפדפן מלא או חסום. ייצא את ההצעה ל-Word כדי לא לאבד אותה.";
     return;
   }
   el.textContent = "";
@@ -928,6 +956,12 @@ function draftSummary(d) {
 function renderDraftList() {
   const box = document.getElementById("drafts-list");
   if (!box) return;
+  if (draftsUnreadable) {
+    box.innerHTML = `<div class="msg err">לא הצלחתי לקרוא את ההצעות השמורות —
+      האחסון המקומי של הדפדפן פגום או חסום. <b>ההצעות לא נמחקו</b>,
+      אבל אי אפשר להציג אותן כאן.</div>`;
+    return;
+  }
   const list = readDrafts();
   document.getElementById("drafts-count").textContent = list.length ? `(${list.length})` : "";
   if (!list.length) {
@@ -1437,15 +1471,17 @@ async function checkSimilarBills(title) {
       .map((b) => {
         const link = b.bill_id
           ? `<a href="${KNESSET_BILL_URL}${encodeURIComponent(b.bill_id)}"
-                target="_blank" rel="noopener">${escapeHtml(b.private_number || String(b.bill_id))}</a>`
-          : escapeHtml(b.private_number || "");
+                target="_blank" rel="noopener">${escapeHtml(b.bill_label || "דף ההצעה")}</a>`
+          : escapeHtml(b.bill_label || "");
         // הצעות ממשלתיות אינן מופיעות ב-KNS_BillInitiator כלל -
         // היוזמת היא הממשלה, לא חברי כנסת. אומת מול הפיד. במקרה
         // כזה מוצג סוג ההצעה, כדי שהשורה לא תישאר חסרת הקשר.
-        const who = (b.initiators || []).length
-          ? ` · ${escapeHtml(b.initiators.slice(0, 3).join(", "))}` +
-            (b.initiators.length > 3 ? ` ועוד ${b.initiators.length - 3}` : "")
-          : (b.kind ? ` · ${escapeHtml(b.kind)}` : "");
+        const who = b.initiators_unavailable
+          ? ' · <span class="similar-unknown">שמות היוזמים לא נטענו</span>'
+          : (b.initiators || []).length
+            ? ` · ${escapeHtml(b.initiators.slice(0, 3).join(", "))}` +
+              (b.initiators.length > 3 ? ` ועוד ${b.initiators.length - 3}` : "")
+            : (b.kind ? ` · ${escapeHtml(b.kind)}` : "");
         return `<li>${escapeHtml(b.title)}
           <span class="citation-date">${link ? link + " · " : ""}כנסת ${b.knesset}${
             b.became_law ? " · התקבל כחוק" : ""}${who}</span></li>`;
@@ -1475,7 +1511,14 @@ async function checkSimilarBills(title) {
       try { localStorage.setItem(SIMILAR_COLLAPSED_KEY, nowCollapsed ? "1" : "0"); } catch { /* ignore */ }
     });
   } catch {
-    el.innerHTML = "";  // הפיד לא זמין - לא מציקים למשתמש, הכלי ממשיך לעבוד
+    // **כשל פיד אינו "לא נמצאו הצעות דומות".** מסך ריק נראה בדיוק
+    // כמו בדיקה שהסתיימה בלא-כלום - וזו הבדיקה שהחוברת הסגולה
+    // מחייבת לפני הנחה. המשתמש חייב לדעת שהיא **לא רצה**.
+    el.innerHTML = `<div class="notice notice-coverage">
+        <b>לא הצלחתי לבדוק אם קיימות הצעות דומות.</b>
+        מאגר הכנסת אינו זמין כרגע. <b>זו אינה תשובה ש"אין" הצעות דומות</b> —
+        הבדיקה לא רצה. נסו שוב, או בדקו ידנית באתר הכנסת לפני ההנחה.
+      </div>`;
   }
 }
 

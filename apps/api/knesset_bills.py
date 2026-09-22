@@ -58,6 +58,33 @@ def _core_terms(title: str) -> list[str]:
 
 
 
+
+# המזהה שעוזר פרלמנטרי משתמש בו. **מורכב, לא שדה בפיד:**
+# ב-KNS_Bill יש `PrivateNumber` (מספר עירום: 6803) ו-`KnessetNum`,
+# והתווית המלאה מורכבת מהם. אומת מול הצעה 2244611, שבקובץ ה-docx
+# שלה כתוב במפורש "פ/6803/25" - ובפיד PrivateNumber=6803,
+# KnessetNum=25.
+#
+# **הצעה ממשלתית אין לה PrivateNumber בכלל** (נמדד: 106 הצעות
+# ממשלתיות בכנסת ה-25, אפס עם PrivateNumber) - שם המספר יושב
+# בשדה `Number` והקידומת היא מ'. הצעת ועדה - כ'.
+_BILL_PREFIX = {"פרטית": "פ", "ממשלתית": "מ", "ועדה": "כ"}
+
+
+def bill_label(bill: dict) -> str | None:
+    """המזהה בצורה שמזהים בה הצעה בכנסת: `פ/6803/25`.
+
+    מחזירה None כשאין מספיק נתונים - **ולא מזהה פנימי במקום**:
+    מזהה פנימי אינו אומר דבר לעוזר פרלמנטרי, והצגתו כאילו הוא
+    המזהה המוכר היא הטעיה."""
+    prefix = _BILL_PREFIX.get(bill.get("SubTypeDesc") or "")
+    knesset = bill.get("KnessetNum")
+    serial = bill.get("PrivateNumber") or bill.get("Number")
+    if not prefix or not serial:
+        return None
+    return f"{prefix}/{serial}/{knesset}" if knesset else f"{prefix}/{serial}"
+
+
 def _attach_initiators(bills: list[dict]) -> None:
     """מוסיפה `initiators` לכל הצעה, במקום.
 
@@ -72,7 +99,13 @@ def _attach_initiators(bills: list[dict]) -> None:
     if not bills:
         return
     for bill in bills:
+        # **שני מצבים שונים, ולכן שני שדות.** `initiators=[]` עם
+        # `initiators_unavailable=False` פירושו "נבדק, אין יוזמים
+        # רשומים" (הצעה ממשלתית). `initiators_unavailable=True`
+        # פירושו "לא הצלחתי לבדוק". עד לתיקון הזה שניהם הופיעו
+        # כרשימה ריקה, וכשל 400 מהפיד נראה בממשק כ"אין יוזמים".
         bill["initiators"] = []
+        bill["initiators_unavailable"] = False
     try:
         ids = [b["bill_id"] for b in bills if b.get("bill_id")]
         if not ids:
@@ -106,7 +139,9 @@ def _attach_initiators(bills: list[dict]) -> None:
             ordered = sorted(by_bill.get(bill["bill_id"], []))
             bill["initiators"] = [name for _, name in ordered]
     except OdataError:
-        return  # ראו דוקסטרינג - תוספת נוחות, לא תנאי לתוצאה
+        for bill in bills:
+            bill["initiators_unavailable"] = True
+        return  # התוצאה עדיין מוצגת - אבל **מסומנת** כלא-נבדקה
 
 
 def similar_bills(title: str, *, knesset_num: int | None = None, limit: int = 10) -> dict:
@@ -127,7 +162,7 @@ def similar_bills(title: str, *, knesset_num: int | None = None, limit: int = 10
             clause += f" and KnessetNum eq {knesset_num}"
         for bill in fetch(
             "KNS_Bill", filter=clause,
-            select="Id,Name,KnessetNum,SubTypeDesc,StatusID,PrivateNumber,PublicationDate",
+            select="Id,Name,KnessetNum,SubTypeDesc,StatusID,PrivateNumber,Number,PublicationDate",
             top=200,
         ):
             seen.setdefault(bill["Id"], bill)
@@ -148,7 +183,7 @@ def similar_bills(title: str, *, knesset_num: int | None = None, limit: int = 10
             "title": bill.get("Name"),
             "knesset": bill.get("KnessetNum"),
             "kind": bill.get("SubTypeDesc"),
-            "private_number": bill.get("PrivateNumber"),
+            "bill_label": bill_label(bill),
             "became_law": bill.get("StatusID") == _STATUS_PASSED,
             "published_at": (bill.get("PublicationDate") or "")[:10] or None,
             "similarity": round(score, 3),
