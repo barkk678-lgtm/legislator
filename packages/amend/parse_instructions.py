@@ -51,6 +51,24 @@ _INSERT_AFTER_RE = re.compile(
 # '"(3)\tהילד נמצא..."' - התווית בפתח הנוסח החדש
 _NEW_UNIT_RE = re.compile(r'^\s*[״"”]\s*\((?P<label>[^)]+)\)\s*(?P<text>.+?)\s*[״"”]?\s*$', re.S)
 
+# 'במקום "לחלוטין" יבוא "במידה רבה"' - הדפוס הנפוץ ביותר בהצעות
+# אמיתיות. בלי "המילים" (מדריך משפטים §7.10.2, ראו drafting-rules
+# §8.7.1), אבל מקבלים גם אותו בקריאה - הצעות אמיתיות כותבות את שתי
+# הצורות, והכיוון הזה רק **קורא** ולכן סלחני יותר מהכיוון שכותב.
+_REPLACE_RE = re.compile(
+    r'במקום\s+(?:המיל(?:ה|ים)\s+)?[״"”](?P<old>[^״"”]+)[״"”]\s+'
+    r'יבוא\s+[״"”](?P<new>[^״"”]+)[״"”]')
+
+# 'ובסופו יבוא "או שזקוק..."' / 'בסופו יבוא "..."'
+_APPEND_RE = re.compile(
+    r'\bו?בסופו\s+יבוא\s+[״"”](?P<text>[^״"”]+)[״"”]')
+
+# 'האמור בו יסומן "(א)" ואחריו יבוא:' - מספור מחדש. מזיז את העוגנים
+# של כל מה שאחריו בסעיף, ולכן ההחלה חייבת להיות לפי הסדר.
+_RELABEL_RE = re.compile(
+    r'האמור\s+בו\s+יסומן\s+[״"”]\((?P<label>[^)]+)\)[״"”]\s+'
+    r'ואחריו\s+יבוא\s*:?\s*$')
+
 _KIND_TO_LEVEL = {
     "סעיף": "section",
     "סעיף קטן": "subsection",
@@ -80,6 +98,36 @@ class InsertUnit:
     after_kind: str         # "paragraph"
     after_label: str        # "2"
     new_label: str          # "3"
+    new_text: str
+    source_line: int
+
+
+@dataclass(frozen=True)
+class ReplaceWords:
+    """החלפת מילים בתוך יחידה קיימת - הדפוס הנפוץ ביותר."""
+    section: str
+    container: str | None   # "(1)" / "(א)" - היחידה שבתוכה מחליפים
+    old_phrase: str
+    new_phrase: str
+    source_line: int
+
+
+@dataclass(frozen=True)
+class AppendAtEnd:
+    """'ובסופו יבוא "X"' - הוספת מילים בסוף יחידה קיימת."""
+    section: str
+    container: str | None
+    text: str
+    source_line: int
+
+
+@dataclass(frozen=True)
+class RelabelAndInsert:
+    """'האמור בו יסומן "(א)" ואחריו יבוא: "(ב) ..."' - סעיף שאין בו
+    עדיין סעיפים קטנים מקבל את הראשון שלו, ותוכנו הקיים מקבל תווית."""
+    section: str
+    relabeled_label: str    # "א"
+    new_label: str          # "ב"
     new_text: str
     source_line: int
 
@@ -152,6 +200,58 @@ def parse_instructions(lines: list[tuple[str, str]]) -> AmendmentPlan:
         section_match = _SECTION_RE.search(stripped)
         insert_match = _INSERT_AFTER_RE.search(stripped)
 
+        # מספור מחדש: הנוסח החדש יושב בשורה הבאה, כמו בהוספת יחידה.
+        relabel_match = _RELABEL_RE.search(stripped)
+        if section_match and relabel_match:
+            unit = (_NEW_UNIT_RE.match(lines[index + 1][1].strip())
+                    if index + 1 < len(lines) else None)
+            if unit is None:
+                plan.unparsed.append((index, stripped))
+                index += 1
+                continue
+            plan.operations.append(RelabelAndInsert(
+                section=section_match.group("section"),
+                relabeled_label=relabel_match.group("label").strip(),
+                new_label=unit.group("label").strip(),
+                new_text=_strip_quotes(unit.group("text")),
+                source_line=index,
+            ))
+            index += 2
+            continue
+
+        # **כמה פעולות בשורה אחת.** ההוראה האמיתית
+        # 'בסעיף 3(1) ..., במקום "א" יבוא "ב" ובסופו יבוא "ג"' מכילה
+        # שתי פעולות נפרדות על אותה יחידה. כל אחת נרשמת בנפרד ומוחלת
+        # בנפרד - ולא מפורשת כפעולה אחת שאיש לא הגדיר.
+        if section_match:
+            container = section_match.group("para") or section_match.group("sub")
+            word_ops = []
+            for match in _REPLACE_RE.finditer(stripped):
+                word_ops.append(ReplaceWords(
+                    section=section_match.group("section"), container=container,
+                    old_phrase=match.group("old").strip(),
+                    new_phrase=match.group("new").strip(), source_line=index,
+                ))
+            for match in _APPEND_RE.finditer(stripped):
+                word_ops.append(AppendAtEnd(
+                    section=section_match.group("section"), container=container,
+                    text=match.group("text").strip(), source_line=index,
+                ))
+            if word_ops:
+                # **מחסום נגד פירוש חלקי של שורה.** אם הוסרו מהשורה כל
+                # הקטעים שזוהו ונשאר בה עוד "יבוא" - יש בה פעולה נוספת
+                # שאיני מכיר, והשורה כולה נרשמת כלא-מזוהה. עדיף להודיע
+                # שלא הבנתי מאשר להחיל שתיים מתוך שלוש.
+                remainder = _REPLACE_RE.sub("", stripped)
+                remainder = _APPEND_RE.sub("", remainder)
+                if "יבוא" in remainder or "יימחק" in remainder or "תימחק" in remainder:
+                    plan.unparsed.append((index, stripped))
+                    index += 1
+                    continue
+                plan.operations.extend(word_ops)
+                index += 1
+                continue
+
         if section_match and insert_match:
             # הנוסח החדש יושב בשורה הבאה, במרכאות.
             new_label, new_text = "", ""
@@ -193,4 +293,5 @@ def parse_instructions(lines: list[tuple[str, str]]) -> AmendmentPlan:
     return plan
 
 
-__all__ = ["AmendmentPlan", "InsertUnit", "LawReference", "parse_instructions"]
+__all__ = ["AmendmentPlan", "AppendAtEnd", "InsertUnit", "LawReference",
+           "RelabelAndInsert", "ReplaceWords", "parse_instructions"]
