@@ -1538,17 +1538,20 @@ async function checkSimilarBills(title) {
 const PQ_MAX_STRONG_ROWS = 12;   // שורות מיחידות רב-מיליות
 const PQ_MAX_RANK1_ROWS = 4;     // "דירוג 1" - הזנב, נחתך לארבעה
 
-// **מכסה ליחידה, לפי רוחבה** - הכלל שמונע מהצירוף הראשון שחוזר
-// להשתלט על המסך. נמדד (2026-09-22): "זיהום אוויר" (116 תוצאות)
-// מילאה את כל 12 השורות בזיהום אוויר בתל אביב ובאשקלון לפני
-// ש"מפרץ חיפה" (13 תוצאות) חזרה בכלל, והדיוק ירד מ-89% ל-77%.
-// ככל שצירוף מתאים ליותר כותרות כך הוא מלמד פחות. חייב להיות זהה
-// ל-knesset_queries.unit_budget.
+// **צירוף רחב מוחזק עד סוף החיפוש.** זה הכלל היחיד שסוגר את הפער
+// בין 89% ל-96% דיוק, והוא יקר: צירוף שמתאים ליותר מ-60 כותרות
+// אינו מציג שורות בזמן אמת - בסוף החיפוש מוצג ממנו רק מה שהצטלב
+// עם צירוף אחר. נמדד (2026-09-22) שכל הרעש היה שורות כאלה שנכנסו
+// ב-2.8 שניות, לפני שידענו מה מצטלב: "זיהום אוויר" (116 תוצאות)
+// הכניסה זיהום אוויר בתל אביב ובאשקלון לפני ש"מפרץ חיפה" (13)
+// חזרה בכלל. המחיר: בנושא שבו הצירוף הפותח רחב, השורה הראשונה
+// ב-5.5 שניות במקום 2.8. החלטת ברק: "הראש הוא מה שנקרא".
+// חייב להיות זהה ל-knesset_queries.unit_budget/HOLD_ABOVE.
+const PQ_HOLD_ABOVE = 60;
 function pqUnitBudget(count) {
   if (count <= 25) return PQ_MAX_STRONG_ROWS;
-  if (count <= 60) return 6;
-  if (count <= 120) return 3;
-  return 0;                      // רחבה מדי - לדירוג בלבד
+  if (count <= PQ_HOLD_ABOVE) return 6;
+  return 0;                      // רחב - מוחזק לסוף, רק ההצלבה מוצגת
 }
 const PQ_CONCURRENCY = 3;        // + בדיקת הפתיחה = 4 בו-זמנית. נמדד: הפיד
                                  // מחזיר HTTP 473 מעל כך; run_unit מנסה שוב, ומה
@@ -1636,9 +1639,9 @@ async function searchPastQueries() {
         }
         continue;
       }
-      if (rankOnly || budget === 0) continue;
+      if (rankOnly) continue;
       const candidate = { ...row, matched: n, matched_by: unit.words.join(" "),
-                          unit_count: data.count };
+                          unit_count: data.count, broad: data.count > PQ_HOLD_ABOVE };
       if (used < budget && strongRows < PQ_MAX_STRONG_ROWS) {
         used += 1; strongRows += 1;
         appendRow(candidate);
@@ -1730,9 +1733,11 @@ async function searchPastQueries() {
     .slice(0, Math.max(0, PQ_MAX_STRONG_ROWS - strongRows))
     .forEach((r) => { strongRows += 1; held.delete(r.query_id); appendRow(r); });
 
-  // ואז הזנב: עד ארבע שורות שהתאימו לצירוף אחד בלבד, מהצירוף הצר ביותר.
+  // ואז הזנב: עד ארבע שורות שהתאימו לצירוף אחד בלבד, מהצירוף הצר
+  // ביותר. **שורה של צירוף רחב אינה נכנסת לזנב** - מצירוף רחב מוצג
+  // רק מה שהצטלב.
   [...held.values()]
-    .filter((r) => r.matched < 2 && !shown.has(r.query_id))
+    .filter((r) => !r.broad && r.matched < 2 && !shown.has(r.query_id))
     .sort((a, b) => a.unit_count - b.unit_count)
     .slice(0, PQ_MAX_RANK1_ROWS)
     .forEach(appendRow);

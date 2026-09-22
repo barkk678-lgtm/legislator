@@ -54,6 +54,14 @@ from service import LLMConfigError, LLMRequestError, draft  # noqa: E402
 # 116 - כולן שימושיות; "דיור"/"חינוך"/"חיפה"/"נגב" חצו 200 (התקרה
 # שנשלפה) והחזירו רעש. 120 מפריד בין השתיים.
 GENERIC_CAP = 120
+# **צירוף רחב מוחזק עד סוף החיפוש** (החלטת ברק, 2026-09-22). יחידה
+# שמתאימה ליותר מזה אינה מציגה שורות בזמן אמת - רק בסוף, ורק את
+# מה שהצטלב עם צירוף אחר. נמדד שזה מה שמפריד 89% מ-96%: הרעש כולו
+# היה שורות של צירוף רחב שנכנסו ב-2.8 שניות, לפני שידענו מה מצטלב.
+# המחיר: בנושא שבו הצירוף הפותח רחב, השורה הראשונה ב-5.5 שניות
+# במקום 2.8. "שלוש שניות עדיפות על ארבע שורות רעש בראש הרשימה,
+# כי הראש הוא מה שנקרא."
+HOLD_ABOVE = 60
 # **"דירוג 1" נחתך לארבעה מקומות** (החלטת ברק: דיוק לפני כיסוי).
 MAX_RANK1_ROWS = 4
 MAX_STRONG_ROWS = 12
@@ -81,11 +89,9 @@ def unit_budget(count: int) -> int:
     מכסתו קטנה. הסף העליון (GENERIC_CAP) נשאר "לדירוג בלבד"."""
     if count <= 25:
         return MAX_STRONG_ROWS
-    if count <= 60:
+    if count <= HOLD_ABOVE:
         return 6
-    if count <= GENERIC_CAP:
-        return 3
-    return 0
+    return 0   # רחב - מוחזק לסוף, ורק ההצלבה שלו מוצגת
 
 _EXPAND_SYSTEM = (
     "אתה מפרק נושא של שאילתה פרלמנטרית לצירופי חיפוש. החזר JSON בלבד:\n"
@@ -307,12 +313,13 @@ def search_queries(q: str, *, limit: int = 12, expand_fn=None, run_fn=None) -> d
         if u["too_broad"] or _is_single_word(u["words"]):
             continue
         budget = unit_budget(u["count"])
+        broad = u["count"] > HOLD_ABOVE
         used = 0
         for row in u["rows"]:
             if row["query_id"] in taken:
                 continue
             row = {**row, "matched": rank[row["query_id"]], "matched_by": " ".join(u["words"]),
-                   "unit_count": u["count"]}
+                   "unit_count": u["count"], "broad": broad}
             if used < budget and len(chosen) < MAX_STRONG_ROWS:
                 used += 1
                 taken.add(row["query_id"])
@@ -326,10 +333,13 @@ def search_queries(q: str, *, limit: int = 12, expand_fn=None, run_fn=None) -> d
             continue
         taken.add(row["query_id"])
         chosen.append(row)
-    # ואז הזנב - עד ארבע שורות שהתאימו לצירוף אחד בלבד, מהצירוף הצר ביותר.
+    # ואז הזנב - עד ארבע שורות שהתאימו לצירוף אחד בלבד, מהצירוף הצר
+    # ביותר. **שורה של צירוף רחב אינה נכנסת לזנב**: מצירוף רחב מוצג
+    # רק מה שהצטלב, ולא התאמה בודדת שאינה מלמדת דבר.
     tail = 0
     for row in sorted(held, key=lambda r: r["unit_count"]):
-        if row["matched"] >= 2 or row["query_id"] in taken or tail >= MAX_RANK1_ROWS:
+        if row["broad"] or row["matched"] >= 2 or row["query_id"] in taken \
+                or tail >= MAX_RANK1_ROWS:
             continue
         if len(chosen) >= MAX_ROWS:
             break

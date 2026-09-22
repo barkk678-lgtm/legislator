@@ -94,7 +94,7 @@ def test_rank1_tail_is_capped_at_four():
 def test_broad_unit_budget_does_not_flood_the_screen():
     """**הבאג שנמדד בדפדפן:** "זיהום אוויר" (116 תוצאות) מילאה את כל
     המסך לפני ש"מפרץ חיפה" (13) חזרה. יחידה רחבה מקבלת שלוש שורות."""
-    broad = [row(i, f"זיהום אוויר {i}") for i in range(1, 100)]     # 99 -> מכסה 3
+    broad = [row(i, f"זיהום אוויר {i}") for i in range(1, 100)]     # 99 -> רחב, מוחזק
     narrow = [row(500 + i, f"מפרץ חיפה {i}") for i in range(1, 15)]  # 14 -> מכסה 12
     out = run(
         [["זיהום", "אוויר"], ["מפרץ", "חיפה"]],
@@ -102,8 +102,21 @@ def test_broad_unit_budget_does_not_flood_the_screen():
          "מפרץ חיפה": unit(["מפרץ", "חיפה"], narrow)},
     )
     titles = [r["title"] for r in out["results"]]
-    assert sum(1 for t in titles if t.startswith("זיהום")) == 3, titles
-    assert sum(1 for t in titles if t.startswith("מפרץ")) == 9, titles
+    assert sum(1 for t in titles if t.startswith("זיהום")) == 0, titles
+    assert sum(1 for t in titles if t.startswith("מפרץ")) == 12, titles
+
+
+def test_broad_unit_shows_only_what_intersects():
+    """מצירוף רחב מוצג רק מה שהצטלב עם צירוף אחר - לא התאמה בודדת."""
+    shared = row(7, "זיהום אוויר במפרץ חיפה")
+    broad = [shared] + [row(i, f"זיהום אוויר {i}") for i in range(10, 100)]
+    out = run(
+        [["זיהום", "אוויר"], ["מפרץ", "חיפה"]],
+        {"זיהום אוויר": unit(["זיהום", "אוויר"], broad),
+         "מפרץ חיפה": unit(["מפרץ", "חיפה"], [shared])},
+    )
+    titles = [r["title"] for r in out["results"]]
+    assert titles == ["זיהום אוויר במפרץ חיפה"], titles
 
 
 def test_single_word_row_that_matches_twice_is_not_held_back():
