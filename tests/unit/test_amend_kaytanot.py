@@ -98,7 +98,11 @@ EXPECTED_LINES = [
     Line(
         side_heading="תיקון סעיף 2",
         number="2.",
-        text='בסעיף 2 לחוק העיקרי, אחרי המילים "לא ינהל אדם קייטנה" יבוא '
+        # סטייה מכוונת מס' 2 מקובץ הזהב - מדריך משפטים §7.10.2, עמ' 27:
+        # תבנית העוגן היא `אחרי "X" יבוא "Y"`, בלי "המילים". ראו
+        # docs/drafting-rules.md §7 (שורה 2) ו-§8.7.1, ואת
+        # _known_anchor_pattern_correction ב-tests/golden/test_kaytanot.py.
+        text='בסעיף 2 לחוק העיקרי, אחרי "לא ינהל אדם קייטנה" יבוא '
         '"שאינה קייטנה מפוקחת".',
         depth=0,
         source_node_id="kaytanot-1990/s2/p0",

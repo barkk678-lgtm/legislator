@@ -32,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
-from node import LegislativeNode, effective_as_of, find_sections  # noqa: E402
+from node import LegislativeNode, effective_as_of, find_parent, find_sections  # noqa: E402
 from numbering import sort_section_numbers  # noqa: E402
 from render_bill import Line  # noqa: E402
 from transform import Annotation, FootnoteAnnotation, ReplacementAnnotation  # noqa: E402
@@ -169,9 +169,19 @@ class _RelabelAndInsert:
 
 
 def _diff_section(before_section: LegislativeNode, after_section: LegislativeNode):
-    """משווה את הילדים הישירים (הנורמטיביים) של סעיף בין לפני/אחרי.
-    לא יורד רקורסיבית לתוך תת-סעיפים - מספיק למקרה הזהב הנוכחי, שבו
-    כל השינויים הם ברמת הילד הישיר של הסעיף."""
+    """משווה את הצאצאים (הנורמטיביים) של סעיף בין לפני/אחרי, **בכל
+    עומק**.
+
+    הורחב במשימה 58: עד אז ההשוואה הייתה רק על הילדים הישירים של
+    הסעיף, ולכן שינוי שיושב בתוך סעיף קטן - למשל פסקה חדשה בתוך סעיף
+    קטן (א), הדפוס הנפוץ ביותר - פשוט לא נראה. `amend()` החזיר רשימת
+    שורות **ריקה**, בלי שגיאה: העריכה "הצליחה" ולא יצאה ממנה שום
+    הוראת תיקון. זה היה הביטוי הכי מסוכן של הפער, כי הוא שקט.
+
+    סדר ההוראות נשמר בדיוק כפי שהיה (כל ההוספות, ואז כל המוטציות) -
+    שתי רשימות נפרדות שמתמלאות לאורך כל הרקורסיה ומחוברות בסוף, ולא
+    רשימה אחת שמתמלאת לפי סדר הביקור. כך סעיף שטוח מייצר בדיוק את
+    אותו פלט כמו קודם."""
     before_children = [c for c in before_section.children if c.is_normative]
     after_children = [c for c in after_section.children if c.is_normative]
     before_ids = [c.id for c in before_children]
@@ -222,7 +232,26 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
             )
         ]
 
-    instructions: list[_Insertion | _Mutation] = []
+    insertions: list[_Insertion] = []
+    mutations: list[_Mutation] = []
+    _scan_level(before_section, after_section, insertions, mutations)
+    return [*insertions, *mutations]
+
+
+def _scan_level(
+    before_parent: LegislativeNode,
+    after_parent: LegislativeNode,
+    insertions: list["_Insertion"],
+    mutations: list["_Mutation"],
+) -> None:
+    """רמה אחת של ההשוואה, ואז ירידה רקורסיבית לכל ילד שקיים בשני
+    הצדדים. "העוגן", "הילד האחרון" והמספור נמדדים תמיד מול **ההורה
+    בפועל** של הצומת החדש - סעיף קטן שמכיל פסקאות, לא הסעיף - כי זה
+    ההקשר שההוראה מתייחסת אליו."""
+    before_children = [c for c in before_parent.children if c.is_normative]
+    after_children = [c for c in after_parent.children if c.is_normative]
+    before_ids = [c.id for c in before_children]
+
     for i, child in enumerate(after_children):
         if child.id not in before_ids:
             anchor = after_children[i - 1] if i > 0 else None
@@ -243,15 +272,19 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
                     "מחייבת לשנות מספור סעיפים קטנים/פסקאות קיימים, מה "
                     "שפוגע בהפניות קיימות בחקיקה ובפסיקה."
                 )
-            anchor_is_last_child = anchor.id == before_ids[-1]
-            instructions.append(
+            anchor_is_last_child = bool(before_ids) and anchor.id == before_ids[-1]
+            insertions.append(
                 _Insertion(anchor=anchor, anchor_is_last_child=anchor_is_last_child, new_node=child)
             )
 
     before_by_id = {c.id: c for c in before_children}
     for child in after_children:
         prior = before_by_id.get(child.id)
-        if prior is not None and prior.text != child.text:
+        if prior is None:
+            continue
+        if prior.children or child.children:
+            _scan_level(prior, child, insertions, mutations)
+        if prior.text != child.text:
             if prior.node_type == "raw_block":
                 # בלוק <table> גולמי (ראו node.py, wikitext_parser
                 # ._consume_html_table) - נטען כדי לא לזרוק את כל החוק,
@@ -264,9 +297,7 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
                     f"id={prior.id!r}) אינו נתמך - טבלאות נטענות לתצוגה "
                     "בלבד, לא לעריכה תכנותית."
                 )
-            instructions.append(_Mutation(before_node=prior, before_text=prior.text, after_text=child.text))
-
-    return instructions
+            mutations.append(_Mutation(before_node=prior, before_text=prior.text, after_text=child.text))
 
 
 def _wrap_new_content(
@@ -530,6 +561,43 @@ def _render_relabel_and_insert(
     return [phrase_line, content_line]
 
 
+
+def _container_suffix(section: LegislativeNode, node: LegislativeNode, *, inclusive: bool) -> str:
+    """שרשרת ה"מכולה" שנוספת למספר הסעיף בכתובת ההוראה: `בסעיף 17(א)`,
+    `בסעיף 5(א1)(1)`. ראו docs/drafting-rules.md §8.7.
+
+    יחידת משנה ממלאת שני תפקידים שונים בהוראת תיקון, ורק אחד מהם נכתב
+    בסוגריים על מספר הסעיף:
+
+    - **מכולה** - השינוי קורה *בתוכה*. נכתבת בסוגריים:
+      `בסעיף 17(א) לחוק העיקרי, אחרי פסקה (4) יבוא:`
+    - **עוגן** - היא עצמה היעד (מוסיפים אחריה, מחליפים אותה). נכתבת
+      במילים אחרי הפסיק, ו**אינה** נכנסת לסוגריים:
+      `בסעיף 31 לחוק העיקרי, אחרי סעיף קטן (ד) יבוא:`
+
+    שני הניסוחים מופיעים באותה הצעה אמיתית (13948365) - ההבדל אינו
+    סגנוני. מכאן שני המצבים של inclusive:
+
+    - `inclusive=True` (מוטציה): הטקסט של `node` עצמו הוא מה שמשתנה,
+      ולכן `node` הוא חלק מהמכולה. `בסעיף 30(ב), אחרי "..." יבוא`.
+    - `inclusive=False` (הוספה): `node` הוא העוגן, והמכולה היא רק
+      אבותיו שמתחת לסעיף. `בסעיף 17(א), אחרי פסקה (4) יבוא:`.
+
+    מחזירה מחרוזת ריקה כשהצומת יושב ישירות בסעיף (או הוא הסעיף עצמו) -
+    אז הכתובת נשארת `בסעיף N` בדיוק כפי שהייתה.
+    """
+    chain: list[str] = []
+    current: LegislativeNode | None = node if inclusive else find_parent(section, node.id)
+    while current is not None and current.id != section.id:
+        if current.number:
+            # ה-number כבר כולל סוגריים משלו ("(ב)") - כך הוא מגיע
+            # מ-wikitext_parser. אסור להוסיף זוג נוסף (באג שכבר נתפס
+            # פעם אחת ב-_render_insertion, ראו ההערה שם).
+            chain.append(current.number)
+        current = find_parent(section, current.id)
+    return "".join(reversed(chain))
+
+
 def _render_mutation(
     section_number: str,
     mutation: _Mutation,
@@ -558,7 +626,17 @@ def _render_mutation(
     else:
         anchor, inserted = _diff_text(mutation.before_text, mutation.after_text)
         anchor, inserted = anchor.strip(), inserted.strip()
-        body = f'אחרי המילים "{anchor}" יבוא "{inserted}".'
+        # סטייה מכוונת מס' 2 מקובץ הזהב (drafting-rules.md §7 ו-§8.7.1):
+        # מדריך משפטים §7.10.2, עמ' 27 [PDF 56], קובע את תבנית העוגן
+        # במפורש **בלי** "המילים" - `אחרי "ציטוט מהסעיף הקיים" יבוא
+        # "תוספת"`. golden-kaytanot.docx כותב "אחרי המילים ..." בשורה 16
+        # אבל "אחרי "בחוק זה" יבוא:" בשורה 8 - שני ניסוחים סותרים באותו
+        # מסמך. הקורפוס: 23 עוגנים בלי "המילים", 0 איתה.
+        #
+        # הסטייה חלה **רק** על תפקיד העוגן. `המילים "X" – יימחקו`
+        # (§7.10.3) ו-`עד המילים`/`החל במילים` (ניב טווח) נשארים כפי
+        # שהם - שם "המילים" היא הנושא הדקדוקי או חלק מניב קבוע.
+        body = f'אחרי "{anchor}" יבוא "{inserted}".'
 
     if full_title is not None:
         # ראו הערה מקבילה ב-_render_new_section: מראה המקום חייב לשבת
@@ -773,23 +851,80 @@ def amend(
             # חופפים (סעיף 2 הוא גם מוטציה יחידה וגם לא-ראשון) ואי אפשר
             # להפריד ביניהם ממקרה אחד.
             replacement = replacements_by_id.get(instructions[0].node_id)
+            # המכולה: הטקסט שמשתנה הוא של before_node עצמו, ולכן הוא
+            # נכלל בשרשרת - `בסעיף 30(ב), במקום "..." יבוא`. ראו
+            # _container_suffix ו-drafting-rules.md §8.7. כותרת השוליים
+            # נשארת "תיקון סעיף 30" בלי המכולה (אומת מול 13948365:
+            # "תיקון סעיף 5" מעל "בסעיף 5(א1)(1) לחוק העיקרי, ...").
+            locator = number + _container_suffix(
+                before_sec, instructions[0].before_node, inclusive=True
+            )
             if touched_count == 1:
                 # תוקן במשימה 6א: התנאי ל"החוק מוזכר בפעם הראשונה" הוא
                 # touched_count==1, בלי קשר לאיזה ענף מטפל בסעיף - ראו
                 # תיעוד ב-_render_mutation.
                 mutation_line = _render_mutation(
-                    number,
+                    locator,
                     instructions[0],
                     replacement,
                     full_title=before.full_title or "",
                     law_footnote_key=law_footnote_key,
                 )
             else:
-                mutation_line = _render_mutation(number, instructions[0], replacement)
+                mutation_line = _render_mutation(locator, instructions[0], replacement)
             mutation_line.side_heading = f"תיקון סעיף {number}"
             mutation_line.number = f"{touched_count}."
             _stamp_provenance(mutation_line, instructions[0].before_node, before)
             lines.append(mutation_line)
+            continue
+
+        if len(instructions) == 1 and isinstance(instructions[0], _Insertion):
+            # הוספה יחידה בסעיף מתלכדת לשורה אחת, בדיוק כמו מוטציה
+            # יחידה - `בסעיף 17(א) לחוק העיקרי, אחרי פסקה (4) יבוא:`
+            # ואחריה התוכן המצוטט, בלי שורת פתיח עם מקף.
+            #
+            # זה סוגר שאלה פתוחה שתועדה בענף _Mutation למעלה ("לא ברור
+            # מה מפעיל את ההתלכדות - הוראה יחידה, או סעיף שאינו
+            # הראשון?"). ב-40 ההצעות האמיתיות התשובה חד-משמעית: **מספר
+            # ההוראות**, לא סדר הסעיף. שש שורות הפתיח שנמצאו בקורפוס
+            # כולן עם שתי הוראות ומעלה, ואין ולו שורת פתיח אחת עם
+            # הוראה יחידה; ובצד השני, `בסעיף 17(א) ... אחרי פסקה (4)
+            # יבוא:` (13948365) הוא סעיף שלישי בהצעה, לא ראשון, ובכל
+            # זאת שורה אחת. ראו docs/drafting-rules.md §8.7 ואת
+            # המדידה ב-docs/measurements/nested-locator-2026-09-22/.
+            item = instructions[0]
+            before_anchor = _find_by_id(before, item.anchor.id)
+            if before_anchor is None:
+                raise NotImplementedError(
+                    f"עוגן {item.anchor.id!r} אינו צומת קיים ב'לפני' "
+                    "(כנראה הכנסה משורשרת אחרי הוספה חדשה) - אין מקרה זהב "
+                    "עדיין ל-provenance במצב הזה."
+                )
+            # inclusive=False: העוגן הוא ה*יעד* ("אחרי פסקה (4)"), לא
+            # המכולה. המכולה היא רק אבותיו שמתחת לסעיף - `(א)`.
+            locator = number + _container_suffix(before_sec, before_anchor, inclusive=False)
+            footnote = footnotes_by_id.get(item.new_node.id)
+            insertion_lines = _render_insertion(item, ".", ordinal=1, footnote=footnote)
+            head = insertion_lines[0]
+            # _render_insertion מחזיק את ניסוח ההוראה ב-.text ("אחרי פסקה
+            # (4) יבוא:"), ומוסיף marker="(1)" רק בענף "בסופו יבוא" - שם
+            # הוא מספר סידורי בתוך רשימת הוראות. בהוראה יחידה אין רשימה,
+            # ולכן אין מספר סידורי: `בסעיף 4 לחוק העיקרי, בסופו יבוא:`.
+            phrase = head.text or ""
+            head.marker = ""
+            if touched_count == 1:
+                # ראו הערה מקבילה ב-_render_new_section: מראה המקום של
+                # החוק חייב לשבת מיד אחרי שם החוק, לפני "(להלן...".
+                head.text = "ב" + (before.full_title or "")
+                head.text_after = f" (להלן – החוק העיקרי), בסעיף {locator}, {phrase}"
+                head.footnotes = [law_footnote_key] + list(head.footnotes or [])
+            else:
+                head.text = f"בסעיף {locator} לחוק העיקרי, {phrase}"
+            head.side_heading = f"תיקון סעיף {number}"
+            head.number = f"{touched_count}."
+            for insertion_line in insertion_lines:
+                _stamp_provenance(insertion_line, before_anchor, before)
+            lines.extend(insertion_lines)
             continue
 
         if len(instructions) == 1 and isinstance(instructions[0], _RelabelAndInsert):

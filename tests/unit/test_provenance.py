@@ -45,8 +45,11 @@ def main():
     )
     lines = amend(before, after, annotations, law_footnote_key="x")
 
-    # header (סעיף ראשון שנוגעים בו) + phrase_line + content_line
-    checks.append(("יש 3 שורות: כותרת + phrase + content", len(lines) == 3))
+    # הוראה יחידה מתלכדת לשורה אחת עם כתובת הסעיף (משימה 58): אין
+    # עוד שורת פתיח נפרדת, אלא phrase_line שנושאת גם את כתובת החוק
+    # ("בחוק... (להלן – החוק העיקרי), בסעיף 1, אחרי ההגדרה ... יבוא:")
+    # ואחריה content_line. קודם לכן היו שלוש שורות, עם שורת פתיח.
+    checks.append(("יש 2 שורות: phrase מתולכד + content", len(lines) == 2))
     checks.append(
         ("לכל שורה יש source_node_id", all(line.source_node_id is not None for line in lines))
     )
@@ -56,11 +59,10 @@ def main():
             all(line.as_of == "2024-01-01T00:00:00Z" for line in lines),
         )
     )
-    checks.append(("כותרת הסעיף: source_node_id הוא שורש החוק", lines[0].source_node_id == "law"))
     checks.append(
         (
             "phrase_line ו-content_line: source_node_id מצביע על העוגן p0 (לא על הצומת החדש)",
-            lines[1].source_node_id == "law/s1/p0" and lines[2].source_node_id == "law/s1/p0",
+            all(line.source_node_id == "law/s1/p0" for line in lines),
         )
     )
 

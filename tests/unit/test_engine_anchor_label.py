@@ -53,6 +53,15 @@ def _law_with_section_5() -> LegislativeNode:
     )
 
 
+
+def _anchor_phrase(line):
+    """מחלצת את ניסוח העוגן מתוך שורה מלאה, בלי תלות בשאלה אם ההוראה
+    התלכדה לשורה אחת עם כתובת הסעיף או קיבלה שורת פתיח נפרדת."""
+    full = (line.text or "") + (line.text_after or "")
+    idx = full.find("אחרי ")
+    return full[idx:] if idx != -1 else None
+
+
 def main():
     ok = True
     before = _law_with_section_5()
@@ -71,7 +80,11 @@ def main():
         ),
     ])
     lines = amend(before, after, annotations, law_footnote_key="fake")
-    phrase_lines = [line.text for line in lines if line.text and line.text.startswith("אחרי")]
+    # הוראה יחידה מתלכדת לשורה אחת עם כתובת הסעיף (משימה 58) -
+    # "בסעיף 5 לחוק העיקרי, אחרי סעיף קטן (ב) יבוא:". הטסט בודק את
+    # **ניסוח העוגן**, ולכן מחפש את הביטוי בתוך השורה המלאה ולא
+    # כשורה שמתחילה בו.
+    phrase_lines = [p for p in (_anchor_phrase(x) for x in lines) if p]
     got = phrase_lines[0] if phrase_lines else None
     want = "אחרי סעיף קטן (ב) יבוא:"
     passed = got == want
@@ -101,7 +114,11 @@ def main():
         ),
     ])
     lines2 = amend(before, after2, annotations2, law_footnote_key="fake")
-    phrase_lines2 = [line.text for line in lines2 if line.text and line.text.startswith("אחרי")]
+    # הוראה יחידה מתלכדת לשורה אחת עם כתובת הסעיף (משימה 58) -
+    # "בסעיף 5 לחוק העיקרי, אחרי סעיף קטן (ב) יבוא:". הטסט בודק את
+    # **ניסוח העוגן**, ולכן מחפש את הביטוי בתוך השורה המלאה ולא
+    # כשורה שמתחילה בו.
+    phrase_lines2 = [p for p in (_anchor_phrase(x) for x in lines2) if p]
     got2 = phrase_lines2[0] if phrase_lines2 else None
     want2 = "אחרי פסקה (1) יבוא:"
     passed2 = got2 == want2

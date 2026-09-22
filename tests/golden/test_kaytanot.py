@@ -178,6 +178,34 @@ def _known_source_typo_correction(rows):
     return fixed
 
 
+
+def _known_anchor_pattern_correction(rows):
+    """מתקנת סטייה מכוונת **מתועדת** מהמקור (סטייה מס' 2 בטבלת
+    docs/drafting-rules.md §7): golden-kaytanot.docx כותב את הוראת
+    סעיף 2 כ-'אחרי המילים "לא ינהל אדם קייטנה" יבוא', בעוד שמדריך
+    משפטים §7.10.2, עמ' 27 [PDF 56], קובע את תבנית העוגן במפורש
+    **בלי** "המילים": `אחרי "ציטוט מהסעיף הקיים" יבוא "תוספת"`.
+
+    העדות עומדת באותו סטנדרט כמו שתי התיקונים שמעליה - לא "נראה נכון
+    יותר" אלא שני ניסוחים סותרים **בתוך אותו קובץ זהב**: שורה 8
+    באותו מסמך כותבת `אחרי "בחוק זה" יבוא:` בלי "המילים". ב-40
+    ההצעות האמיתיות: 23 עוגנים בלי "המילים", 0 איתה.
+
+    הסטייה חלה **רק** על תפקיד העוגן. `המילים "X" – יימחקו` (§7.10.3)
+    ו-`עד המילים`/`החל במילים` (ניב טווח) נשארים כפי שהם - שם
+    "המילים" היא הנושא הדקדוקי או חלק מניב קבוע, והמדריך עצמו כותב
+    אותה."""
+    fixed = []
+    for row in rows:
+        fixed.append(
+            [
+                (w, sp, st, text.replace('אחרי המילים "', 'אחרי "'))
+                for (w, sp, st, text) in row
+            ]
+        )
+    return fixed
+
+
 def _known_missing_first_number_correction(rows):
     """מתקנת פער **מתועד** נוסף במקור, לא סטייה כללית: golden-kaytanot.docx
     משאיר את הוראת התיקון הראשונה (סעיף 1, שורה 0) בלי מספר סידורי
@@ -208,13 +236,16 @@ def main():
     write_docx(BILL, REFS, SKELETON, out)
 
     got = table_shape(out)
-    want = _known_missing_first_number_correction(
-        _known_source_typo_correction(table_shape(ORIGINAL))
+    want = _known_anchor_pattern_correction(
+        _known_missing_first_number_correction(
+            _known_source_typo_correction(table_shape(ORIGINAL))
+        )
     )
 
     print(f"שורות: נוצרו {len(got)}, במקור {len(want)}\n")
-    print("(השוואה מול ORIGINAL עם שני תיקונים מתועדים - ראו _known_source_typo_correction "
-          "ו-_known_missing_first_number_correction)\n")
+    print("(השוואה מול ORIGINAL עם שלושה תיקונים מתועדים - ראו "
+          "_known_source_typo_correction, _known_missing_first_number_correction "
+          "ו-_known_anchor_pattern_correction)\n")
     for i in range(max(len(got), len(want))):
         g = got[i] if i < len(got) else None
         w = want[i] if i < len(want) else None

@@ -15,10 +15,11 @@
 - "subsection": זמין כשהצומת הנוכחי הוא סעיף או סעיף קטן (לא פסקה/
   פסקת משנה) - סעיפים קטנים הם ילדים ישירים של סעיף (AddFirstSubsection
   אם עדיין אין; אחרת הוספה אחרי הסעיף הקטן העוגן, §7.10.6(ב)).
-- "paragraph": זמין רק כשהצומת הנוכחי הוא פסקה שהיא ילד ישיר של סעיף
-  (לא של סעיף קטן) - הכנסת פסקה לתוך סעיף קטן קיים אינה נתמכת עדיין
-  (transform.InsertAfter מוצא רק node_type=="section", לא "subsection";
-  זה פער אמיתי, לא הוסתר - ראו reason).
+- "paragraph": זמין כשהצומת הנוכחי הוא פסקה ממוספרת - בין אם היא ילד
+  ישיר של סעיף ובין אם היא בתוך סעיף קטן (הורחב במשימה 58; קודם לכן
+  רק ילד ישיר של סעיף, כי transform.InsertAfter חיפש את העוגן רק בין
+  הילדים הישירים של הסעיף). המספור נגזר מאחיה של הפסקה בתוך ההורה
+  בפועל, כי מספור פסקאות מתאפס בכל סעיף קטן.
 - "definition": זמין כשהצומת הנוכחי הוא הגדרה - מוסיף הגדרה חדשה
   אחריה, ללא מספור (הגדרות ממוינות א"ב, לא ממוספרות - ראו
   drafting-rules/validator בדיקה 11). משתמש ב-InsertAfter הקיים בדיוק
@@ -171,12 +172,23 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
     if level == "paragraph":
         current_node = _find_by_id(root, node_id)
         parent = find_parent(root, node_id)
-        if current_node.node_type != "paragraph" or parent is None or parent.node_type != "section":
+        # הורחב (משימה 58): פסקה בתוך סעיף קטן קיים נתמכת מעכשיו -
+        # transform.InsertAfter מוצא את העוגן בכל עומק בתוך הסעיף
+        # ומכניס אל ההורה בפועל. המספור נגזר מ**אחיה של הפסקה** (ילדי
+        # אותו סעיף קטן), לא מכל פסקאות הסעיף: מספור פסקאות מתאפס בכל
+        # סעיף קטן, ולכן "אחרי פסקה (2)" בתוך סעיף קטן (א) מתייחס
+        # לפסקאות של (א) בלבד.
+        if current_node is None or current_node.node_type != "paragraph" or parent is None:
+            return _Resolution(
+                supported=False,
+                reason="הוספת פסקה זמינה רק כשעומדים על פסקה ממוספרת קיימת",
+            )
+        if parent.node_type not in ("section", "subsection"):
             return _Resolution(
                 supported=False,
                 reason=(
-                    "הוספת פסקה נתמכת רק כשהיא ילד ישיר של סעיף (לא של סעיף "
-                    "קטן) - אין עדיין תמיכה בהוספת פסקה בתוך סעיף קטן קיים"
+                    f"פסקה בתוך {parent.node_type!r} אינה נתמכת - נתמכות פסקאות "
+                    "בתוך סעיף או בתוך סעיף קטן"
                 ),
             )
         paragraphs = [c for c in parent.children if c.is_normative and c.node_type == "paragraph" and c.number]
@@ -195,9 +207,16 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
             label = _wrap_parens(
                 next_inserted_label(_strip_parens(current_node.number), set(existing_numbers))
             )
+        # section_number חייב להיות מספר ה**סעיף**, גם כשההורה הישיר
+        # הוא סעיף קטן - transform.InsertAfter מאתר לפיו את הסעיף,
+        # ומשם יורד אל ההורה בפועל.
+        anchor_section = _ancestor_of_type(root, node_id, "section")
+        if anchor_section is None:
+            return _Resolution(supported=False, reason="לא נמצא סעיף אב לפסקה")
         return _Resolution(
             supported=True, label=label, kind="insert_after",
-            section_number=parent.number, anchor_id=current_node.id, node_type="paragraph",
+            section_number=anchor_section.number, anchor_id=current_node.id,
+            node_type="paragraph",
         )
 
     if level == "definition":

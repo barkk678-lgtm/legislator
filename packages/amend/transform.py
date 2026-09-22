@@ -206,14 +206,26 @@ def apply(
             section = _find_section(after, t.section_number)
             if section is None:
                 raise ValueError(f"סעיף {t.section_number} לא נמצא ב'לפני'")
-            idx = next(
-                (i for i, c in enumerate(section.children) if c.id == t.anchor_id),
-                None,
-            )
-            if idx is None:
+            # תוקן (משימה 58): העוגן עשוי לשבת בכל עומק בתוך הסעיף -
+            # פסקה בתוך סעיף קטן היא הדפוס הנפוץ ביותר. עד לתיקון זה
+            # החיפוש היה רק ב-section.children (ילדים ישירים), כך
+            # שהוספת פסקה לתוך סעיף קטן קיים נכשלה ב-ValueError.
+            # אותו תיקון בדיוק שכבר נעשה ב-InsertSectionAfter למטה:
+            # מוצאים את העוגן בכל עומק, ומכניסים אל **ההורה בפועל**
+            # שלו - לא אל section.children, אחרת הצומת החדש "יברח"
+            # מהסעיף הקטן אל הסעיף.
+            container = find_parent(section, t.anchor_id)
+            if container is None:
+                if section.id == t.anchor_id:
+                    raise ValueError(
+                        f"עוגן {t.anchor_id} הוא הסעיף {t.section_number} עצמו - "
+                        "אי אפשר להוסיף אח לסעיף דרך InsertAfter "
+                        "(זו InsertSectionAfter)."
+                    )
                 raise ValueError(f"עוגן {t.anchor_id} לא נמצא בסעיף {t.section_number}")
+            idx = next(i for i, c in enumerate(container.children) if c.id == t.anchor_id)
             new_child = copy.deepcopy(t.new_child)
-            section.children.insert(idx + 1, new_child)
+            container.children.insert(idx + 1, new_child)
             for anchor_substring, key in t.footnotes:
                 count = new_child.text.count(anchor_substring)
                 if count == 0:
