@@ -1,0 +1,57 @@
+# הבדיקות רצות על כל push ועל כל PR.
+#
+# **למה זה קיים:** עד 22.9.2026 59 הבדיקות רצו אך ורק כשמישהו
+# הריץ אותן ביד. קוד יכול היה להגיע ל-master ולפרודקשן בלי ששום
+# בדיקה נגעה בו. זה השורש של כל באג שמתגלה אצל המשתמש.
+#
+# **בלי שום secret.** אומת ב-22.9: כל 59 הבדיקות עוברות כשכל חמשת
+# המפתחות מוסרים מהסביבה ו-LEGISLATOR_ENV_FILE מצביע לקובץ שאינו
+# קיים. זו אינה הנחה - זו בדיקה שרצה, וה-workflow שומר עליה בכך
+# שהוא פשוט לא נותן מפתחות. בדיקה שתתחיל לדרוש מפתח תיפול כאן,
+# וזה בדיוק מה שצריך לקרות: בדיקה שתלויה במה שמוגדר במכונה אינה
+# בדיקה (CLAUDE.md).
+name: בדיקות
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit-and-golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: התקנת תלויות
+        run: pip install -r requirements.txt
+
+      - name: הרצת כל הבדיקות
+        # **כל קובץ בנפרד, וממשיכים גם אחרי כישלון** - אחרת הכישלון
+        # הראשון מסתיר את כל מה שאחריו, ומקבלים סבב תיקונים אחד לכל
+        # באג במקום תמונה מלאה.
+        run: |
+          failed=""
+          total=0
+          for f in tests/unit/*.py tests/golden/*.py; do
+            total=$((total+1))
+            echo "::group::$f"
+            if python3 "$f"; then
+              echo "✓ $f"
+            else
+              echo "::error file=$f::הבדיקה נכשלה"
+              failed="$failed $f"
+            fi
+            echo "::endgroup::"
+          done
+          echo "--- $total בדיקות ---"
+          if [ -n "$failed" ]; then
+            echo "נכשלו:$failed"
+            exit 1
+          fi
+          echo "הכול עבר."

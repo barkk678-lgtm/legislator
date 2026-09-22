@@ -1,0 +1,51 @@
+# בדיקות "כמו לקוח" מול האתר החי.
+#
+# **למה בנפרד מ-tests.yml:** שם בודקים שהקוד נכון, כאן שהאתר
+# שפרוס **עכשיו** עובד. השניים נכשלים מסיבות שונות - בדיקת יחידה
+# נשברת מקוד, בדיקה חיה נשברת מפריסה שלא עלתה, ממשתנה סביבה חסר
+# ב-Vercel, מ-Supabase שנפל, או מקוד שנכתב ומעולם לא נדחף.
+#
+# **זה לא תיאורטי:** בהרצה הראשונה שלה (22.9.2026) הבדיקה מצאה
+# ש-14 קומיטים של לילה שלם ישבו מקומית ולא הגיעו לפרודקשן. כל
+# בדיקות היחידה עברו, והאתר החי הריץ את הקוד של אתמול.
+#
+# **עלות:** ברירת המחדל חינמית לגמרי. הריצה היומית מוסיפה
+# `--with-llm`, שכולל את כלי הצ'אט - שם כל קריאה עולה כסף.
+name: בדיקות מול האתר החי
+
+on:
+  schedule:
+    - cron: "30 5 * * *"   # אחרי העדכון היומי של הקורפוס (04:00)
+  workflow_dispatch:
+    inputs:
+      with_llm:
+        description: "לכלול גם את כלי הצ'אט (עולה כסף)"
+        type: boolean
+        default: false
+  push:
+    branches: [master]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # **המתנה לפריסה.** push ל-master מפעיל פריסה ב-Vercel,
+      # והבדיקה שתרוץ מיד תיבדק מול הגרסה הקודמת ותדווח כשל שווא -
+      # או גרוע יותר, תעבור ותסתיר בעיה אמיתית.
+      - name: המתנה לפריסת Vercel
+        if: github.event_name == 'push'
+        run: sleep 120
+
+      - name: בדיקות כמו לקוח
+        run: |
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "schedule" ] || \
+             [ "${{ inputs.with_llm }}" = "true" ]; then
+            EXTRA="--with-llm"
+          fi
+          python3 tests/live_smoke.py $EXTRA
