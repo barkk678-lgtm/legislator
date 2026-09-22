@@ -178,6 +178,112 @@ TEMPLATES: dict[str, Template] = {
     ),
 }
 
+# ── מגבלה שהשאלה מזכירה והתבנית אינה יודעת להחיל ─────────────────
+#
+# **הליקוי שזה מתקן** (ברק, 21.9.2026): "מי היוזמים הפוריים ביותר
+# בכנסת הנוכחית" החזיר עשרה שמות שמסתכמים ב-19,420 הצעות, בעוד
+# שלפי התשובה של אותו כלי עצמו בכנסת ה-25 הוגשו בסך הכול 7,491.
+# המילים "בכנסת הנוכחית" לא השפיעו על דבר, והתשובה סומנה
+# `answered: true`. משתמש קיבל מספרים שגויים בביטחון מלא.
+#
+# ארבעה מופעים נמצאו באותה הרצה, לא אחד:
+#   "היוזמים הפוריים ביותר **בכנסת הנוכחית**"        -> כנסת נזרקה
+#   "חינוך **בשנתיים האחרונות**"                      -> זמן נזרק
+#   "בריאות **בשנה האחרונה**"                         -> זמן נזרק
+#   "כמה הצעות חוק **פרטיות** עוברות בקריאה שלישית"  -> סוג נזרק
+#
+# **למה בדיקה דטרמיניסטית ולא רק הוראה למנתב:** אותו שיעור בדיוק
+# שנלמד בשומר 86(ד)(2) - הנחיה לבדה אינה ערובה. ההוראה למנתב
+# נוספה גם היא, אבל **הבדיקה כאן היא המחסום**.
+
+_CONSTRAINT_PATTERNS: dict[str, list[str]] = {
+    # **תחיליות עברית**: "בכנסת הנוכחית" - ה-ב' דבוקה למילה, ולכן
+    # דפוס שמחפש "הכנסת" מפספס בדיוק את המקרה שפתח את כל הליקוי.
+    # `[בלמוהש]*` בתחילת המילה, לא התאמה מדויקת.
+    "knesset": [
+        r"\b[בלמוהשכ]*כנסת\s+ה?(?:נוכחית|זו|אחרונה|יוצאת|הזאת)",
+        r"\b[בלמוהשכ]*כנסת\s+ה?[-–]?\s*\d{1,2}\b",
+    ],
+    "time_window": [
+        r"בשנה\s+האחרונה",
+        r"בשנתיים\s+האחרונות",
+        r"ב(?:שלוש|ארבע|חמש|עשר)\s+השנים\s+האחרונות",
+        r"בחודשים\s+האחרונים",
+        r"בעשור\s+האחרון",
+        r"מאז\s+(?:שנת\s+)?\d{4}",
+        r"החל\s+מ[-–]?\s*\d{4}",
+        r"בשנת\s+\d{4}",
+        r"לאחרונה",
+    ],
+    "bill_kind": [
+        r"הצעות\s+חוק\s+פרטיות",
+        r"הצעות\s+חוק\s+ממשלתיות",
+        r"\bפרטיות\b",
+        r"\bממשלתיות\b",
+    ],
+}
+
+_CONSTRAINT_LABELS = {
+    "knesset": "כנסת מסוימת",
+    "time_window": "תקופת זמן",
+    "bill_kind": "סוג ההצעה (פרטית/ממשלתית)",
+}
+
+# מה כל תבנית באמת יודעת להחיל. **נגזר מהקוד, לא מהכוונה:**
+#   pass_rates    - מסננת לפי knesset, ומפרידה התקבלו/סך הכול.
+#                   אינה מפרידה לפי סוג מציע ואין לה מימד זמן.
+#   top_initiators- צבירה על כל הכנסות. הפיד חוסם filter בתוך
+#                   צבירה (WAF, סטטוס 473), ולכן אין שום חיתוך.
+#   bills_on_topic- מחפשת מחרוזת בשם; התקציר סופר כמה התקבלו.
+#                   אין סינון לפי כנסת, זמן או סוג.
+_APPLICABLE_CONSTRAINTS: dict[str, frozenset[str]] = {
+    "pass_rates": frozenset({"knesset"}),
+    "top_initiators": frozenset(),
+    "bills_on_topic": frozenset(),
+}
+
+
+# מה להסיר כשמציעים את השאלה בלי המגבלה. **צר יותר מדפוסי
+# הזיהוי בכוונה:** הזיהוי צריך לתפוס "הצעות חוק פרטיות", אבל
+# ההסרה חייבת להוריד רק את "פרטיות" - אחרת נשארת השאלה המשובשת
+# "כמה עוברות בקריאה שלישית?" במקום "כמה הצעות חוק עוברות".
+_CONSTRAINT_STRIP = {
+    "knesset": _CONSTRAINT_PATTERNS["knesset"],
+    "time_window": _CONSTRAINT_PATTERNS["time_window"],
+    "bill_kind": [r"\s*\bפרטיות\b", r"\s*\bממשלתיות\b"],
+}
+
+
+def _without_constraints(question: str, missing: list[str]) -> str:
+    """מה אפשר לשאול במקום. **מסירה את המגבלה מהשאלה עצמה** ולא
+    מנסחת מחדש - מה שחוזר הוא המילים של המשתמש פחות מה שאי אפשר
+    להחיל, כדי שהוא יראה בדיוק מה ויתר עליו."""
+    import re  # noqa: PLC0415
+
+    out = question
+    for name in missing:
+        for pattern in _CONSTRAINT_STRIP.get(name, ()):
+            out = re.sub(pattern, "", out)
+    out = re.sub(r"\s{2,}", " ", out).strip(" ,?.")
+    return (out + "?") if out else ""
+
+
+def _constraints_in(question: str) -> set[str]:
+    """אילו מגבלות השאלה מזכירה. regex בלבד - דטרמיניסטי."""
+    import re  # noqa: PLC0415
+
+    found = set()
+    for name, patterns in _CONSTRAINT_PATTERNS.items():
+        if any(re.search(p, question) for p in patterns):
+            found.add(name)
+    return found
+
+
+def unapplicable_constraints(template_id: str, question: str) -> list[str]:
+    """המגבלות שהשאלה מזכירה והתבנית אינה יודעת להחיל."""
+    applicable = _APPLICABLE_CONSTRAINTS.get(template_id, frozenset())
+    return sorted(_constraints_in(question) - applicable)
+
 # כמה בקשות לשרת הכנסת עולה כל תבנית - נמדד, לא הונח.
 _REQUEST_COST = {"pass_rates": 4, "top_initiators": 11, "bills_on_topic": 1}
 
@@ -281,6 +387,12 @@ _ROUTER_INSTRUCTIONS = """אתה מנתב שאלות מחקר פרלמנטריו
 (מה הוגש לכנסת), לא את נוסח החוק התקף. "אילו חוקים עוסקים ב..."
 היא שאלת תוכן - החזר null.
 
+**כלל שני, חשוב לא פחות:** אם השאלה מגבילה לפי משהו שהתבנית אינה
+יודעת להחיל - כנסת מסוימת, תקופת זמן, או סוג הצעה (פרטית/ממשלתית) -
+**אל תבחר בה**. החזר null עם נימוק שאומר איזו הגבלה חסרה. תבנית
+שמחזירה נתונים של כל הכנסות בתשובה לשאלה על כנסת אחת עונה על שאלה
+אחרת מזו שנשאלה. מה כל תבנית יודעת להחיל מופיע ברשימה למטה.
+
 החזר JSON בלבד, בלי טקסט נוסף, באחד משני הפורמטים:
 {"template": "<מזהה>", "params": {...}}
 {"template": null, "reason": "<למה אין התאמה, במשפט אחד בעברית>"}
@@ -295,6 +407,12 @@ def _router_prompt() -> str:
         lines.append(f"\n- מזהה: {t.id}\n  מה זה נותן: {t.title}")
         if t.params:
             lines.append("  פרמטרים: " + "; ".join(f"{k} - {v}" for k, v in t.params.items()))
+        can = _APPLICABLE_CONSTRAINTS.get(t.id, frozenset())
+        lines.append("  יודעת להחיל: " +
+                     (", ".join(_CONSTRAINT_LABELS[c] for c in sorted(can)) if can else "שום הגבלה"))
+        cannot = sorted(set(_CONSTRAINT_LABELS) - can)
+        lines.append("  **אינה** יודעת להחיל: " +
+                     ", ".join(_CONSTRAINT_LABELS[c] for c in cannot))
         lines.append("  שאלות לדוגמה: " + " / ".join(t.question_examples))
     return "\n".join(lines)
 
@@ -315,6 +433,19 @@ def _coerce_params(template_id: str, raw: dict) -> dict:
         else:
             clean[key] = str(value)
     return clean
+
+
+def _humanize(reason: str | None) -> str:
+    """מחליפה מזהי תבנית בשמן העברי. **הנימוק מגיע מהמנתב**, והוא
+    נוטה לצטט את המזהה שראה בפרומפט ("התבנית top_initiators אינה
+    יודעת...") - מחרוזת פנימית שאין למשתמש שום דרך לפרש. אותו כלל
+    כמו הסרת הודעות המפתח מהממשק (ברק, 21.9.2026)."""
+    text = (reason or "").strip()
+    if not text:
+        return ""
+    for tid, tpl in TEMPLATES.items():
+        text = text.replace(tid, f"\u201c{tpl.title}\u201d")
+    return text
 
 
 def ask(question: str, *, draft_fn=None) -> dict:
@@ -345,9 +476,17 @@ def ask(question: str, *, draft_fn=None) -> dict:
 
     template_id = decision.get("template")
     if not template_id:
+        # **גם כשהמנתב עצמו סירב** - אם הסירוב נובע ממגבלה שהשאלה
+        # מזכירה, מציעים את אותה שאלה בלעדיה. בלי זה המשתמש מקבל
+        # נימוק נכון ושום דרך להמשיך, ושני מסלולי הסירוב (המנתב
+        # והמחסום הדטרמיניסטי) מתנהגים שונה בלי סיבה.
+        seen = sorted(_constraints_in(question))
         return {
             "answered": False,
-            "reason": decision.get("reason") or "השאלה אינה נופלת באף אחת מהתבניות הקיימות.",
+            "reason": _humanize(decision.get("reason"))
+            or "השאלה אינה נופלת באף אחת מהתבניות הקיימות.",
+            "unapplicable": seen,
+            "answerable_instead": _without_constraints(question, seen) if seen else "",
             "available": [{"id": t.id, "title": t.title} for t in TEMPLATES.values()],
             # שאלת תוכן אינה מבוי סתום - החיפוש הסמנטי יושב באותה
             # לשונית ועונה בדיוק על זה. הממשק מציע מעבר ישיר.
@@ -356,6 +495,27 @@ def ask(question: str, *, draft_fn=None) -> dict:
         }
     if template_id not in TEMPLATES:
         raise ResearchError(f"הניתוב החזיר תבנית לא מוכרת: {template_id}")
+
+    # **מגבלה שאי אפשר להחיל -> לא עונים על שאלה אחרת.** זה
+    # המחסום, לא ההוראה למנתב: ההוראה נוספה גם היא, אבל היא
+    # הסתברותית והבדיקה כאן דטרמיניסטית. ראו unapplicable_constraints.
+    missing = unapplicable_constraints(template_id, question)
+    if missing:
+        labels = [_CONSTRAINT_LABELS[m] for m in missing]
+        joined = " ו".join(labels) if len(labels) > 1 else labels[0]
+        return {
+            "answered": False,
+            "question": question,
+            "unapplicable": missing,
+            "reason": (
+                f"השאלה מגבילה לפי {joined}, ו\"{TEMPLATES[template_id].title}\" "
+                f"אינה יודעת להחיל את ההגבלה הזו. אם אענה בכל זאת, המספרים "
+                f"יהיו של כל הכנסות ושל כל סוגי ההצעות - כלומר תשובה לשאלה "
+                f"אחרת מזו שנשאלה."
+            ),
+            "answerable_instead": _without_constraints(question, missing),
+            "available": [{"id": t.id, "title": t.title} for t in TEMPLATES.values()],
+        }
 
     result = run_template(template_id, _coerce_params(template_id, decision.get("params")))
     return {"answered": True, "question": question, **result}

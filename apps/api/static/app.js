@@ -1479,10 +1479,29 @@ async function askResearch() {
         ? `<button id="research-handoff-btn" class="primary" style="margin-top:10px">
              חפשו את זה בחיפוש הסמנטי</button>`
         : "";
+      // **שתי סיבות שונות לאי-מענה, ולכן שתי הודעות שונות** (ברק,
+      // 21.9.2026): "אין תבנית לנושא" לעומת "יש תבנית, אבל היא לא
+      // יודעת להחיל את ההגבלה שביקשת". השנייה מציעה בכפתור את אותה
+      // שאלה בלי ההגבלה - התשובה שהכלי כן יכול לתת באמת.
+      const retry = data.answerable_instead
+        ? `<button id="research-retry-btn" class="primary" style="margin-top:10px">
+             שאל בלי ההגבלה: ${escapeHtml(data.answerable_instead)}</button>`
+        : "";
+      const headline = (data.unapplicable || []).length
+        ? "לא אענה על שאלה אחרת מזו ששאלת."
+        : "אין לי תבנית שאילתה לשאלה הזו.";
       out.innerHTML = `<div class="notice notice-coverage">
-          <b>אין לי תבנית שאילתה לשאלה הזו.</b> ${escapeHtml(data.reason)}
-          <br>מה כן אפשר לשאול כאן:<ul>${list}</ul>${handoff}
+          <b>${headline}</b> ${escapeHtml(data.reason)}
+          <br>מה כן אפשר לשאול כאן:<ul>${list}</ul>${retry}${retry && handoff ? " " : ""}${handoff}
         </div>`;
+      const retryBtn = document.getElementById("research-retry-btn");
+      if (retryBtn) {
+        retryBtn.addEventListener("click", () => {
+          const input = document.getElementById("research-ask-input");
+          input.value = data.answerable_instead;
+          askResearch();
+        });
+      }
       const btn = document.getElementById("research-handoff-btn");
       if (btn) {
         btn.addEventListener("click", () => {
