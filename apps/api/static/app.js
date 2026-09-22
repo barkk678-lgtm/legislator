@@ -2052,6 +2052,28 @@ async function generateSummary() {
       return;
     }
     const d = await resp.json();
+    // א7 - **שינויים שטרם התקבלו הם פגם בקובץ, לא הערת חילוץ.**
+    // Word מוסר ל-python-docx את ההוספות שטרם אושרו כאילו הן חלק
+    // מהנוסח, ומשמיט את המחיקות שטרם אושרו כאילו כבר בוצעו - כלומר
+    // המסמך נבדק כאילו כל השינויים התקבלו. הקובץ כן נקלט; השגיאה
+    // מוצגת בראש, לפני הממצאים.
+    const tc = d.tracked_changes || {};
+    let tracked = "";
+    if (tc.unknown) {
+      tracked = `<div class="notice notice-coverage" style="margin-top:12px">
+        <b>לא הצלחתי לבדוק אם יש במסמך שינויים שטרם התקבלו.</b>
+        <b>זו אינה תשובה שאין כאלה</b> — הבדיקה לא רצה.</div>`;
+    } else if (tc.total) {
+      const kinds = Object.entries(tc.by_kind || {})
+        .map(([k, n]) => `${k}: ${n}`).join(" · ");
+      tracked = `<div class="notice notice-coverage" style="margin-top:12px">
+        <b>זוהו שינויים שטרם התקבלו בפורמט עבודה של "עקוב אחר שינויים".</b>
+        יש לקבל את כל השינויים בטרם הגשת הצעת החוק.
+        <div class="hint" style="margin-top:6px">${escapeHtml(kinds)} —
+        הבדיקה שלהלן רצה על הנוסח <b>כאילו כל השינויים כבר התקבלו</b>,
+        וייתכן שהוא אינו הנוסח שבכוונתכם להגיש.</div></div>`;
+    }
+
     const warn = d.warnings.length
       ? `<div class="notice notice-coverage" style="margin-top:12px"><b>אזהרות חילוץ:</b>
            <ul>${d.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>`
@@ -2102,23 +2124,23 @@ async function runCritique() {
 
     let body;
     if (!d.findings.length) {
-      body = `<div class="msg ok" style="margin-top:12px">לא נמצאו ליקויים בבדיקות שהורצו
-        (${d.checks_run.join(", ")}). זו קביעה של הקוד, לא של מודל.</div>`;
+      body = `<div class="msg ok" style="margin-top:12px">לא נמצאו ליקויי ניסוח
+        ב-${d.checks_run.length} הבדיקות שהורצו. זו קביעה של הקוד, לא של מודל.</div>`;
     } else {
       body = d.findings.map((f) => `
         <div class="critique-item critique-${f.status === "אזהרה" ? "warn" : "fail"}">
           <div class="critique-head">
-            <span class="critique-badge">${escapeHtml(f.status)}</span>
+            <span class="critique-badge">${escapeHtml(critiqueStatusLabel(f.status))}</span>
             <b>${escapeHtml(f.what || f.description)}</b>
           </div>
           ${f.why ? `<div class="critique-why">${escapeHtml(f.why)}</div>` : ""}
           ${f.fix ? `<div class="critique-fix"><b>מה לעשות:</b> ${escapeHtml(f.fix)}</div>` : ""}
-          <div class="critique-raw">בדיקה ${f.check} — ${escapeHtml(f.message)}</div>
+          <div class="critique-raw">${escapeHtml(f.message)}</div>
         </div>`).join("");
       if (d.dropped_explanations && d.dropped_explanations.length) {
         body += `<div class="notice notice-coverage" style="margin-top:12px">
-          ההסבר לבדיקות ${d.dropped_explanations.join(", ")} נדחה כי הצביע על מקום
-          שהממצא עצמו לא נקב בו — הממצא הדטרמיניסטי מוצג בלעדיו.</div>`;
+          ההסבר ל-${d.dropped_explanations.length} ממצאים נדחה כי הצביע על מקום
+          שהממצא עצמו לא נקב בו — הממצא עצמו מוצג בלעדיו.</div>`;
       }
       if (!d.explained) {
         body += `<div class="notice notice-coverage" style="margin-top:12px">
@@ -2129,22 +2151,93 @@ async function runCritique() {
 
     const skipped = d.not_checked.length
       ? `<details class="critique-skipped"><summary>${d.not_checked.length} בדיקות לא הורצו על המסמך הזה</summary>
-           <div class="hint">בדיקות ${d.not_checked.join(", ")} דורשות מידע שאין במסמך חיצוני
-           (החוק המתוקן, הרפרנסים, ה-docx שהמערכת הפיקה) או שידוע שהן שגויות
-           על הצעות אמיתיות וממתינות לתיקון.</div></details>`
+           <div class="hint">חלקן דורשות מידע שאינו נמצא במסמך עצמו (החוק שהוא
+           מתקן, מראי המקום), חלקן אינן רלוונטיות לסוג ההצעה, וחלקן ידועות
+           כשגויות על הצעות אמיתיות וממתינות לתיקון.</div></details>`
       : "";
+
+    // א7 - **שינויים שטרם התקבלו הם פגם בקובץ, לא הערת חילוץ.**
+    // Word מוסר ל-python-docx את ההוספות שטרם אושרו כאילו הן חלק
+    // מהנוסח, ומשמיט את המחיקות שטרם אושרו כאילו כבר בוצעו - כלומר
+    // המסמך נבדק כאילו כל השינויים התקבלו. הקובץ כן נקלט; השגיאה
+    // מוצגת בראש, לפני הממצאים.
+    const tc = d.tracked_changes || {};
+    let tracked = "";
+    if (tc.unknown) {
+      tracked = `<div class="notice notice-coverage" style="margin-top:12px">
+        <b>לא הצלחתי לבדוק אם יש במסמך שינויים שטרם התקבלו.</b>
+        <b>זו אינה תשובה שאין כאלה</b> — הבדיקה לא רצה.</div>`;
+    } else if (tc.total) {
+      const kinds = Object.entries(tc.by_kind || {})
+        .map(([k, n]) => `${k}: ${n}`).join(" · ");
+      tracked = `<div class="notice notice-coverage" style="margin-top:12px">
+        <b>זוהו שינויים שטרם התקבלו בפורמט עבודה של "עקוב אחר שינויים".</b>
+        יש לקבל את כל השינויים בטרם הגשת הצעת החוק.
+        <div class="hint" style="margin-top:6px">${escapeHtml(kinds)} —
+        הבדיקה שלהלן רצה על הנוסח <b>כאילו כל השינויים כבר התקבלו</b>,
+        וייתכן שהוא אינו הנוסח שבכוונתכם להגיש.</div></div>`;
+    }
 
     const warn = d.warnings.length
       ? `<div class="notice notice-coverage" style="margin-top:12px"><b>אזהרות חילוץ:</b>
            <ul>${d.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>`
       : "";
 
-    out.innerHTML = head + body + skipped + warn;
+    // התראת 'עקוב אחר שינויים' לפני הממצאים: היא משנה את
+    // המשמעות של כל מה שמתחתיה.
+    out.innerHTML = head + tracked + body + skipped + warn;
   } finally {
     btn.disabled = false;
   }
 }
 document.getElementById("critique-btn").addEventListener("click", runCritique);
+
+// א8 - אזור גרירה במקום כפתור "בחר קובץ" האפור. אותו אזור בתקציר
+// ובבודק הניסוח; ה-input נשאר (גרירה לבדה אינה נגישה במקלדת).
+function wireDropzone(zoneId, inputId, pickId, nameId) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  if (!zone || !input) return;
+  const nameEl = document.getElementById(nameId);
+  const show = () => {
+    const f = input.files && input.files[0];
+    nameEl.textContent = f ? f.name : ".docx בלבד";
+    zone.classList.toggle("has-file", Boolean(f));
+  };
+  document.getElementById(pickId).addEventListener("click", () => input.click());
+  zone.addEventListener("click", (ev) => { if (ev.target === zone) input.click(); });
+  input.addEventListener("change", show);
+  ["dragenter", "dragover"].forEach((e) =>
+    zone.addEventListener(e, (ev) => { ev.preventDefault(); zone.classList.add("is-over"); }));
+  ["dragleave", "drop"].forEach((e) =>
+    zone.addEventListener(e, (ev) => { ev.preventDefault(); zone.classList.remove("is-over"); }));
+  zone.addEventListener("drop", (ev) => {
+    const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (!f) return;
+    // **הסוג נבדק כאן ולא רק בשרת** - גרירת PDF והמתנה לשגיאה
+    // מהשרת היא מסע מיותר.
+    if (!f.name.toLowerCase().endsWith(".docx")) {
+      nameEl.textContent = `${f.name} — נתמך .docx בלבד`;
+      zone.classList.add("has-error");
+      return;
+    }
+    zone.classList.remove("has-error");
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    input.files = dt.files;
+    show();
+  });
+  show();
+}
+wireDropzone("summary-drop", "summary-file", "summary-pick", "summary-name");
+wireDropzone("critique-drop", "critique-file", "critique-pick", "critique-name");
+
+// א4 - **"נכשל" הוא מונח של מריץ בדיקות, לא של מי שכתב הצעת חוק.**
+// החיווי האדום נשאר; רק המילה משתנה.
+function critiqueStatusLabel(status) {
+  if (status === "נכשל") return "זוהתה שגיאת ניסוח";
+  return status;
+}
 
 /* ═══ הסתייגויות ═══ (2026-09-18)
  * שני המספרים מוצגים תמיד יחד ולעולם לא לחוד: "עד N הסתייגויות,

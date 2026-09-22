@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import re
+import zipfile
 from dataclasses import dataclass, field
 
 _STYLE_TITLE = "Head HatzaotHok"
@@ -75,6 +76,69 @@ class ExtractedBill:
     # "marker" = הטבלה שטוחה (3 עמודות) והקינון מבוטא רק בסימן
     # שבתוך הטקסט - depth יהיה 0 לכל השורות, וזו מגבלת המקור.
     depth_source: str = "column"
+    # **שינויים שטרם התקבלו ב"עקוב אחר שינויים".** נספרים בנפרד
+    # מ-warnings כי זו אינה מגבלת חילוץ אלא פגם בקובץ עצמו, והוא
+    # חייב להיראות כשגיאה ולא כהערה (ברק, 22.9.2026).
+    tracked_changes: dict = field(default_factory=dict)
+
+
+# ── "עקוב אחר שינויים" ───────────────────────────────────────────────
+# **למה זה לא נתפס עד עכשיו, וזה החלק המסוכן:** python-docx מחזיר
+# ב-`p.text` את תוכן ה-`<w:ins>` (הוספה שטרם התקבלה) **כאילו הוא
+# חלק מהנוסח**, ומשמיט את תוכן ה-`<w:del>` (מחיקה שטרם התקבלה)
+# כאילו כבר בוצעה. כלומר המסמך נקרא בדיוק כאילו כל השינויים אושרו -
+# ולכן הצעה עם שינויים פתוחים עברה נקי. לא היה חסר כלל: היה חסר
+# **מידע**, כי השכבה שמתחת שקרה בשקט.
+#
+# התגים נבדקים על ה-XML הגולמי ולא דרך python-docx, כי הוא לא חושף
+# אותם. ראו ECMA-376 §17.13.5.
+_TRACKED_TAGS = {
+    "ins": "הוספות",
+    "del": "מחיקות",
+    "moveFrom": "העברות (מקור)",
+    "moveTo": "העברות (יעד)",
+}
+_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_TRACKED_RE = re.compile(
+    r"<w:(ins|del|moveFrom|moveTo)\b(?![a-zA-Z])", re.IGNORECASE)
+
+
+def find_tracked_changes(path_or_stream) -> dict:
+    """סופרת שינויים שטרם התקבלו. מחזירה {} כשאין, או
+    {"total": n, "by_kind": {...}} כשיש.
+
+    **כשל בקריאת ה-ZIP אינו "אין שינויים".** אם אי אפשר לבדוק -
+    מוחזר {"unknown": True} והממשק יאמר שהבדיקה לא רצה, ולא
+    שהמסמך נקי. ראו CLAUDE.md, "לא נמצא" מול "לא הצלחתי לבדוק"."""
+    try:
+        if hasattr(path_or_stream, "seek"):
+            path_or_stream.seek(0)
+        with zipfile.ZipFile(path_or_stream) as z:
+            parts = [n for n in z.namelist()
+                     if n.startswith("word/") and n.endswith(".xml")]
+            counts: dict[str, int] = {}
+            for name in parts:
+                xml = z.read(name).decode("utf-8", errors="replace")
+                for tag in _TRACKED_RE.findall(xml):
+                    key = _TRACKED_TAGS.get(tag[0].lower() + tag[1:], None)
+                    # התאמה חסרת-רישיות מחזירה את הצורה שבקובץ;
+                    # מנרמלים לשם התג התקני.
+                    for canonical, label in _TRACKED_TAGS.items():
+                        if tag.lower() == canonical.lower():
+                            key = label
+                            break
+                    if key:
+                        counts[key] = counts.get(key, 0) + 1
+    except Exception:
+        return {"unknown": True}
+    finally:
+        if hasattr(path_or_stream, "seek"):
+            try:
+                path_or_stream.seek(0)
+            except Exception:
+                pass
+    total = sum(counts.values())
+    return {"total": total, "by_kind": counts} if total else {}
 
 
 def _row_cells(row) -> list:
@@ -175,12 +239,16 @@ def extract_bill(path_or_stream) -> ExtractedBill:
     except ImportError:  # pragma: no cover
         raise DocumentExtractError("python-docx אינו מותקן.") from None
 
+    # נבדק **לפני** python-docx, כי הוא צורך את הזרם ואינו חושף את
+    # התגים האלה בכלל.
+    tracked = find_tracked_changes(path_or_stream)
+
     try:
         document = docx.Document(path_or_stream)
     except Exception as e:
         raise DocumentExtractError(f"לא ניתן לפתוח את הקובץ כמסמך Word: {e}") from None
 
-    bill = ExtractedBill()
+    bill = ExtractedBill(tracked_changes=tracked)
     heads: list[str] = []
     in_explanatory = False
     collecting_initiators = False

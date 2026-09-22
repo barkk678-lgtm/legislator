@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
 from node import LegislativeNode  # noqa: E402
 from numbering import sort_section_numbers  # noqa: E402
 from render_bill import Bill  # noqa: E402
+from bill_kind import classify as classify_bill_kind, section_openings_from_bill
 
 CHECKS = {
     1: ("מספרי הסעיפים בהוראות התיקון קיימים בפועל בחוק המתוקן", "רגילה"),
@@ -138,6 +139,33 @@ def _instruction_counts(bill: Bill) -> tuple[int, int]:
     return principal, other
 
 
+def locate(bill: Bill, index: int) -> str:
+    """מיקום במונחי המסמך במקום אינדקס שורה (א3, ברק 22.9.2026).
+
+    **"שורה 0" חסר משמעות למשתמש.** הוא מספר האיבר במערך הפנימי
+    שלנו - אין לו שום ביטוי במסמך שהמשתמש רואה, ואי אפשר לחפש לפיו.
+    מה שכן יש במסמך: כותרת, מספר סעיף, וסימן פסקה/סעיף קטן.
+
+    מחזיר "בכותרת" / "ברישה של סעיף 1" / "בסעיף 1(1)"."""
+    lines = bill.lines or []
+    if not 0 <= index < len(lines):
+        return "במקום לא מזוהה במסמך"
+    section = ""
+    for i in range(index + 1):
+        number = (getattr(lines[i], "number", "") or "").strip()
+        if number:
+            section = number.rstrip(".")
+    if not section:
+        return "בכותרת"
+    target = lines[index]
+    marker = (getattr(target, "marker", "") or "").strip()
+    if marker:
+        return f"בסעיף {section}{marker}"
+    if (getattr(target, "number", "") or "").strip():
+        return f"ברישה של סעיף {section}"
+    return f"בסעיף {section}"
+
+
 def _check_3(bill: Bill) -> Finding:
     """הכינוי "(להלן – החוק העיקרי)" נדרש **רק כשיש יותר מהוראת תיקון
     אחת לאותו חוק** - אחרת שם החוק המלא מופיע פעם אחת ואין למה לקצר.
@@ -172,7 +200,7 @@ def _check_3(bill: Bill) -> Finding:
         return _finding(
             3,
             "נכשל",
-            f"הכינוי מופיע בשורה {loose_idxs[0]} אך לא בניסוח התקני "
+            f"הכינוי מופיע {locate(bill, loose_idxs[0])} אך לא בניסוח התקני "
             "'(להלן – החוק העיקרי)' - בדקו רווחים, en-dash (–) וה' הידיעה: "
             f"{combined[loose_idxs[0]][:90]!r}",
         )
@@ -183,7 +211,7 @@ def _check_3(bill: Bill) -> Finding:
                 3,
                 "נכשל",
                 "יש הוראת תיקון אחת בלבד לחוק העיקרי, ולכן הכינוי "
-                f"'(להלן – החוק העיקרי)' מיותר - הוא מופיע בשורה {defining_idxs[0]}. "
+                f"'(להלן – החוק העיקרי)' מיותר - הוא מופיע {locate(bill, defining_idxs[0])}. "
                 "שם החוק המלא מופיע פעם אחת, אין למה לקצר (drafting-rules.md §5.8)",
             )
         return _finding(
@@ -197,7 +225,7 @@ def _check_3(bill: Bill) -> Finding:
         return _finding(
             3,
             "נכשל",
-            f"יש {principal} הוראות תיקון לחוק העיקרי אבל אין שורה שמגדירה "
+            f"יש {principal} הוראות תיקון לחוק העיקרי אבל אין מקום שמגדיר "
             "'(להלן – החוק העיקרי)' - מההוראה השנייה ואילך צריך כינוי",
         )
     if len(defining_idxs) > 1:
@@ -207,12 +235,12 @@ def _check_3(bill: Bill) -> Finding:
         i for i, t in enumerate(combined) if i < define_at and _PRINCIPAL_LAW_MENTION_RE.search(t)
     ]
     if used_before:
-        return _finding(3, "נכשל", f"'החוק העיקרי' מוזכר בשורה {used_before[0]}, לפני שהוגדר בשורה {define_at}")
+        return _finding(3, "נכשל", f"'החוק העיקרי' מוזכר {locate(bill, used_before[0])}, לפני שהוגדר {locate(bill, define_at)}")
     return _finding(
         3,
         "עבר",
         f"{principal} הוראות תיקון לחוק העיקרי; ההגדרה מופיעה פעם אחת "
-        f"(שורה {define_at}), וכל שימוש בא אחריה",
+        f"({locate(bill, define_at)}), וכל שימוש בא אחריה",
     )
 
 
@@ -242,7 +270,9 @@ def _check_5(bill: Bill) -> Finding:
         i for i, ln in enumerate(bill.lines) if "״" in (ln.text + ln.text_after + ln.side_heading)
     ]
     if bad_idxs:
-        return _finding(5, "נכשל", f"נמצא ״ (U+05F4) בשורות: {bad_idxs} - יש להשתמש ב-\" (U+0022)")
+        where = " · ".join(locate(bill, i) for i in bad_idxs[:5])
+        more = f" (ועוד {len(bad_idxs) - 5})" if len(bad_idxs) > 5 else ""
+        return _finding(5, "נכשל", f"נמצא ״ (U+05F4) {where}{more} - יש להשתמש ב-\" (U+0022)")
     return _finding(5, "עבר", 'אין שימוש ב-״ (U+05F4) בשום שורה - כל הגרשיים הם " (U+0022)')
 
 
@@ -585,6 +615,8 @@ _DRAFT_SKIP_REASONS = {
     2: "דורשת את מפתחות הערות השוליים (refs) שהמערכת מייצרת - אינם קיימים במסמך חיצוני",
     4: "הבדיקה ידועה כשגויה על הצעות אמיתיות (נכשלה על 25 מתוך 40 שנבדקו, "
        "בעיקר על כותרת לכמה סעיפים ועל כותרת שנוקבת בשם חוק) - מושבתת עד שתתוקן",
+    # שתי הסיבות הבאות מחליפות את 4/7 כשההצעה אינה מתקנת - ראו
+    # _KIND_SKIP_REASONS למטה.
     7: "הבדיקה ידועה כצרה מדי (נכשלה על 22 מתוך 40 הצעות אמיתיות - היא אינה "
        "מכירה בצורות כמו '(תיקוני חקיקה)' או הצעת חוק חדש) - מושבתת עד שתתוקן",
     8: "דורשת את תאריך ההגשה בפועל, שנכתב על ידי מזכירות הכנסת אחרי ההנחה",
@@ -599,18 +631,52 @@ _DRAFT_SKIP_REASONS = {
 
 DRAFT_CHECKS = (3, 5, 6, 9, 11)
 
+# בדיקות שנכונות **רק** להצעה שמתקנת חוק קיים. על הצעה לחוק חדש הן
+# נכשלות תמיד - לא כי יש פגם בהצעה אלא כי הן שואלות שאלה לא
+# רלוונטית. ברק, 22.9.2026: "מי שמעלה הצעה לחוק חדש לא יקבל שתי
+# שגיאות שווא."
+AMENDING_ONLY_CHECKS = (4, 7)
+
+_KIND_SKIP_REASONS = {
+    "new": {
+        4: "לא רלוונטית להצעת חוק חדש: כותרת שוליים בפורמט "
+           "'{פעולה} סעיף {N}' מתארת תיקון לסעיף קיים.",
+        7: "לא רלוונטית להצעת חוק חדש: הפורמט 'חוק X (תיקון – תיאור)' "
+           "הוא פורמט של הצעה מתקנת.",
+    },
+    "unknown": {
+        4: "לא ניתן היה לקבוע אם ההצעה מתקנת חוק קיים; הבדיקה תלויה "
+           "בהבחנה הזו ולכן לא הורצה.",
+        7: "לא ניתן היה לקבוע אם ההצעה מתקנת חוק קיים; הבדיקה תלויה "
+           "בהבחנה הזו ולכן לא הורצה.",
+    },
+}
+
 
 def validate_draft(bill: Bill) -> list[Finding]:
     """הבדיקות הדטרמיניסטיות שאפשר להריץ על טיוטה שהמשתמש העלה.
 
-    מחזירה את כל 15 הבדיקות לפי סדר, כמו validate() - חמש מהן מורצות
-    בפועל והשאר "לא נבדק" עם הסיבה. אין כאן LLM ואין רשת: הפלט תלוי
-    אך ורק ב-bill."""
+    מחזירה את כל 15 הבדיקות לפי סדר, כמו validate() - אין בדיקה
+    שנעלמת, ו"לא נבדק" גלוי כמו "נכשל". אין כאן LLM ואין רשת: הפלט
+    תלוי אך ורק ב-bill.
+
+    **בדיקות 4 ו-7 מותנות בסוג ההצעה** (א6): הן שואלות שאלה שיש לה
+    משמעות רק להצעה שמתקנת חוק קיים. על הצעה לחוק חדש הן מדווחות
+    "לא נבדק" עם הסיבה - ולא "נכשל", שהיה שגיאת שווא."""
+    kind, kind_reason = bill_kind(bill)
     runners = {3: _check_3, 5: _check_5, 6: _check_6, 9: _check_9, 11: _check_11}
     out: list[Finding] = []
     for number in sorted(CHECKS):
-        if number in runners:
+        if number in AMENDING_ONLY_CHECKS and kind != "amending":
+            out.append(_finding(number, "לא נבדק", _KIND_SKIP_REASONS[kind][number]))
+        elif number in runners:
             out.append(runners[number](bill))
         else:
             out.append(_finding(number, "לא נבדק", _DRAFT_SKIP_REASONS[number]))
     return out
+
+
+def bill_kind(bill: Bill) -> tuple[str, str]:
+    """("amending" | "new" | "unknown", הסבר בעברית). ראו bill_kind.py -
+    שני מבחינים, שם ההצעה ופתיחות הסעיפים, ו-unknown כשהם חלוקים."""
+    return classify_bill_kind(getattr(bill, "title", ""), section_openings_from_bill(bill))

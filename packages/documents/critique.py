@@ -34,7 +34,7 @@ for _sub in ("render", "corpus", "validate"):
     sys.path.insert(0, str(_PKGS / _sub))
 
 from render_bill import Bill, Line  # noqa: E402
-from validator import DRAFT_CHECKS, Finding, validate_draft  # noqa: E402
+from validator import DRAFT_CHECKS, Finding, locate, validate_draft  # noqa: E402
 
 _MAX_DEPTH = 5
 
@@ -88,6 +88,10 @@ class BillCritique:
     explained: bool = False
     explain_error: str = ""
     extraction_warnings: list[str] = field(default_factory=list)
+    # שינויים שטרם התקבלו ב"עקוב אחר שינויים" - ראו
+    # extract_docx.find_tracked_changes. נשמר כאן כדי שהממשק יציג
+    # שגיאה מפורשת, ולא כהערת חילוץ בין השאר.
+    tracked_changes: dict = field(default_factory=dict)
     # ממצאים שההסבר שלהם נזרק כי הצביע על שורה שאינה בממצא
     dropped_explanations: list[int] = field(default_factory=list)
 
@@ -131,7 +135,11 @@ def _findings_as_prompt(findings: list[Finding], bill: Bill) -> str:
         head = f"[{ln.side_heading}] " if ln.side_heading else ""
         num = f"{ln.number} " if ln.number else ""
         inner = f"[{ln.inner_heading} {ln.inner_number}] " if ln.inner_number else ""
-        parts.append(f"שורה {i}: {'  ' * ln.depth}{head}{num}{inner}{ln.marker} {ln.text}".rstrip())
+        # **המיקום נמסר למודל במונחי המסמך ולא כאינדקס פנימי** (א3).
+        # אחרת ההסבר שהוא מנסח חוזר ומדבר על "שורה 4", ולמשתמש אין
+        # שום דרך למצוא אותה.
+        parts.append(
+            f"{locate(bill, i)}: {'  ' * ln.depth}{head}{num}{inner}{ln.marker} {ln.text}".rstrip())
     return "\n".join(parts)
 
 
@@ -207,6 +215,7 @@ def critique_bill(extracted, *, draft_fn=None) -> BillCritique:
         passed=[f.check_number for f in findings if f.status == "עבר"],
         not_checked=[f.check_number for f in findings if f.status == "לא נבדק"],
         extraction_warnings=list(extracted.warnings),
+        tracked_changes=dict(getattr(extracted, "tracked_changes", {}) or {}),
     )
     if not problems:
         return critique  # אין ליקוי - אין למה לקרוא למודל

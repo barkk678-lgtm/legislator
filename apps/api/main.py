@@ -463,6 +463,11 @@ async def api_critique_document(file: UploadFile = File(...)) -> dict:
         "explain_error": result.explain_error,
         "dropped_explanations": result.dropped_explanations,
         "warnings": result.extraction_warnings,
+        # **"עקוב אחר שינויים" הוא פגם בקובץ, לא הערת חילוץ.** הקובץ
+        # נקלט ונבדק במלואו, אבל הנוסח שנקרא אינו הנוסח שיוגש: Word
+        # מוסר את ההוספות שטרם אושרו כחלק מהטקסט ומשמיט את המחיקות
+        # שטרם אושרו - כלומר המסמך נקרא כאילו כל השינויים התקבלו.
+        "tracked_changes": result.tracked_changes,
         "findings": [
             {
                 "check": it.check_number,

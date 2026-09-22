@@ -22,6 +22,7 @@
       <button data-t="agenda"><span class="ico">!</span>הצעות לסדר</button>
       <button data-t="rules"><span class="ico">✦</span>מומחה התקנון</button>
       <button data-t="proto"><span class="ico">≡</span>תקציר הצעה</button>
+      <button data-t="critique"><span class="ico">✓</span>בודק הניסוח</button>
       <button data-t="reservations"><span class="ico">≠</span>הסתייגויות</button>
       <button data-t="research"><span class="ico">◎</span>מחקר</button>
     </div>
@@ -217,14 +218,25 @@
                 תמיד קובץ Word</b> — חילוץ מ-PDF מאבד את מבנה ההזחות ואת סדר
                 הפסקאות, ולכן אינו מספיק מדויק לעריכת נוסח.
               </div>
-              <input type="file" id="summary-file" accept=".docx" class="inp" />
+              <div class="dropzone" id="summary-drop">
+                <input type="file" id="summary-file" accept=".docx" hidden />
+                <svg class="dz-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                <div class="dz-main">גררו לכאן קובץ Word, או <button type="button" class="dz-link" id="summary-pick">בחרו קובץ</button></div>
+                <div class="dz-sub" id="summary-name">.docx בלבד</div>
+              </div>
               <button id="summary-btn" class="primary" style="margin-top:10px">הפקת תקציר</button>
               <div id="summary-result" style="margin-top:16px"></div>
             </div>
           </section>
 
-          <section class="card" style="max-width:900px;margin:18px auto 0;width:100%">
-            <header><h2>ביקורת ניסוח</h2><span>בדיקה אוטומטית של כללי הניסוח</span></header>
+        </div>
+      </div>
+
+      <!-- א1+א2: בודק הניסוח הופרד מתקציר ההצעה - שני כלים ולא אחד. -->
+      <div class="tab" id="critique">
+        <div class="cols" style="grid-template-columns:1fr">
+          <section class="card" style="max-width:900px;margin:0 auto;width:100%">
+            <header><h2>בודק הניסוח</h2><span>כתבת הצעת חוק בעצמך? ניתן לבדוק תוך מספר שניות אם היא תקינה לפי כללי ניסוח החקיקה.</span></header>
             <div class="body">
               <div class="notice" style="margin-bottom:14px">
                 <b>הממצאים נקבעים בקוד, לא על ידי מודל.</b>
@@ -232,7 +244,12 @@
                 לכל ממצא בשפה מובנת. בדיקה שאינה ניתנת להרצה על מסמך חיצוני
                 מוצגת כ"לא נבדקה" עם הסיבה — היא לא נעלמת מהרשימה.
               </div>
-              <input type="file" id="critique-file" accept=".docx" class="inp" />
+              <div class="dropzone" id="critique-drop">
+                <input type="file" id="critique-file" accept=".docx" hidden />
+                <svg class="dz-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                <div class="dz-main">גררו לכאן קובץ Word, או <button type="button" class="dz-link" id="critique-pick">בחרו קובץ</button></div>
+                <div class="dz-sub" id="critique-name">.docx בלבד</div>
+              </div>
               <button id="critique-btn" class="primary" style="margin-top:10px">בדיקת ניסוח</button>
               <div id="critique-result" style="margin-top:16px"></div>
             </div>
