@@ -13,9 +13,12 @@ ReplyDatePlanned, ReplyMinisterDate, LastUpdatedDate). ולכן כל חיפוש
 `fs.knesset.gov.il` - **נבדק ואומת שהוא נגיש מ-Vercel** (200,
 application/msword), אף שהוא חסום מסביבת ה-agent.
 
-**מחזירים קישור ולא מושכים את הקובץ** (החלטת ברק): המשתמש פותח
-בעצמו. משיכה ופרסור של קובצי doc לכל חיפוש הייתה מאטה את החיפוש
-עצמו בלי שביקשו זאת.
+**הקישור מוביל לדף השאילתה באתר הכנסת, לא לקובץ** (ברק, ב6,
+22.9.2026): `m.knesset.gov.il/apps/query/details/<Id>`. קודם הוא
+הוריד את קובץ ה-Word, וזו התנהגות שקופצת על המשתמש במקום לתת לו
+לקרוא. **הדף עצמו לא אומת מסביבת ה-agent** - `m.knesset.gov.il`
+חסום כאן (403 מהפרוקסי), כמו `fs.knesset.gov.il`. הדפוס והדוגמה
+(480993) הגיעו מברק.
 
 ## למה החיפוש אינו התאמת מחרוזת אחת
 
@@ -48,6 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "kness
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
 from odata import OdataError, escape, fetch, fetch_raw_array  # noqa: E402
 from service import LLMConfigError, LLMRequestError, draft  # noqa: E402
+from dates import display_date  # noqa: E402
 
 # יחידה שמחזירה יותר מזה - רחבה מדי לשליפה, משמשת לדירוג בלבד.
 # הערך נגזר מהמדידה: "מצוקת דיור" 46, "מחירי דירות" 43, "זיהום אוויר"
@@ -170,7 +174,44 @@ def expand_query(q: str) -> dict:
     return {"units": units, "expanded": True}
 
 
-def run_unit(words: list[str], *, top: int = 200) -> dict:
+_current_knesset_cache: int | None = None
+
+
+def current_knesset() -> int | None:
+    """מספר הכנסת המכהנת, מתוך `KNS_KnessetDates.IsCurrent` (ב5).
+
+    **ולא `max(KnessetNum)`, שהוא המלכודת כאן.** נמדד (22.9.2026):
+    בפיד כבר יושבת שורה לכנסת ה-26 - אבל `PlenumStart` שלה הוא
+    10.11.2026, כלומר היא טרם התכנסה, ו-`IsCurrent` שלה False.
+    המקסימום היה מחזיר 26 ומסנן את כל התוצאות האמיתיות החוצה.
+    השורה היחידה עם `IsCurrent=True` היא כנסת 25, מושב 4.
+
+    **כשל אינו 25.** ערך קבוע היה נכון היום ושגוי בעוד חודשיים,
+    בלי שאיש ישים לב. None אומר "לא ידוע", והקורא מחפש בלי סינון
+    כנסת ואומר זאת."""
+    global _current_knesset_cache
+    if _current_knesset_cache:
+        return _current_knesset_cache
+    try:
+        rows = fetch("KNS_KnessetDates", filter="IsCurrent eq true",
+                     select="KnessetNum", top=5)
+    except OdataError:
+        return None
+    nums = [r.get("KnessetNum") for r in rows if r.get("KnessetNum")]
+    if not nums:
+        return None
+    _current_knesset_cache = max(nums)
+    return _current_knesset_cache
+
+
+def default_knesset_nums() -> list[int]:
+    """ברירת המחדל לחיפוש: הכנסת הנוכחית והקודמת (ברק). נגזרת ולא
+    קבועה - היום 25 ו-24, ובעוד חודשיים 26 ו-25."""
+    current = current_knesset()
+    return [current, current - 1] if current else []
+
+
+def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None = None) -> dict:
     """יחידת חיפוש אחת = קריאה אחת לפיד. **כל** מילות היחידה חייבות
     להופיע בכותרת (and, לא or) - זה מה שמונע את "מצוקת" לבדה.
 
@@ -181,6 +222,9 @@ def run_unit(words: list[str], *, top: int = 200) -> dict:
     if not words:
         return {"words": [], "rows": [], "count": 0}
     clause = " and ".join(f"contains(Name,'{escape(w)}')" for w in words)
+    if knesset_nums:
+        ors = " or ".join(f"KnessetNum eq {int(n)}" for n in knesset_nums)
+        clause = f"({clause}) and ({ors})"
     # **הפיד מגביל קצב.** נמדד: מעל ~4 בקשות בו-זמנית הוא מחזיר
     # HTTP 473, וכשל כזה מתבטא כ"מקור שלא נבדק" אצל המשתמש. שני
     # ניסיונות חוזרים עם השהיה גדלה מכסים את הרוב; מה שנשאר נספר
@@ -205,10 +249,11 @@ def run_unit(words: list[str], *, top: int = 200) -> dict:
         "too_broad": len(rows) > GENERIC_CAP,
         "rows": [{
             "query_id": r["Id"],
+            "page_url": page_url(r["Id"]),
             "title": r.get("Name"),
             "kind": r.get("TypeDesc"),
             "knesset": r.get("KnessetNum"),
-            "submitted_at": (r.get("SubmitDate") or "")[:10] or None,
+            "submitted_at": display_date(r.get("SubmitDate")),
             "person_id": r.get("PersonID"),
         } for r in rows],
     }
@@ -249,6 +294,11 @@ def _document_links(query_ids: list[int]) -> dict[int, str]:
         except OdataError:
             return links  # הקישור הוא תוספת, לא תנאי - חיפוש שעובד חשוב יותר
     return links
+
+
+def page_url(query_id: int | None) -> str | None:
+    """דף השאילתה באתר הכנסת. ללא מזהה - אין קישור, ולא קישור שבור."""
+    return f"https://m.knesset.gov.il/apps/query/details/{query_id}" if query_id else None
 
 
 def enrich(query_ids: list[int], person_ids: list[int]) -> dict:
@@ -350,6 +400,7 @@ def search_queries(q: str, *, limit: int = 12, expand_fn=None, run_fn=None) -> d
     chosen = chosen[:limit] if limit else chosen
     extra = enrich([r["query_id"] for r in chosen], [r["person_id"] for r in chosen])
     for r in chosen:
+        r["page_url"] = page_url(r["query_id"])
         r["document_url"] = extra["docs"].get(str(r["query_id"]))
         r["asked_by"] = extra["names"].get(str(r["person_id"])) or None
         r.pop("person_id", None)
@@ -364,5 +415,5 @@ def search_queries(q: str, *, limit: int = 12, expand_fn=None, run_fn=None) -> d
             "expanded": plan["expanded"]}
 
 
-__all__ = ["OdataError", "enrich", "expand_query", "run_unit", "search_queries",
-           "unit_budget"]
+__all__ = ["OdataError", "current_knesset", "default_knesset_nums", "enrich",
+           "expand_query", "page_url", "run_unit", "search_queries", "unit_budget"]

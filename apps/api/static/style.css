@@ -600,3 +600,47 @@ select { font-weight: 600; max-width: 420px; }
   background: none; border: 0; padding: 0; font: inherit;
   color: var(--flag); text-decoration: underline; cursor: pointer;
 }
+
+
+/* --- אייקון פעולה על הודעת צ'אט (ב3) --- */
+.msg.has-action { position: relative; padding-inline-start: 38px; }
+.msg-action {
+  position: absolute; inset-inline-start: 8px; top: 8px;
+  width: 26px; height: 26px; padding: 4px; border-radius: 6px;
+  border: 1px solid var(--rule); background: var(--page);
+  cursor: pointer; display: grid; place-items: center;
+}
+.msg-action:hover { border-color: var(--flag); background: var(--tint); }
+.msg-action:disabled { opacity: .5; cursor: default; }
+.msg-action svg {
+  width: 16px; height: 16px; fill: none; stroke: var(--flag);
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+
+
+/* --- בורר הכנסות (ב5) --- */
+.pq-knesset {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+  padding: 6px 2px 0; font-size: 12px;
+}
+.pq-knesset-note { color: var(--soft); margin-inline-end: 4px; }
+.pq-chip {
+  border: 1px solid var(--rule); background: var(--page); color: var(--soft);
+  border-radius: 11px; padding: 1px 9px; font-size: 12px; cursor: pointer;
+}
+.pq-chip:hover { border-color: var(--flag); }
+.pq-chip.on { background: var(--flag); border-color: var(--flag); color: #fff; }
+
+
+/* --- שיחות שאילתא קודמות (ב4) --- */
+.qconv-new { font-size: 12.5px; padding: 5px 11px; }
+.qconv-item {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  width: 100%; text-align: start; background: none; cursor: pointer;
+  border: 0; border-bottom: 1px solid var(--rule); padding: 8px 2px; font: inherit;
+}
+.qconv-item:last-child { border-bottom: 0; }
+.qconv-item:hover { background: var(--tint-2); }
+.qconv-item.on { background: var(--tint); }
+.qconv-title { color: var(--ink); font-size: 13.5px; }
+.qconv-date { color: var(--soft); font-size: 12px; white-space: nowrap; }

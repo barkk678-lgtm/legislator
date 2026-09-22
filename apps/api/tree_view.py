@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 from node import LegislativeNode, effective_as_of, find_sections  # noqa: E402
+from dates import display_date  # noqa: E402
 
 TYPE_HE = {
     "law": "חוק",
@@ -86,5 +87,4 @@ def as_of_display(root: LegislativeNode) -> str | None:
     value = effective_as_of(root, root)
     if value is None:
         return None
-    date_part = value[:10] if len(value) >= 10 else value
-    return f"נוסח כפי שהופיע בוויקיטקסט ביום {date_part}"
+    return f"נוסח כפי שהופיע בוויקיטקסט ביום {display_date(value) or value}"

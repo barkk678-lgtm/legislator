@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "knesset"))
 from odata import OdataError, escape, fetch  # noqa: E402
+from dates import display_date  # noqa: E402
 
 # מילים שמופיעות כמעט בכל שם הצעת חוק ולכן לא מעידות על דמיון.
 _STOPWORDS = {"חוק", "הצעת", "הצעה", "תיקון", "מס", "מספר", "תיקוני", "חקיקה",
@@ -185,7 +186,7 @@ def similar_bills(title: str, *, knesset_num: int | None = None, limit: int = 10
             "kind": bill.get("SubTypeDesc"),
             "bill_label": bill_label(bill),
             "became_law": bill.get("StatusID") == _STATUS_PASSED,
-            "published_at": (bill.get("PublicationDate") or "")[:10] or None,
+            "published_at": display_date(bill.get("PublicationDate")),
             "similarity": round(score, 3),
             "shared_words": sorted(shared),
         })

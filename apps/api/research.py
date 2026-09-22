@@ -38,6 +38,7 @@ _CONFIG_DIR = str(Path(__file__).resolve().parents[2] / "packages" / "config")
 if _CONFIG_DIR not in sys.path:
     sys.path.insert(0, _CONFIG_DIR)
 from env_file import MissingSecret, get as env_get, require, require_supabase  # noqa: E402
+from dates import display_date  # noqa: E402
 
 
 _STATUS_PASSED = 118  # התקבלה בקריאה שלישית
@@ -146,7 +147,7 @@ def _bills_on_topic(topic: str, limit: int = 15) -> dict:
             "knesset": r.get("KnessetNum"),
             "kind": r.get("SubTypeDesc"),
             "became_law": r.get("StatusID") == _STATUS_PASSED,
-            "published_at": (r.get("PublicationDate") or "")[:10] or None,
+            "published_at": display_date(r.get("PublicationDate")),
         } for r in rows[:limit]],
         "columns": ["title", "knesset", "kind", "became_law", "published_at"],
         "summary": f"נמצאו {len(rows)} הצעות ששמן מכיל \"{topic}\", מתוכן {passed} התקבלו כחוק.",

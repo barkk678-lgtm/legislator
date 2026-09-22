@@ -52,7 +52,6 @@
     <div class="topbar" data-bar="query" hidden>
       <h1>שאילתות</h1><span class="sub">ניסוח שאילתה לשר לפי הפורמט המקובל</span>
       <div class="grow"></div>
-      <button id="query-export-btn" class="primary" disabled>ייצוא לוורד</button>
     </div>
     <div class="topbar" data-bar="agenda" hidden>
       <h1>הצעות לסדר</h1><span class="sub">נושא, נימוק, ובקשה לדיון</span>
@@ -147,7 +146,10 @@
       <div class="tab" id="query">
         <div class="cols" style="grid-template-columns:1.4fr 1fr">
           <section class="card">
-            <header><h2>ניסוח השאילתה</h2></header>
+            <header>
+              <h2>ניסוח השאילתה</h2>
+              <button id="qconv-new" class="primary qconv-new">+ צור שאילתה חדשה</button>
+            </header>
             <div class="chat-form">
               <div class="fld"><label>אל השר/ה</label>
                 <input id="query-minister-input" class="inp" type="text" placeholder="למשל: לביטחון הפנים" /></div>
@@ -172,7 +174,12 @@
               <input id="past-queries-input" class="inp" type="text" placeholder="נושא לחיפוש…" />
               <button id="past-queries-btn" class="primary">חיפוש</button>
             </div>
+            <div class="pq-knesset" id="pq-knesset"></div>
             <div class="body" id="past-queries-results"></div>
+          </section>
+          <section class="card">
+            <header><h2>שיחות קודמות</h2><span>נשמרות בדפדפן שלכם</span></header>
+            <div class="body" id="qconv-list"></div>
           </section>
         </div>
       </div>

@@ -53,6 +53,8 @@ from knesset_bills import similar_bills  # noqa: E402
 from knesset_citations import OdataError, citations_for_law  # noqa: E402
 from knesset_queries import (  # noqa: E402
     GENERIC_CAP as QUERY_GENERIC_CAP,
+    current_knesset,
+    default_knesset_nums,
     enrich,
     expand_query,
     run_unit,
@@ -75,6 +77,7 @@ from semantic_search import (  # noqa: E402
     search as semantic_search,
 )
 from tree_view import as_of_display, node_view, touched_section_numbers  # noqa: E402
+from dates import display_date  # noqa: E402
 from schemas import (  # noqa: E402
     AgendaDraftRequestIn,
     BillMetaIn,
@@ -333,7 +336,7 @@ def api_knesset_bill_docs(x_ingest_secret: str | None = Header(None),
             docs.append({
                 "id": r["Id"], "bill_id": r.get("BillID"),
                 "doc_type": r.get("GroupTypeDesc"),
-                "updated_at": (r.get("LastUpdatedDate") or "")[:10],
+                "updated_at": display_date(r.get("LastUpdatedDate")),
                 "bytes": len(body),
                 "content_b64": base64.b64encode(body).decode(),
             })
@@ -847,14 +850,25 @@ def api_queries_plan(q: str = "") -> dict:
     return {**expand_query(q), "generic_cap": QUERY_GENERIC_CAP}
 
 
+@app.get("/api/queries/knessets")
+def api_queries_knessets() -> dict:
+    """הכנסת המכהנת וברירת המחדל לסינון (ב5). **ערך נגזר ולא קבוע** -
+    ראו knesset_queries.current_knesset. current=None פירושו שלא
+    הצלחנו לקבוע, והממשק אומר זאת במקום להציג 25 כאילו ידוע."""
+    current = current_knesset()
+    return {"current": current, "default": default_knesset_nums(),
+            "available": list(range(1, current + 1)) if current else []}
+
+
 @app.get("/api/queries/unit")
-def api_queries_unit(w: list[str] = Query(default=[])) -> dict:
+def api_queries_unit(w: list[str] = Query(default=[]),
+                     knesset: list[int] = Query(default=[])) -> dict:
     """שלב ב: יחידת חיפוש אחת = קריאה אחת לפיד. הלקוח קורא לכאן
     לכל יחידה בנפרד ומציג כל תשובה ברגע שהיא חוזרת, בלי לחכות
     לשאר. **הכישלון מוחזר כ-502 ולא כתוצאה ריקה** - הלקוח סופר
     כמה מקורות לא נבדקו ואומר זאת למשתמש."""
     try:
-        return run_unit(w)
+        return run_unit(w, knesset_nums=knesset or None)
     except OdataError as e:
         raise HTTPException(502, str(e))
 

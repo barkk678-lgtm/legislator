@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "knesset"))
 from odata import OdataError, fetch  # noqa: E402
+from dates import display_date  # noqa: E402
 
 _BILL_FIELDS = "Id,Name,PublicationSeriesDesc,MagazineNumber,PageNumber,PublicationDate"
 _BILL_ID_CHUNK = 150  # 200 עובר, 400 נשבר - 150 משאיר מרווח
@@ -100,7 +101,7 @@ def citations_for_law(law_id: str) -> dict:
             "is_original": b.get("BindingTypeDesc") == "החוק המקורי",
             "amendment_kind": b.get("AmendmentTypeDesc"),
             "correction_number": b.get("CorrectionNumber"),
-            "published_at": (bill.get("PublicationDate") or "")[:10],
+            "published_at": display_date(bill.get("PublicationDate")),
             "reference": _format_reference(bill, b.get("PageNumber")),
         })
     citations.sort(key=lambda c: (not c["is_original"], c["published_at"]))

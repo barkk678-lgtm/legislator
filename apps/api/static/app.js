@@ -1186,14 +1186,21 @@ async function sendQueryMessage() {
       role: "assistant",
       content: `נושא: ${currentQueryDraft.subject}\nגוף: ${currentQueryDraft.body}`,
     });
-    document.getElementById("query-export-btn").disabled = false;
-    appendMsg(
+    // ב3 - אייקון הייצוא יושב **על ההודעה עצמה**, ורק על הודעה
+    // שהיא שאילתה מנוסחת. הודעת שגיאה, סירוב או הודעה רגילה אינן
+    // מקבלות אותו - אין מה לייצא מהן.
+    const bubble = appendMsg(
       chat,
       "a",
       `ניסחתי טיוטה לפי הפורמט המקובל.` +
         `<div class="draft"><div class="to">שאילתה ${escapeHtml(currentQueryDraft.kind)} ${escapeHtml(minister)}</div>` +
         `${escapeHtml(currentQueryDraft.body)}${wordCountHtml(currentQueryDraft.word_count, currentQueryDraft.word_limit)}${currentQueryDraft.removed_addressee ? `<div class="word-count">הוסרה פנייה לנמען מתחילת הגוף (${escapeHtml(currentQueryDraft.removed_addressee)}) — הנמען נקבע בשדה ומוזרק למסמך</div>` : ""}</div>`
     );
+    attachQueryExport(bubble, { ...currentQueryDraft });
+    // ב5 - **החיפוש רץ מעצמו, ואינו מעכב את הניסוח.** הטיוטה כבר
+    // על המסך; זה יוצא לדרך אחריה ומופיע כשהוא מוכן.
+    autoSearchPastQueries(currentQueryDraft.subject || text);
+    saveCurrentConv();
   } finally {
     thinking.remove();
     input.disabled = false;
@@ -1206,24 +1213,48 @@ document.getElementById("query-composer-input").addEventListener("keydown", (ev)
   if (ev.key === "Enter") sendQueryMessage();
 });
 
-document.getElementById("query-export-btn").addEventListener("click", async () => {
-  if (!currentQueryDraft) return;
-  const resp = await fetch("/api/query/export", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(currentQueryDraft),
-  });
-  if (!resp.ok) return;
-  const blob = await resp.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "שאילתה.docx";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-});
+async function exportQueryDraft(draft, btn) {
+  const original = btn ? btn.getAttribute("title") : "";
+  try {
+    if (btn) { btn.disabled = true; btn.setAttribute("title", "מייצא…"); }
+    const resp = await fetch("/api/query/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(draft),
+    });
+    // **כשל ייצוא לא נבלע.** לחיצה שלא עושה כלום נראית כמו תקלה
+    // בכפתור, והמשתמש לוחץ שוב ושוב.
+    if (!resp.ok) throw new Error("export");
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "שאילתה.docx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    appendMsg(document.getElementById("query-chat"), "err",
+              "הייצוא לוורד נכשל. הטיוטה עצמה נשארה כאן - אפשר להעתיק אותה ידנית.");
+  } finally {
+    if (btn) { btn.disabled = false; btn.setAttribute("title", original || "ייצוא לוורד"); }
+  }
+}
+
+function attachQueryExport(bubble, draft) {
+  const btn = document.createElement("button");
+  btn.className = "msg-action";
+  btn.type = "button";
+  btn.title = "ייצוא לוורד";
+  btn.setAttribute("aria-label", "ייצוא השאילתה לקובץ Word");
+  btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>' +
+    '<path d="M14 3v5h5"/><path d="M9 13l1.5 4L12 13l1.5 4L15 13"/></svg>';
+  btn.addEventListener("click", () => exportQueryDraft(draft, btn));
+  bubble.classList.add("has-action");
+  bubble.appendChild(btn);
+}
 
 // --- הצעות לסדר ---
 let agendaTopicHistory = [];
@@ -1295,6 +1326,119 @@ document.getElementById("agenda-copy-btn").addEventListener("click", async () =>
     appendMsg(document.getElementById("agenda-chat"), "err", "ההעתקה נכשלה - יש להעתיק ידנית.");
   }
 });
+
+/* ═══ ב4 - שיחות שאילתא קודמות ═══
+ * אותו דפוס בדיוק כמו "ההצעות שלי" (DRAFTS_KEY): localStorage,
+ * מכסה, וכישלון קריאה **שאינו מוצג כ"אין שיחות"** - ראו readDrafts
+ * והלקח שנלמד שם. שיחה נשמרת אחרי כל תור, כך שסגירת לשונית
+ * באמצע אינה מאבדת אותה. */
+const QCONV_KEY = "legislator.queryConversations.v1";
+const QCONV_LIMIT = 30;
+let currentConvId = null;
+let qconvUnreadable = false;
+
+function readConvs() {
+  try {
+    const raw = localStorage.getItem(QCONV_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    qconvUnreadable = false;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // **אחסון פגום אינו "אין שיחות".** המשתמש יראה הודעה שאומרת
+    // שלא הצלחנו לקרוא, ולא מסך ריק שנראה כמו מי שלא שמר מעולם.
+    qconvUnreadable = true;
+    return [];
+  }
+}
+
+function writeConvs(list) {
+  try {
+    localStorage.setItem(QCONV_KEY, JSON.stringify(list.slice(0, QCONV_LIMIT)));
+    return true;
+  } catch {
+    return false;   // הקורא חייב לבדוק - ראו writeDrafts
+  }
+}
+
+function saveCurrentConv() {
+  if (!queryTurns.length) return;
+  const list = readConvs().filter((c) => c.id !== currentConvId);
+  currentConvId = currentConvId || `c${Date.now()}`;
+  const firstUser = queryTurns.find((t) => t.role === "user");
+  list.unshift({
+    id: currentConvId,
+    title: (currentQueryDraft && currentQueryDraft.subject)
+      || (firstUser ? firstUser.content.slice(0, 60) : "שיחה"),
+    at: Date.now(),
+    turns: queryTurns,
+    minister: document.getElementById("query-minister-input").value.trim(),
+    mk: document.getElementById("query-mk-input").value.trim(),
+    kind: document.getElementById("query-kind-input").value,
+  });
+  const ok = writeConvs(list);
+  renderConvs(ok);
+}
+
+function renderConvs(saveOk = true) {
+  const el = document.getElementById("qconv-list");
+  if (!el) return;
+  const list = readConvs();
+  if (qconvUnreadable) {
+    el.innerHTML = `<div class="notice notice-coverage"><b>לא הצלחתי לקרוא את
+      השיחות השמורות.</b> <b>זו אינה תשובה שאין כאלה</b> — ייתכן שהן קיימות
+      ולא נקראו.</div>`;
+    return;
+  }
+  if (saveOk === false) {
+    el.innerHTML = `<div class="notice notice-coverage">⚠ שמירת השיחה נכשלה —
+      השיחה אינה שמורה.</div>` + el.innerHTML;
+    return;
+  }
+  if (!list.length) {
+    el.innerHTML = `<div class="hint">אין עדיין שיחות שמורות.</div>`;
+    return;
+  }
+  el.innerHTML = list.map((c) => `
+    <button type="button" class="qconv-item${c.id === currentConvId ? " on" : ""}"
+            data-id="${escapeHtml(c.id)}">
+      <span class="qconv-title">${escapeHtml(c.title)}</span>
+      <span class="qconv-date">${new Date(c.at).toLocaleDateString("he-IL")}</span>
+    </button>`).join("");
+  el.querySelectorAll(".qconv-item").forEach((b) =>
+    b.addEventListener("click", () => openConv(b.dataset.id)));
+}
+
+function openConv(id) {
+  const conv = readConvs().find((c) => c.id === id);
+  if (!conv) return;
+  currentConvId = id;
+  queryTurns = conv.turns || [];
+  currentQueryDraft = null;
+  document.getElementById("query-minister-input").value = conv.minister || "";
+  document.getElementById("query-mk-input").value = conv.mk || "";
+  if (conv.kind) document.getElementById("query-kind-input").value = conv.kind;
+  const chat = document.getElementById("query-chat");
+  chat.innerHTML = "";
+  for (const t of queryTurns) {
+    if (t.role === "user") appendMsg(chat, "u", escapeHtml(t.content));
+    else appendMsg(chat, "a", escapeHtml(t.content).replace(/\n/g, "<br>"));
+  }
+  renderConvs();
+}
+
+function newConv() {
+  saveCurrentConv();
+  currentConvId = null;
+  queryTurns = [];
+  currentQueryDraft = null;
+  document.getElementById("query-chat").innerHTML = "";
+  document.getElementById("past-queries-results").innerHTML = "";
+  document.getElementById("query-composer-input").focus();
+  renderConvs();
+}
+
+document.getElementById("qconv-new").addEventListener("click", newConv);
+renderConvs();
 
 // --- מומחה התקנון: עזרי ניסוח ---
 // השאלה לדוגמה היא ה-placeholder של תיבת הקלט, ולכן היא **חוזרת
@@ -1652,6 +1796,59 @@ async function checkSimilarBills(title) {
 //    תוצאה שהגיעה מיחידה של מילה בודדת **נעצרת בצד** עד סוף החיפוש,
 //    ורק ארבע הטובות שבהן נוספות בסוף, למטה. זה המימוש של "דירוג 1
 //    נחתך לארבעה מקומות" בלי ששום שורה תיעלם מהמסך.
+// ב5 - סינון לפי כנסת. **ברירת המחדל נגזרת ולא קבועה:** הכנסת
+// הנוכחית והקודמת, לפי KNS_KnessetDates.IsCurrent - היום 25 ו-24,
+// ובעוד חודשיים 26 ו-25. null = "לא הצלחנו לקבוע", ואז מחפשים בכל
+// הכנסות ואומרים זאת, במקום להציג 25 כאילו הוא ידוע.
+let pqKnessetInfo = { current: null, default: [], available: [] };
+let pqKnessetChoice = null;   // null = ברירת המחדל; [] = כל הכנסות
+
+async function loadKnessetInfo() {
+  try {
+    const r = await fetch("/api/queries/knessets");
+    if (r.ok) pqKnessetInfo = await r.json();
+  } catch { /* נשאר null - הממשק יאמר שלא ידוע */ }
+  renderKnessetPicker();
+}
+
+function pqActiveKnessets() {
+  return pqKnessetChoice !== null ? pqKnessetChoice : (pqKnessetInfo.default || []);
+}
+
+function pqKnessetParams() {
+  return pqActiveKnessets().map((n) => `&knesset=${n}`).join("");
+}
+
+function renderKnessetPicker() {
+  const el = document.getElementById("pq-knesset");
+  if (!el) return;
+  const active = pqActiveKnessets();
+  const all = active.length === 0;
+  if (!pqKnessetInfo.current) {
+    el.innerHTML = `<span class="pq-knesset-note">לא הצלחתי לקבוע מהי הכנסת
+      הנוכחית — החיפוש רץ על כל הכנסות.</span>`;
+    return;
+  }
+  const opts = (pqKnessetInfo.available || []).slice(-8).reverse();
+  el.innerHTML =
+    `<span class="pq-knesset-note">כנסות:</span>` +
+    `<button type="button" class="pq-chip${all ? " on" : ""}" data-k="all">הכול</button>` +
+    opts.map((n) => `<button type="button" class="pq-chip${
+      active.includes(n) ? " on" : ""}" data-k="${n}">${n}</button>`).join("");
+  el.querySelectorAll(".pq-chip").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.k;
+    if (k === "all") { pqKnessetChoice = []; }
+    else {
+      const n = Number(k);
+      const cur = new Set(pqActiveKnessets());
+      cur.has(n) ? cur.delete(n) : cur.add(n);
+      pqKnessetChoice = [...cur].sort((a, z) => z - a);
+    }
+    renderKnessetPicker();
+  }));
+}
+loadKnessetInfo();
+
 const PQ_MAX_STRONG_ROWS = 12;   // שורות מיחידות רב-מיליות
 const PQ_MAX_RANK1_ROWS = 4;     // "דירוג 1" - הזנב, נחתך לארבעה
 
@@ -1684,10 +1881,27 @@ function pqRowHtml(row) {
   // תווית הדירוג מופיעה רק מ-2 ומעלה: "1" אינו מידע, הוא רעש על כל שורה.
   const rank = `<span class="pq-rank" title="מספר צירופי החיפוש שהתאימו"${
     row.matched >= 2 ? "" : " hidden"}>${row.matched}</span>`;
+  // ב6 - הכותרת מקשרת ל**דף השאילתה** באתר הכנסת, לא מורידה את
+  // קובץ ה-Word. הקישור ידוע בזמן הרינדור (הוא נגזר מהמזהה), ולכן
+  // אינו ממתין לשלב ההשלמה.
+  const title = escapeHtml(row.title || "");
+  const titleHtml = row.page_url
+    ? `<a href="${escapeHtml(row.page_url)}" target="_blank" rel="noopener">${title}</a>`
+    : title;
   return `<div class="citation-row" data-qid="${row.query_id}" data-person="${row.person_id || ""}">
-      <div class="citation-title"><span class="pq-title">${escapeHtml(row.title || "")}</span>${rank}</div>
+      <div class="citation-title"><span class="pq-title">${titleHtml}</span>${rank}</div>
       <span class="citation-date">${meta}${meta ? " · " : ""}<span class="pq-asked">…</span></span>
     </div>`;
+}
+
+// ב5 - מריץ את חיפוש השאילתות הקודמות מעצמו אחרי שנוסחה שאילתה.
+// אותו מנגנון בדיוק כמו חיפוש ידני (כולל התצוגה ההדרגתית), רק
+// שהקלט מגיע מהנושא שנוסח ולא מהקלדה.
+function autoSearchPastQueries(topic) {
+  const input = document.getElementById("past-queries-input");
+  if (!input || !topic) return;
+  input.value = topic;
+  searchPastQueries();
 }
 
 async function searchPastQueries() {
@@ -1769,7 +1983,8 @@ async function searchPastQueries() {
   };
 
   const runUnit = async (unit) => {
-    const qs = unit.words.map((w) => `w=${encodeURIComponent(w)}`).join("&");
+    const qs = unit.words.map((w) => `w=${encodeURIComponent(w)}`).join("&")
+      + pqKnessetParams();
     try {
       const r = await fetch(`/api/queries/unit?${qs}`);
       if (!r.ok) throw new Error("unit");
@@ -1900,11 +2115,6 @@ async function searchPastQueries() {
       const name = extra.names[pid];
       el.querySelector(".pq-asked").textContent =
         name || (extra.names_unavailable ? "שם המגיש לא נשלף" : "המגיש אינו רשום במאגר");
-      const url = extra.docs[String(id)];
-      if (url) {
-        const t = el.querySelector(".pq-title");
-        t.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${t.innerHTML}</a>`;
-      }
     }
   } catch {
     if (token !== pqToken) return;
