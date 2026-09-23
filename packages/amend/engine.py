@@ -33,8 +33,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
 from node import (  # noqa: E402
-    LegislativeNode, duplicate_section_numbers, effective_as_of, find_parent,
-    find_sections)
+    LegislativeNode, deferred_sections, duplicate_section_numbers,
+    effective_as_of, find_parent, find_sections)
 from numbering import sort_section_numbers  # noqa: E402
 from render_bill import Line  # noqa: E402
 from transform import Annotation, FootnoteAnnotation, ReplacementAnnotation  # noqa: E402
@@ -784,6 +784,19 @@ def _stamp_provenance(line: Line, source: LegislativeNode, before_root: Legislat
     return line
 
 
+def _all_sections(root: LegislativeNode) -> list[LegislativeNode]:
+    """כל צמתי הסעיף בעץ, בכל עומק - כולל אלה ש-find_sections אינה
+    מחזירה (הוראות שתחולתן ממועד קובע)."""
+    found = []
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.node_type == "section":
+            found.append(node)
+        stack.extend(node.children)
+    return found
+
+
 def _raise_on_ambiguous_number(
     before: LegislativeNode, after: LegislativeNode
 ) -> None:
@@ -791,6 +804,26 @@ def _raise_on_ambiguous_number(
     node.duplicate_section_numbers - הכפילות היא עובדה על המקור
     (נוסח עתידי, הוראת שעה, או טעות מספור שוויקיטקסט עצמו מסמן),
     ולא משהו שאנחנו יכולים להכריע בו."""
+    # **הוראה שתחולתה ממועד קובע מוצגת לקריאה בלבד** (ברק, 23.9.2026).
+    # היא בתוקף - רק החלתה מתחילה במועד - ותיקון נכתב על גבי הנוסח
+    # המבצעי שלצידה. `find_sections` כבר מחזירה את המבצעי, ולכן שינוי
+    # בהוראה כזו לא היה מגיע לדיף בכלל: שוב אפס הוראות בשקט. כאן הוא
+    # הופך לשגיאה מפורשת.
+    deferred_before = deferred_sections(before)
+    if deferred_before:
+        after_by_id = {n.id: n for n in _all_sections(after)}
+        for node in _all_sections(before):
+            note = deferred_before.get(node.id)
+            if note is None:
+                continue
+            twin = after_by_id.get(node.id)
+            if twin is None or _serialize_for_compare(node) != _serialize_for_compare(twin):
+                raise NotImplementedError(
+                    f"סעיף {node.number} ({note}) מוצג לקריאה בלבד: ההוראה "
+                    "הזו בתוקף ותחולתה מתחילה במועד הנקוב, ותיקון בהצעת "
+                    "חוק נכתב על גבי הנוסח שבתוקף עכשיו שלצידה."
+                )
+
     duplicates = duplicate_section_numbers(before)
     if not duplicates:
         return

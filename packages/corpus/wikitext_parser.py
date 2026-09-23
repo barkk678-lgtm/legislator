@@ -695,7 +695,17 @@ def parse_wikitext(
             parent_node = stack[-1][1]
             # ברירת מחדל: לרשת את מרחב המספור מההורה (לא "law" קבוע) -
             # תוספת יכולה עקרונית להיפתח בכל רמת מכל, לא רק ב-קטע2.
-            numbering_space = "schedule" if anchor.startswith("תוספת") else stack[-1][2]
+            #
+            # **"לוח" נוסף 23.9.2026 (ברק: "באג תיוג, לא שאלת עיצוב").**
+            # לוח הוא תוספת לכל דבר - המספור שבתוכו מתחיל מחדש מ-1 -
+            # אבל הוא לא נתפס כאן, ולכן סעיפיו קיבלו numbering_space
+            # "law" והתנגשו עם סעיפי גוף החוק. נמדד מול ה-DB:
+            #   לוח יד/טו/יח בחוק הביטוח הלאומי - 57 סעיפים, שהסתירו
+            #   את סעיפים 1-10 של גוף החוק;
+            #   "לוח השוואה" - 32 סעיפים ב-12 חוקים. זה בדיוק הפער
+            #   שתועד ב-node.find_sections כ"פער תיוג אמיתי ב-ingest".
+            numbering_space = (
+                "schedule" if anchor.startswith(("תוספת", "לוח")) else stack[-1][2])
             node = LegislativeNode(
                 id=_unique_child_id(parent_node, _slug(anchor, len(parent_node.children)), collisions),
                 node_type=node_type,

@@ -71,6 +71,7 @@ extract_revision_timestamp) - **לא** "מעודכן ליום X" (ראו ההב�
 הסעיף עצמו, כי הוא באמת שונה בין סעיפים.
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -177,6 +178,67 @@ def effective_as_of(root: LegislativeNode, target: LegislativeNode) -> str | Non
     raise ValueError("target אינו צומת בעץ שמשורשו root")
 
 
+# ── הסימון שוויקיטקסט עצמו נותן לסעיף כפול ──────────────────────────
+#
+# **דיוק במונחים (ברק, 23.9.2026):** הוראה שחלה ממועד קובע **אינה**
+# "נוסח שאינו בתוקף". היא נחקקה והיא בתוקף; רק תחולתה מתחילה במועד
+# מסוים. לכן אסור לסמן אותה כ"לא בתוקף" בשום מקום - לא בקוד, לא
+# בתיעוד ולא בממשק. המונח כאן הוא **"יחול החל מ-"**.
+#
+# הסימונים נמדדו על הקורפוס (23.9.2026) ולא הומצאו - אלה כל הצורות
+# שנצפו בפתיח של סעיף כפול:
+#   (החל מיום 26.1.2027) · (החל מהמועד הקובע) · (החל מיום תחילת
+#   כהונתה של הכנסת העשרים ושש) · (הוראת שעה עד יום 31.12.2026) ·
+#   (הוראת שעה מיום 20.3.2022 עד יום 31.12.2026) · (הנוסח הקבוע) ·
+#   (פקע) · (ספרור שגוי במקור) · (מספור כפול במקור)
+_DEFERRED_RE = re.compile(r"^\(\s*(?:החל מ|הוראת שעה)")
+_NUMBERING_ERROR_RE = re.compile(r"^\(\s*(?:ספרור שגוי|מספור כפול)")
+_EXPIRED_RE = re.compile(r"^\(\s*פקע")
+_PARENTHETICAL_RE = re.compile(r"^\((?P<note>[^)]{0,120})\)")
+
+SOURCE_NOTE_KINDS = ("deferred", "numbering_error", "expired")
+
+
+def section_source_note(section: LegislativeNode) -> tuple[str, str] | None:
+    """הסימון שהמקור נותן לסעיף, אם יש: `(kind, הטקסט כלשונו)`.
+
+    kind הוא אחד מ-`SOURCE_NOTE_KINDS`:
+    - `"deferred"` - הוראה שתחולתה מתחילה במועד קובע, או הוראת שעה.
+      **בתוקף**; רק החלתה מתחילה/מסתיימת במועד.
+    - `"numbering_error"` - ויקיטקסט מסמן שהמספור במקור שגוי.
+    - `"expired"` - הסעיף פקע.
+
+    הסימון יושב בפתיח של הצומת הראשון שמתחת לסעיף, בסוגריים. הטקסט
+    מוחזר **כלשונו מהמקור** - שום ניסוח משלנו, כדי שמה שיוצג למשתמש
+    יהיה מה שכתוב בחוק."""
+    first = next((c for c in section.children), None)
+    head = ((first.text if first is not None else "") or "").strip()
+    match = _PARENTHETICAL_RE.match(head)
+    if not match:
+        return None
+    if _DEFERRED_RE.match(head):
+        return "deferred", match.group("note").strip()
+    if _NUMBERING_ERROR_RE.match(head):
+        return "numbering_error", match.group("note").strip()
+    if _EXPIRED_RE.match(head):
+        return "expired", match.group("note").strip()
+    return None
+
+
+def _is_deferred(section: LegislativeNode) -> bool:
+    note = section_source_note(section)
+    return note is not None and note[0] == "deferred"
+
+
+def operative_section(nodes: list["LegislativeNode"]) -> "LegislativeNode":
+    """מתוך כמה צמתים שנושאים אותו מספר - זה שהוראת תיקון נכתבת עליו.
+
+    תיקון בהצעת חוק נעשה על גבי הנוסח שבתוקף עכשיו (ברק, 23.9.2026),
+    ולא על גבי ההוראה שתחולתה מתחילה במועד קובע. אם כולם מסומנים -
+    הראשון בסדר המסמך."""
+    return next((n for n in nodes if not _is_deferred(n)), nodes[0])
+
+
 def find_sections(root: LegislativeNode, *, numbering_space: str = "law") -> dict[str, "LegislativeNode"]:
     """אוספת את כל צמתי node_type=="section" בעץ, **בכל עומק** - לא רק
     ילדים ישירים של השורש. תוקן (2026-09-16, ברק: "42.3% מהקורפוס לא
@@ -209,7 +271,7 @@ def find_sections(root: LegislativeNode, *, numbering_space: str = "law") -> dic
     result: dict[str, LegislativeNode] = {}
 
     for number, nodes in find_sections_all(root, numbering_space=numbering_space).items():
-        result[number] = nodes[0]
+        result[number] = operative_section(nodes)
     return result
 
 
@@ -256,18 +318,65 @@ def find_sections_all(
 def duplicate_section_numbers(
     root: LegislativeNode, *, numbering_space: str = "law"
 ) -> dict[str, list["LegislativeNode"]]:
-    """רק המספרים שיש להם יותר מצומת אחד. `{}` בחוק תקין.
+    """מספרים שיש להם יותר מצומת אחד **ואי אפשר להכריע ביניהם**.
+    `{}` בחוק תקין.
+
+    **לא כל כפילות היא דו-משמעות.** כשהמקור מסמן איזה מהם חל ממועד
+    קובע, נשארת בדיוק הוראה מבצעית אחת - וזו כתובת חד-משמעית
+    לחלוטין. נמדד על הקורפוס (23.9.2026): מתוך 78 הכפילויות בגוף
+    החוק, **44 הן מהסוג הזה** (88 סעיפים ב-24 חוקים), והן אינן
+    חסומות. חסומות נשארות רק אלה שבהן אי אפשר להכריע:
+
+    | מה יש בקבוצה | חסום? |
+    |---|---|
+    | הוראה שתחולתה ממועד קובע / הוראת שעה, לצד נוסח מבצעי אחד | לא |
+    | `(ספרור שגוי במקור)` / `(מספור כפול במקור)` | כן - 4 |
+    | `(פקע)` | כן - 11 |
+    | שני נוסחים בלי שום סימון | כן - 19 |
 
     **הפער אינו ניתן לתיקון אוטומטי, ולכן הוא חייב להיות גלוי.**
-    "בסעיף 25 לחוק העיקרי" היא כתובת **דו-משמעית** בחוק שיש בו שני
-    סעיפים 25 - אי אפשר לנסח ממנה הוראת תיקון תקנית, ולא משנה באיזה
-    מהשניים המשתמש נגע. מי שקורא לכאן אמור לחסום מראש ולהסביר, לא
-    לבחור אחד מהם ולקוות."""
-    return {
-        number: nodes
-        for number, nodes in find_sections_all(root, numbering_space=numbering_space).items()
-        if len(nodes) > 1
-    }
+    "בסעיף 25 לחוק העיקרי" היא כתובת דו-משמעית בחוק שיש בו שני
+    סעיפים 25 שאין ביניהם הכרעה - אי אפשר לנסח ממנה הוראת תיקון
+    תקנית, ולא משנה באיזה מהם המשתמש נגע."""
+    result: dict[str, list[LegislativeNode]] = {}
+    for number, nodes in find_sections_all(
+            root, numbering_space=numbering_space).items():
+        if len(nodes) < 2:
+            continue
+        kinds = {note[0] for n in nodes if (note := section_source_note(n))}
+        if kinds & {"numbering_error", "expired"}:
+            result[number] = nodes
+            continue
+        operative = [n for n in nodes if not _is_deferred(n)]
+        if len(operative) == 1 and len(operative) < len(nodes):
+            continue  # הוראה מבצעית אחת + הוראות שתחולתן במועד קובע
+        result[number] = nodes
+    return result
+
+
+def deferred_sections(
+    root: LegislativeNode, *, numbering_space: str = "law"
+) -> dict[str, str]:
+    """`{node_id: הסימון כלשונו מהמקור}` לכל סעיף שתחולתו מתחילה
+    במועד קובע או שהוא הוראת שעה - אבל **רק** כשיש לו נוסח מבצעי
+    לצידו באותו מספר.
+
+    אלה הסעיפים שמוצגים לקריאה בלבד לצד הנוסח שניתן לעריכה. הם
+    בתוקף; מה שמוצג לצידם הוא מועד התחולה, לא "לא בתוקף"."""
+    out: dict[str, str] = {}
+    for nodes in find_sections_all(root, numbering_space=numbering_space).values():
+        if len(nodes) < 2:
+            continue
+        kinds = {note[0] for n in nodes if (note := section_source_note(n))}
+        if kinds & {"numbering_error", "expired"}:
+            continue
+        operative = [n for n in nodes if not _is_deferred(n)]
+        if len(operative) != 1:
+            continue
+        for node in nodes:
+            if (note := section_source_note(node)) and note[0] == "deferred":
+                out[node.id] = note[1]
+    return out
 
 
 def find_parent(root: LegislativeNode, node_id: str) -> "LegislativeNode | None":

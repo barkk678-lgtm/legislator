@@ -8,7 +8,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 from node import (  # noqa: E402
-    LegislativeNode, duplicate_section_numbers, effective_as_of, find_sections)
+    LegislativeNode, deferred_sections, duplicate_section_numbers,
+    effective_as_of, find_sections)
 from dates import display_date  # noqa: E402
 
 TYPE_HE = {
@@ -24,7 +25,8 @@ TYPE_HE = {
 }
 
 
-def node_view(node: LegislativeNode, _ambiguous: frozenset[str] | None = None) -> dict:
+def node_view(node: LegislativeNode, _ambiguous: frozenset[str] | None = None,
+              _deferred: dict[str, str] | None = None) -> dict:
     """ראו TASKS.md משימה 10ב: צמתים עם is_normative=False מוסתרים
     לגמרי מהעץ שנשלח ללקוח (לא רק ב-CSS בצד הלקוח) - אין להם שום
     ייצוג בתגובה, לא רק "אינם מוצגים". השורש עצמו (is_normative=False
@@ -35,6 +37,9 @@ def node_view(node: LegislativeNode, _ambiguous: frozenset[str] | None = None) -
     עם השורש בלבד."""
     if _ambiguous is None:
         _ambiguous = frozenset(duplicate_section_numbers(node))
+    if _deferred is None:
+        _deferred = deferred_sections(node)
+    deferred_note = _deferred.get(node.id, "")
     return {
         "id": node.id,
         "node_type": node.node_type,
@@ -66,11 +71,18 @@ def node_view(node: LegislativeNode, _ambiguous: frozenset[str] | None = None) -
             node.node_type == "raw_block"
             or (node.node_type == "section" and not node.number)
             or (node.node_type == "section" and node.number in _ambiguous)
+            or bool(deferred_note)
         ),
         "ambiguous_number": (
             node.node_type == "section" and node.number in _ambiguous
         ),
-        "children": [node_view(c, _ambiguous) for c in node.children if c.is_normative],
+        # **הוראה שתחולתה מתחילה במועד קובע** - הסימון כלשונו מהמקור
+        # ("החל מיום 26.1.2027", "הוראת שעה עד יום 31.12.2026"). היא
+        # **בתוקף**; מה שמוצג הוא מועד התחולה, ולעולם לא "לא בתוקף".
+        # מוצגת לצד הנוסח שניתן לעריכה, לקריאה בלבד.
+        "deferred_note": deferred_note,
+        "children": [node_view(c, _ambiguous, _deferred)
+                     for c in node.children if c.is_normative],
     }
 
 

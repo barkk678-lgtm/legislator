@@ -364,7 +364,15 @@ function renderNode(node, depth) {
       wrapper.classList.add("not-editable");
       const badge = document.createElement("span");
       badge.className = "not-editable-badge";
-      if (node.ambiguous_number) {
+      if (node.deferred_note) {
+        // **ההוראה הזו בתוקף** - רק תחולתה מתחילה במועד הנקוב.
+        // לכן התווית היא מועד התחולה, ולעולם לא "לא בתוקף".
+        badge.textContent = node.deferred_note;
+        badge.title = `ההוראה הזו נחקקה והיא בתוקף; תחולתה — ${node.deferred_note}. ` +
+          "הנוסח שבתוקף עכשיו מוצג לצידה וניתן לעריכה. תיקון בהצעת " +
+          "חוק נכתב על גבי הנוסח שבתוקף עכשיו, ולכן ההוראה הזו מוצגת " +
+          "לקריאה בלבד.";
+      } else if (node.ambiguous_number) {
         badge.textContent = "מספר כפול";
         badge.title = `בחוק הזה יש יותר מסעיף אחד שמספרו ${node.number}. ` +
           `הוראת תיקון נוסחה "בסעיף ${node.number} לחוק העיקרי", ` +
