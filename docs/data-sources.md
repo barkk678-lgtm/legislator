@@ -221,6 +221,30 @@ manual_law_ids.py`, 4 חוקים בלי שום מספר כנסתי - ראו שם
 
 למראי מקום ולתיקונים שטרם שולבו בוויקיטקסט.
 
+## 3א · הדאטהבייס שלנו — שני ערוצי גישה
+
+| | הערוץ | למה |
+|---|---|---|
+| **קריאה / חקירה** | `tools/sql.py` → `public.readonly_query` (REST + service_role) | אותו ערוץ שדרכו נטענו 1,092 החוקים. בלי שער אישורים |
+| **כתיבה** | REST/PostgREST ישיר (`tools/load_corpus_to_supabase_rest.py`, `rpc/replace_law_version_delete`) | ראו §מנגנון ההחלפה |
+| **שינוי מבנה** | `mcp apply_migration` / `execute_sql` | דורש אישור — **בכוונה** |
+
+`readonly_query` מעבירה את הטרנזקציה ל-`transaction_read_only`,
+ולכן כל כתיבה נכשלת ב-25006 **מהמנוע**, לא מבדיקת מחרוזת. היא
+אינה SECURITY DEFINER, ו-EXECUTE עליה ניתן ל-`service_role` בלבד
+(הוסר מ-PUBLIC/anon/authenticated — היא חשופה דרך PostgREST).
+
+**תקרת זמן 8 שניות**, מ-`authenticator` ונאכפת בפלטפורמה; אי אפשר
+להנמיך אותה מתוך הפונקציה. צבירה על כל 54,879 הסעיפים עלולה
+להיקטע — ניסוח צר יותר בדרך כלל פותר.
+
+- המיגרציה: `supabase/migrations/20260923080000_readonly_query_rpc.sql`
+- הבקרות השליליות: `tests/live/test_readonly_query.py` (להריץ אחרי
+  כל שינוי בפונקציה)
+- הכלל המלא: `CLAUDE.md` → "שאילתות על הדאטהבייס"
+
+---
+
 ## 4 · שווה לבדוק
 
 האם נבו מוכרים רישיון API. עדיף לשלם מלגרד, ואולי יש שם שותפות.
