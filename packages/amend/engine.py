@@ -32,7 +32,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
-from node import LegislativeNode, effective_as_of, find_parent, find_sections  # noqa: E402
+from node import (  # noqa: E402
+    LegislativeNode, duplicate_section_numbers, effective_as_of, find_parent,
+    find_sections)
 from numbering import sort_section_numbers  # noqa: E402
 from render_bill import Line  # noqa: E402
 from transform import Annotation, FootnoteAnnotation, ReplacementAnnotation  # noqa: E402
@@ -782,6 +784,38 @@ def _stamp_provenance(line: Line, source: LegislativeNode, before_root: Legislat
     return line
 
 
+def _raise_on_ambiguous_number(
+    before: LegislativeNode, after: LegislativeNode
+) -> None:
+    """חוסמת עריכה של סעיף שמספרו אינו ייחודי בחוק. ראו
+    node.duplicate_section_numbers - הכפילות היא עובדה על המקור
+    (נוסח עתידי, הוראת שעה, או טעות מספור שוויקיטקסט עצמו מסמן),
+    ולא משהו שאנחנו יכולים להכריע בו."""
+    duplicates = duplicate_section_numbers(before)
+    if not duplicates:
+        return
+    after_duplicates = duplicate_section_numbers(after)
+    for number, nodes in duplicates.items():
+        after_nodes = after_duplicates.get(number, [])
+        if len(after_nodes) != len(nodes) or any(
+            _serialize_for_compare(b) != _serialize_for_compare(a)
+            for b, a in zip(nodes, after_nodes)
+        ):
+            raise NotImplementedError(
+                f"בחוק יש יותר מסעיף אחד שמספרו {number}, ולכן אי אפשר "
+                f"לנסח הוראת תיקון שמזהה אותו באופן חד-משמעי "
+                f"(\"בסעיף {number} לחוק העיקרי\" היה מפנה לשניהם). "
+                "זו עובדה על נוסח החוק במקור - לרוב נוסח עתידי, הוראת "
+                "שעה, או טעות מספור - ולא ניתן להכריע בה אוטומטית."
+            )
+
+
+def _serialize_for_compare(node: LegislativeNode) -> str:
+    """ייצוג שטוח של צומת וצאצאיו, לזיהוי "האם השתנה" בלבד."""
+    return "\u241f".join(
+        [node.text or ""] + [_serialize_for_compare(c) for c in node.children])
+
+
 def amend(
     before: LegislativeNode,
     after: LegislativeNode,
@@ -813,6 +847,15 @@ def amend(
     # עם מבנה חלק/פרק/סימן פשוט לא היה "נראה" כאן בכלל.
     before_sections = find_sections(before)
     after_sections = find_sections(after)
+
+    # **מספר סעיף כפול = כתובת דו-משמעית, ולכן חסימה מפורשת.**
+    # "בסעיף 25 לחוק העיקרי" אינה מזהה סעיף יחיד בחוק שיש בו שני
+    # סעיפים 25, ואין בחוברת הסגולה צורת ניסוח שמבחינה ביניהם.
+    # עד 23.9.2026 המצב היה גרוע מכך: `find_sections` שמרה רק את
+    # האחרון, כלומר המשתמש שערך את הסעיף שבתוקף קיבל **אפס הוראות
+    # תיקון, בלי שום הודעה**. עכשיו זו שגיאה מפורשת, ורק כשהסעיף
+    # הכפול הוא זה שהשתנה - כפילות במקום אחר בחוק אינה חוסמת עריכה.
+    _raise_on_ambiguous_number(before, after)
 
     # תוקן (פער, לא רק דפוס לא ממומש - ראו drafting-rules.md §8.5): עד
     # כאן הלולאה עברה רק על before_sections.keys(), כך שסעיף ראשי חדש

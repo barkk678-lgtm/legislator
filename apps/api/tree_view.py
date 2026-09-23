@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
-from node import LegislativeNode, effective_as_of, find_sections  # noqa: E402
+from node import (  # noqa: E402
+    LegislativeNode, duplicate_section_numbers, effective_as_of, find_sections)
 from dates import display_date  # noqa: E402
 
 TYPE_HE = {
@@ -23,11 +24,17 @@ TYPE_HE = {
 }
 
 
-def node_view(node: LegislativeNode) -> dict:
+def node_view(node: LegislativeNode, _ambiguous: frozenset[str] | None = None) -> dict:
     """ראו TASKS.md משימה 10ב: צמתים עם is_normative=False מוסתרים
     לגמרי מהעץ שנשלח ללקוח (לא רק ב-CSS בצד הלקוח) - אין להם שום
     ייצוג בתגובה, לא רק "אינם מוצגים". השורש עצמו (is_normative=False
-    בעצמו, מטא-דאטה של החוק) עדיין מיוצג - הסינון חל רק על ילדים."""
+    בעצמו, מטא-דאטה של החוק) עדיין מיוצג - הסינון חל רק על ילדים.
+
+    `_ambiguous` נגזר פעם אחת מהשורש ומועבר הלאה ברקורסיה - מספרי
+    הסעיפים שמופיעים יותר מפעם אחת בחוק. פנימי; קוראים ל-node_view
+    עם השורש בלבד."""
+    if _ambiguous is None:
+        _ambiguous = frozenset(duplicate_section_numbers(node))
     return {
         "id": node.id,
         "node_type": node.node_type,
@@ -49,11 +56,21 @@ def node_view(node: LegislativeNode) -> dict:
         # אחר - כלומר המשתמש לוחץ, עורך, ומקבל שגיאה רק בסוף.
         # **אותו כלל בדיוק כמו סעיף בלי מספר:** מה שאי אפשר לערוך
         # חייב להיראות אחרת מראש. 397 בלוקים ב-119 חוקים.
+        # **מספר סעיף כפול - אותו כלל בדיוק** (23.9.2026): כשיש בחוק
+        # שני סעיפים 25, "בסעיף 25 לחוק העיקרי" אינה כתובת חד-משמעית
+        # ו-`amend()` חוסמת. 96 צמתים ב-38 חוקים. עד לתיקון הזה
+        # `find_sections` שמרה רק את האחרון, והמשתמש שערך את הסעיף
+        # שבתוקף קיבל אפס הוראות תיקון בלי שום הודעה. **שני העותקים**
+        # מסומנים, לא רק זה שנדרס: הבעיה היא הכתובת, לא הצומת.
         "editable": not (
             node.node_type == "raw_block"
             or (node.node_type == "section" and not node.number)
+            or (node.node_type == "section" and node.number in _ambiguous)
         ),
-        "children": [node_view(c) for c in node.children if c.is_normative],
+        "ambiguous_number": (
+            node.node_type == "section" and node.number in _ambiguous
+        ),
+        "children": [node_view(c, _ambiguous) for c in node.children if c.is_normative],
     }
 
 

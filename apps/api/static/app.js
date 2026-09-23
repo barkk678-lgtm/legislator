@@ -354,14 +354,32 @@ function renderNode(node, depth) {
       header.appendChild(noteBadge);
     }
 
-    const notEditable = node.node_type === "section" && node.editable === false;
+    // **לכל סיבת-חסימה ההסבר שלה.** עד 23.9.2026 ההסבר היה תמיד
+    // "אין מספר במקור" - גם על סעיף שנחסם מסיבה אחרת לגמרי, כלומר
+    // המשתמש קיבל הסבר שגוי בביטחון מלא.
+    const notEditable =
+      (node.node_type === "section" || node.node_type === "raw_block") &&
+      node.editable === false;
     if (notEditable) {
       wrapper.classList.add("not-editable");
       const badge = document.createElement("span");
       badge.className = "not-editable-badge";
-      badge.textContent = "לא ניתן לעריכה";
-      badge.title = "לסעיף הזה אין מספר במקור, ולכן המערכת אינה יכולה " +
-        "לנסח עליו הוראת תיקון. הנוסח מוצג לקריאה בלבד.";
+      if (node.ambiguous_number) {
+        badge.textContent = "מספר כפול";
+        badge.title = `בחוק הזה יש יותר מסעיף אחד שמספרו ${node.number}. ` +
+          `הוראת תיקון נוסחה "בסעיף ${node.number} לחוק העיקרי", ` +
+          "והיא הייתה מפנה לשניהם — ולכן אי אפשר לנסח אותה. זו עובדה " +
+          "על נוסח החוק במקור (לרוב נוסח עתידי, הוראת שעה או טעות " +
+          "מספור), לא תקלה. הנוסח מוצג לקריאה בלבד.";
+      } else if (node.node_type === "raw_block") {
+        badge.textContent = "טבלה גולמית";
+        badge.title = "הבלוק הזה נשמר כפי שהוא מהמקור (טבלה או מילון " +
+          "מונחים) ואין תקדים לניסוח הוראת תיקון עליו. מוצג לקריאה בלבד.";
+      } else {
+        badge.textContent = "לא ניתן לעריכה";
+        badge.title = "לסעיף הזה אין מספר במקור, ולכן המערכת אינה יכולה " +
+          "לנסח עליו הוראת תיקון. הנוסח מוצג לקריאה בלבד.";
+      }
       header.appendChild(badge);
     }
 

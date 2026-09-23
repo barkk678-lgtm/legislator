@@ -200,8 +200,43 @@ def find_sections(root: LegislativeNode, *, numbering_space: str = "law") -> dic
     זה קרס את /render (ValueError לא-מטופל) על כל חוק עם לוח השוואה -
     נתפס רק בבדיקה אמיתית בדפדפן על חוק העונשין, לא בטסטים. תוכן כזה
     מדולג בשקט (לא חלק מהמספור הרגיל, בדיוק כמו הכוונה המקורית של
-    numbering_space) - לא זורק, כי זו עובדה ידועה על מקור, לא קלט פגום."""
+    numbering_space) - לא זורק, כי זו עובדה ידועה על מקור, לא קלט פגום.
+
+    **כשאותו מספר מופיע יותר מפעם אחת מוחזר הראשון בסדר המסמך** -
+    הנוסח שבתוקף - ולא האחרון, כפי שהיה עד 23.9.2026. ההנמקה המלאה,
+    עם המדידה, ב-`find_sections_all`; מי שצריך לדעת שיש כפילות קורא
+    ל-`duplicate_section_numbers` ולא מסיק זאת מכאן."""
     result: dict[str, LegislativeNode] = {}
+
+    for number, nodes in find_sections_all(root, numbering_space=numbering_space).items():
+        result[number] = nodes[0]
+    return result
+
+
+def find_sections_all(
+    root: LegislativeNode, *, numbering_space: str = "law"
+) -> dict[str, list["LegislativeNode"]]:
+    """כמו `find_sections`, אבל **בלי לאבד אף צומת**: לכל מספר סעיף
+    מוחזרת רשימת כל הצמתים שנושאים אותו, בסדר הופעתם במסמך.
+
+    **למה זה קיים** (ברק, 23.9.2026 - הפער החמור ביותר שנמדד):
+    `find_sections` מחזירה `dict[number, node]`, ולכן מתוך כל קבוצת
+    סעיפים בעלי אותו מספר רק אחד שורד - והשאר נעלמים בלי שום חיווי.
+    **96 צמתים ב-38 חוקים** נדרסו כך.
+
+    ומה שחמור יותר מהאובדן עצמו: עד לתיקון הזה הצומת ששרד היה
+    **האחרון** בסדר המסמך, כי הלולאה פשוט דרסה. נמדד על הקורפוס
+    שהעותק השני הוא כמעט תמיד **לא** הנוסח שבתוקף: מתוך 78 הכפילויות
+    בגוף החוק, 45 מהן הצומת השני נפתח בסימון של נוסח עתידי או זמני
+    ("(החל מהמועד הקובע)", "(הוראת שעה עד יום 31.12.2026)"), ושניים
+    נוספים מסומנים בוויקיטקסט עצמו כטעות ("(ספרור שגוי במקור)",
+    "(מספור כפול במקור)"). כלומר המשתמש שערך את סעיף 25 שבתוקף קיבל
+    **אפס הוראות תיקון, בשקט**, כי המנוע השווה נוסח אחר לגמרי.
+
+    לכן `find_sections` מחזירה מעכשיו את **הראשון** בסדר המסמך - הנוסח
+    שבתוקף - ומי שצריך לדעת שיש יותר מאחד קורא לכאן או ל-
+    `duplicate_section_numbers`."""
+    result: dict[str, list[LegislativeNode]] = {}
 
     def _walk(node: LegislativeNode) -> None:
         if node.node_type == "section" and node.numbering_space == numbering_space:
@@ -210,12 +245,29 @@ def find_sections(root: LegislativeNode, *, numbering_space: str = "law") -> dic
             except ValueError:
                 pass  # ראו התיעוד למעלה - "לוח השוואה" וכדומה, לא מספור-סעיף רגיל
             else:
-                result[node.number] = node
+                result.setdefault(node.number, []).append(node)
         for child in node.children:
             _walk(child)
 
     _walk(root)
     return result
+
+
+def duplicate_section_numbers(
+    root: LegislativeNode, *, numbering_space: str = "law"
+) -> dict[str, list["LegislativeNode"]]:
+    """רק המספרים שיש להם יותר מצומת אחד. `{}` בחוק תקין.
+
+    **הפער אינו ניתן לתיקון אוטומטי, ולכן הוא חייב להיות גלוי.**
+    "בסעיף 25 לחוק העיקרי" היא כתובת **דו-משמעית** בחוק שיש בו שני
+    סעיפים 25 - אי אפשר לנסח ממנה הוראת תיקון תקנית, ולא משנה באיזה
+    מהשניים המשתמש נגע. מי שקורא לכאן אמור לחסום מראש ולהסביר, לא
+    לבחור אחד מהם ולקוות."""
+    return {
+        number: nodes
+        for number, nodes in find_sections_all(root, numbering_space=numbering_space).items()
+        if len(nodes) > 1
+    }
 
 
 def find_parent(root: LegislativeNode, node_id: str) -> "LegislativeNode | None":
