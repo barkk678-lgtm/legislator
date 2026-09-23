@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps" / "api"))
 
 from node import LegislativeNode  # noqa: E402
 from engine import amend  # noqa: E402
@@ -57,6 +58,18 @@ def main():
     after_same = _law_with_raw_block(html_before)
     lines = amend(before_same, after_same, [], law_footnote_key="fake")
     checks.append(("raw_block זהה (בלי שינוי) -> לא זורק, אין הוראות", lines == []))
+
+    # **וגם בעץ שנשלח ללקוח, לא רק במנוע.** עד 23.9.2026 raw_block
+    # חזר עם editable=true: המשתמש לחץ, ערך, וקיבל שגיאה רק בסוף -
+    # בדיוק הכישלון השקט שבגללו סעיף בלי מספר סומן בזמנו.
+    from tree_view import node_view  # noqa: PLC0415
+
+    view = node_view(_law_with_raw_block(html_before))
+    section_view = view["children"][0]
+    checks.append(("raw_block מסומן editable=false בעץ",
+                   section_view["children"][0]["editable"] is False))
+    checks.append(("הסעיף שמכיל אותו עדיין ניתן לעריכה",
+                   section_view["editable"] is True))
 
     ok = all(passed for _, passed in checks)
     for name, passed in checks:

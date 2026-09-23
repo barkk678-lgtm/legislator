@@ -43,7 +43,16 @@ def node_view(node: LegislativeNode) -> dict:
         # find_sections, ולכן amend() לא יראה אותו: 429 סעיפים
         # בקורפוס, מהם 111 בפקודת מס הכנסה לבדה. ראו
         # docs/night-report.md 18.9 לאבחון המלא (הסיבה: {{ח:סעיף*}}).
-        "editable": not (node.node_type == "section" and not node.number),
+        # raw_block נוסף לכאן 23.9.2026: `amend()` זורקת עליו
+        # NotImplementedError מפורש (ראו engine.py והבדיקה
+        # test_raw_block_not_editable), אבל בעץ הוא נראה ככל צומת
+        # אחר - כלומר המשתמש לוחץ, עורך, ומקבל שגיאה רק בסוף.
+        # **אותו כלל בדיוק כמו סעיף בלי מספר:** מה שאי אפשר לערוך
+        # חייב להיראות אחרת מראש. 397 בלוקים ב-119 חוקים.
+        "editable": not (
+            node.node_type == "raw_block"
+            or (node.node_type == "section" and not node.number)
+        ),
         "children": [node_view(c) for c in node.children if c.is_normative],
     }
 
