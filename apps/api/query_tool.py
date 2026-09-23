@@ -155,12 +155,44 @@ def _strip_addressee(body: str) -> tuple[str, str]:
 
 # סוגי המקורות שברק מנה. כל אחד מהם, אם הוא מופיע ברקע, חייב
 # להופיע גם בדברי המשתמש.
+_REWRITE_WITHOUT = (
+    "בפסקת הרקע הופיעו פרטים שלא אמרתי: {items}. נסח מחדש את "
+    "השאילתה בלי אף אחד מהם. אל תחליף אותם בפרט אחר ואל תוסיף מקור - "
+    "פשוט תאר את מה שאמרתי, ואם אין לי מקור, הרקע יהיה כללי ובלי מקור. "
+    "החזר שוב בפורמט המלא (נושא:/גוף:)."
+)
+
+
+# ── השומר: פרט חדש מול ניסוח מחדש ──────────────────────────────────
+#
+# **הכלל (ברק, 23.9.2026): המודל מנסח את מה שהמשתמש אמר ולא מוסיף
+# עליו.** "בתכנית 'עובדה' שודרה כתבה שבה עלה כי..." הוא ניסוח של
+# דברי המשתמש, לא המצאה - וזה בדיוק מה שהכלי אמור לעשות.
+#
+# לכן השומר תופס **פרט חדש** בלבד: מקור, גוף, מספר או תאריך שלא
+# הוזכרו. הוא **אינו** תופס מילים שמתארות איך משהו נעשה פומבי -
+# "פורסם", "שודר", "דווח", "הוצג" - כשהמשתמש כבר אמר שהייתה כתבה.
+#
+# נמדד לפני התיקון: על הקלט "בתכנית 'עובדה' הייתה כתבה על..." הרקע
+# "על-פי **פרסום** בתכנית 'עובדה'" נחסם על המילה "פרסום". הרשימה גם
+# לא הייתה עקבית עם עצמה: "פורסם" נתפס אבל "פורסמה" לא, כי המחרוזת
+# שנבדקה הייתה "פרסמ".
+
+# מילים שמתארות **אופן פרסום**, לא מקור מסוים. לעולם אינן פרט חדש.
+# נשמרות כאן כתיעוד של מה שהוסר במכוון, כדי שלא יוחזרו בטעות.
+_PUBLICATION_VERBS = (
+    "פורסם", "פורסמה", "פרסום", "פרסמ",
+    "שודר", "שודרה", "שידור",
+    "דווח", "דיווח", "הוצג", "הוצגה", "נחשף", "נחשפה",
+)
+
+# מקורות וגופים **מסוימים**. אזכור כזה שלא הופיע בדברי המשתמש הוא
+# פרט חדש לכל דבר - גם אם המשתמש כן הזכיר מקור אחר. דוח של מבקר
+# המדינה אינו ניסוח מחדש של "הייתה כתבה"; הוא טענה אחרת.
 _SOURCE_MARKERS = (
     "ועד",        # ועדה, ועדת, בוועדת
     "דיון",
     "דוח", "דו\"ח", "דו״ח",
-    "כתבה", "כתבת",
-    "פרסום", "פורסם", "פרסמ",
     "מחקר",
     "סקר",
     "מבקר המדינה",
@@ -187,21 +219,28 @@ def _normalize_for_support(text: str) -> str:
     return " " + " ".join(words) + " "
 
 
-def unsupported_source_claims(background: str, user_text: str) -> list[str]:
-    """אזכורי מקור ברקע שאין להם זכר בדברי המשתמש.
+def _normalize_number(value: str) -> str:
+    """"3,000" ו-"3000" הם אותו מספר. בלי זה המשתמש שכתב 3000 היה
+    נחסם על 3,000 שהמודל ניסח."""
+    return value.replace(",", "").rstrip(".")
 
-    מחזירה רשימה של מה שנמצא - ריקה כשהכול נתמך. **פונקציה
-    טהורה**, בלי רשת ובלי מודל, כדי שאפשר יהיה לבדוק אותה."""
+
+def unsupported_source_claims(background: str, user_text: str) -> list[str]:
+    """פרטים ברקע שאין להם זכר בדברי המשתמש - מקור מסוים, גוף או
+    מספר. מחזירה רשימה של מה שנמצא, וריקה כשהכול נתמך.
+
+    **פונקציה טהורה**, בלי רשת ובלי מודל, כדי שאפשר יהיה לבדוק
+    אותה. ראו ההערה למעלה על מה שהיא במכוון **אינה** תופסת."""
     haystack = _normalize_for_support(user_text)
     found: list[str] = []
     for marker in _SOURCE_MARKERS:
         if marker in (background or "") and marker not in haystack:
             found.append(marker)
-    # מספר שהומצא הוא מקור מומצא לכל דבר ("על-פי נתוני 2024",
+    # מספר שהומצא הוא פרט חדש לכל דבר ("על-פי נתוני 2024",
     # "ב-30% מהמקרים") - אלא אם המשתמש נקב בו בעצמו.
-    user_numbers = set(_NUMBER_RE.findall(user_text or ""))
+    user_numbers = {_normalize_number(n) for n in _NUMBER_RE.findall(user_text or "")}
     for number in _NUMBER_RE.findall(background or ""):
-        if number not in user_numbers:
+        if _normalize_number(number) not in user_numbers:
             found.append(number)
     return sorted(set(found))
 
@@ -265,13 +304,35 @@ def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: s
                           if t.get("role") == "user")
     invented = unsupported_source_claims(background, user_text)
     if invented:
-        raise QueryDraftError(
-            "לא ניתן לנסח שאילתה: הניסוח הסתמך על מקור או נתון שלא "
-            f"מופיעים בדבריכם ({', '.join(invented)}). שאילתה מוגשת "
-            "בשם חבר כנסת, ולכן הרקע שבה חייב להישען על מה שמסרתם. "
-            "הוסיפו את המקור (פרסום, דיון, דוח, נתון) ונסו שוב, או "
-            "בקשו ניסוח כללי בלי מקור."
-        )
+        # **קודם מנסים לנסח מחדש בלי הפרט, ורק אז חוסמים** (ברק,
+        # 23.9.2026). חסימה היא המוצא האחרון: המשתמש מסר מידע תקין,
+        # והמודל הוא שהוסיף עליו - אין סיבה שהוא ישלם על זה.
+        retry_turns = list(turns) + [
+            {"role": "assistant", "content": raw},
+            {"role": "user", "content": _REWRITE_WITHOUT.format(
+                items=", ".join(invented))},
+        ]
+        try:
+            raw = draft_conversation(
+                instructions=_instructions(kind), turns=retry_turns, max_tokens=400)
+        except (LLMConfigError, LLMRequestError, ValueError):
+            raw = ""
+        subject_match = re.search(rf"{re.escape(_SUBJECT_MARK)}\s*(.+)", raw)
+        body_match = re.search(rf"{re.escape(_BODY_MARK)}\s*(.+)", raw, re.DOTALL)
+        if subject_match and body_match:
+            subject = subject_match.group(1).strip()
+            body, removed_addressee = _strip_addressee(body_match.group(1).strip())
+            body = "\n".join(ln.strip() for ln in body.split("\n") if ln.strip())
+            background = body.split(_RETSONI)[0]
+            invented = unsupported_source_claims(background, user_text)
+        if invented:
+            raise QueryDraftError(
+                "לא ניתן לנסח שאילתה: הניסוח כלל פרט שלא הופיע בדבריכם - "
+                f"{', '.join(invented)}. ניסיתי לנסח מחדש בלעדיו וזה חזר. "
+                "שאילתה מוגשת בשם חבר כנסת, ולכן כל פרט ברקע חייב להגיע "
+                "ממה שמסרתם. אפשר להזכיר את הפרט הזה במפורש, או לבקש "
+                "ניסוח כללי בלי מקור."
+            )
 
     limit = _WORD_LIMITS[kind]
     wc = _word_count(body)
