@@ -15,7 +15,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "documents"))
+sys.path.insert(0, str(ROOT / "packages" / "validate"))
 
+from validator import DRAFT_CHECKS  # noqa: E402
 from critique import (  # noqa: E402
     _explanation_is_anchored,
     _parse_explanations,
@@ -53,7 +55,11 @@ def main():
     result = critique_bill(clean, draft_fn=counting_draft)
     check("הצעה בלי ליקויים -> אין ממצאים", not result.items)
     check("הצעה בלי ליקויים -> אפס קריאות ל-LLM", not calls)
-    check("הבדיקות שעברו מדווחות", len(result.passed) == 5)
+    # **נגזר ולא קבוע.** המספר היה 5 ונשבר כשבדיקות 4 ו-7 חזרו
+    # לפעול (23.9.2026). בדיקה שנועלת מספר קסם מדווחת על שינוי
+    # מכוון כאילו הוא רגרסיה.
+    check(f"הבדיקות שעברו מדווחות ({len(result.passed)})",
+          len(result.passed) == len(DRAFT_CHECKS))
 
     # 2. הצעה עם ליקוי אמיתי: הממצא נמצא בקוד, לפני כל מודל.
     result = critique_bill(dirty, draft_fn=lambda **kw: "[]")

@@ -58,6 +58,15 @@ _BODY_AMEND = re.compile(
     r"^\s*(?:ב|ל)(?:חוק|פקודת|פקודה|חוק־יסוד|חוק-יסוד)\b"
     r"|^\s*בסעיף\s+\S+\s+ל(?:חוק|פקודת)\b"
 )
+# **"בחוק זה" אינו הוראת תיקון - הוא סעיף ההגדרות של החוק עצמו.**
+# נמדד (23.9.2026): הביטוי הזה לבדו סיווג ארבע הצעות לחוק חדש
+# ("חופש הנחת תפילין", "הזכות לתקן", "אספקת החשמל", "הרשות הארצית
+# למדידה") כהצעות מתקנות. הפניה עצמית היא ההפך הגמור מהפניה לחוק
+# אחר, וזו ההבחנה המבנית - לא רשימת מילים.
+_SELF_REFERENCE = re.compile(r"^\s*(?:ב|ל)(?:חוק|פקודה)\s+(?:זה|זו)\b")
+
+# סעיפי סיום אינם מעידים על סוג ההצעה - הם מופיעים בשני הסוגים.
+_CLOSING = re.compile(r"^\s*(?:תחילתו|תחילתה|תחילת|תחולה|הוראת מעבר|ביצוע ותקנות)\b")
 
 Kind = str  # "amending" | "new" | "unknown"
 
@@ -76,15 +85,18 @@ def kind_from_body(section_openings: list[str]) -> Kind:
     """מפתיחות הסעיפים ברמה העליונה. מחזיר unknown כשאין סעיפים
     בכלל - אין על מה לבסס, וזה לא "חוק חדש"."""
     openings = [s for s in (o.strip() for o in section_openings) if s]
+    openings = [o for o in openings if not _CLOSING.search(o)]
     if not openings:
         return "unknown"
-    amending = sum(1 for o in openings if _BODY_AMEND.search(o))
+    amending = sum(1 for o in openings
+                   if _BODY_AMEND.search(o) and not _SELF_REFERENCE.search(o))
     if amending == 0:
         return "new"
-    # **די בהוראת תיקון אחת.** הצעה מתקנת מכילה כמעט תמיד גם סעיפי
-    # תחילה/תחולה שאינם נפתחים כך, ולכן דרישת רוב הייתה מסווגת
-    # הצעות מתקנות קצרות כחוק חדש.
-    return "amending"
+    # **רוב, ולא הוראה אחת.** נמדד (23.9.2026) שהצעה לחוק חדש מכילה
+    # לעתים קרובות תיקון עקיף אחד בסופה ("בחוק הכשרות המשפטית...,
+    # בתוספת, בסופה") - ולכן "די באחת" סיווג חוקים חדשים כמתקנים.
+    # בהצעה מתקנת אמיתית, הוראות התיקון הן רוב הסעיפים המהותיים.
+    return "amending" if amending * 2 >= len(openings) else "new"
 
 
 def classify(title: str, section_openings: list[str]) -> tuple[Kind, str]:
