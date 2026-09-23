@@ -20,6 +20,8 @@ endpoint.
 import argparse
 import io
 import json
+import os
+import re
 import sys
 import time
 import urllib.error
@@ -33,8 +35,20 @@ TIMEOUT = 120
 
 
 class Result:
+    """**שתי רשימות, לא אחת** (ברק, 23.9.2026).
+
+    `failures` הוא כשל של המוצר - משהו שאנחנו כתבנו לא עובד.
+    `unavailable` הוא תלות חיצונית שלא הייתה זמינה, ובראשה מגבלת
+    הקצב של הפיד (HTTP 473). ההבחנה אינה קוסמטית: כשכשל חיצוני
+    שולח את אותו מייל כמו כשל מוצר, המייל כולו הופך לרעש ומפסיקים
+    לקרוא אותו - וזה בדיוק מה שקרה כאן.
+
+    תלות חיצונית שנפלה אינה "עבר" ואינה "נכשל" - היא **"לא נבדק"**,
+    עם הסיבה. אותו עיקרון של הוולידטור."""
+
     def __init__(self):
         self.failures: list[str] = []
+        self.unavailable: list[str] = []
         self.count = 0
 
     def check(self, name: str, ok: bool, detail: str = "") -> bool:
@@ -46,14 +60,34 @@ class Result:
             self.failures.append(f"{name}: {detail}" if detail else name)
         return ok
 
+    def not_checked(self, name: str, detail: str = "") -> None:
+        """תלות חיצונית לא הייתה זמינה. לא נספר כבדיקה שעברה."""
+        print(f"  לא נבדק  {name}" + (f" — {detail}" if detail else ""))
+        self.unavailable.append(f"{name}: {detail}" if detail else name)
+
 
 # **ניסיון חוזר אחד, ורק על תקלה חולפת מוכרת - ומדווח.**
 # הפיד של הכנסת הוא תלות חיצונית אמיתית שכבר החזירה 429 ו-473
 # בעבר, ו-422 חד-פעמי ממנו אינו "האתר שבור". אבל ניסיון חוזר
 # שקט הוא בדיוק הדרך להסתיר תקלה אמיתית, ולכן הוא מודפס: ריצה
 # שעברה אחרי ניסיון חוזר **אינה** נראית כמו ריצה נקייה.
-_RETRYABLE = {408, 422, 429, 502, 503, 504}
+_RETRYABLE = {408, 422, 429, 473, 502, 503, 504}
+
+# **סטטוסים שאומרים "המקור העליון לא זמין", לא "המוצר שבור".**
+# 473 הוא מגבלת הקצב של הפיד של הכנסת (מעל ~4-6 בקשות מקבילות,
+# נמדד 22.9.2026 ורשום ב-open-gaps). גם אחרי ניסיון חוזר הוא עדיין
+# לא כשל שלנו.
+_UPSTREAM_STATUSES = {429, 473, 502, 503, 504}
 retried: list[str] = []
+
+
+class UpstreamUnavailable(RuntimeError):
+    """תלות חיצונית (הפיד של הכנסת) לא הייתה זמינה."""
+
+    def __init__(self, label: str, code: int):
+        super().__init__(f"{label}: HTTP {code}")
+        self.label = label
+        self.code = code
 
 
 def _request(req_or_url, label):
@@ -68,6 +102,8 @@ def _request(req_or_url, label):
                 retried.append(note)
                 time.sleep(4)
                 continue
+            if e.code in _UPSTREAM_STATUSES:
+                raise UpstreamUnavailable(label, e.code) from None
             raise
     raise AssertionError("לא אמור להגיע לכאן")
 
@@ -245,6 +281,10 @@ def journey_docx(base, res, law_id, payload):
     res.check("דברי הסבר נוצרו אוטומטית", "דברי הסבר" in text)
 
 
+# `17.04.1968` - הפורמט האחיד של המערכת (apps/api/dates.py, ב7).
+_IS_DOTTED_DATE = re.compile(r"^\d{2}\.\d{2}\.\d{4}$")
+
+
 def journey_citations(base, res, law_id):
     print("\n[3] פרסומי החוק ותיקוניו")
     status, body = _get(base, f"/api/laws/{law_id}/citations")
@@ -255,8 +295,17 @@ def journey_citations(base, res, law_id):
         res.check("יש פרסומים", bool(cites), f"{len(cites)}")
         if cites:
             dates = [c.get("published_at") for c in cites if c.get("published_at")]
-            res.check("התאריכים בפורמט ISO (הממשק ממיר לעברי)",
-                      all(len(d) == 10 and d[4] == "-" for d in dates),
+            # **הבדיקה הזו נעלה פורמט שכבר לא נכון** - היא דרשה ISO
+            # (`1968-04-17`), אבל ב7 (422c35f, 22.9.2026) העביר את כל
+            # המערכת ל-`17.04.1968` דרך `apps/api/dates.py`, במכוון.
+            # היא הייתה אדומה בעשר ריצות רצופות מאז, ועל כל אחת נשלח
+            # מייל - כלומר בדיקה שלא עודכנה אחרי שינוי מכוון הפכה את
+            # ההתראה כולה לרעש.
+            #
+            # מנוסחת עכשיו מול הדרישה האמיתית, ותיפול אם הפורמט יחזור
+            # ל-ISO או יתערבב.
+            res.check("התאריכים בפורמט DD.MM.YYYY",
+                      all(_IS_DOTTED_DATE.match(d) for d in dates),
                       dates[0] if dates else "")
 
 
@@ -376,6 +425,13 @@ def journey_merged_text(base, res):
                       "ההצעה הזו דווקא מוזגה במלואה - לא דחייה, וזה תקין")
 
 
+def _annotate(level: str, message: str) -> None:
+    """סימון הריצה ב-GitHub Actions. `warning` נראה בריצה ואינו
+    שולח מייל; `error` מפיל את הריצה ושולח."""
+    if os.environ.get("GITHUB_ACTIONS"):
+        print(f"::{level}::{message}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=DEFAULT_BASE)
@@ -388,34 +444,57 @@ def main():
     res = Result()
     started = time.time()
 
-    try:
-        edited = journey_open_and_edit(base, res)
-        journey_static(base, res)
-        if edited:
-            law_id, payload = edited
-            journey_docx(base, res, law_id, payload)
-            journey_citations(base, res, law_id)
-        journey_merged_text(base, res)
-        if args.with_llm:
-            journey_research(base, res)
-            journey_chat(base, res)
-        else:
-            print("\n(דילוג על כלי ה-LLM - הרץ עם --with-llm)")
-    except urllib.error.HTTPError as e:
-        res.check("הבקשה הושלמה", False, f"HTTP {e.code} on {e.url}")
-    except Exception as e:  # noqa: BLE001
-        res.check("הבדיקה רצה עד הסוף", False, f"{type(e).__name__}: {e}")
+    def run(label, fn, *fn_args):
+        """מסע אחד. תלות חיצונית שנפלה מסומנת "לא נבדק" ואינה מפילה
+        את שאר המסעות - אחרת פיד עמוס מסתיר את כל שאר המוצר."""
+        try:
+            return fn(*fn_args)
+        except UpstreamUnavailable as exc:
+            res.not_checked(label, f"הפיד החזיר HTTP {exc.code} ({exc.label})")
+        except urllib.error.HTTPError as exc:
+            res.check(f"{label}: הבקשה הושלמה", False, f"HTTP {exc.code} on {exc.url}")
+        except Exception as exc:  # noqa: BLE001
+            res.check(f"{label}: רץ עד הסוף", False, f"{type(exc).__name__}: {exc}")
+        return None
+
+    edited = run("פתיחת חוק ועריכה", journey_open_and_edit, base, res)
+    run("הדף וקובצי הסטטיק", journey_static, base, res)
+    if edited:
+        law_id, payload = edited
+        run("הורדת Word", journey_docx, base, res, law_id, payload)
+        run("פרסומי החוק", journey_citations, base, res, law_id)
+    run("נוסח משולב", journey_merged_text, base, res)
+    if args.with_llm:
+        run("כלי המחקר", journey_research, base, res)
+        run("כלי הצ'אט", journey_chat, base, res)
+    else:
+        print("\n(דילוג על כלי ה-LLM - הרץ עם --with-llm)")
 
     print(f"\n{res.count} בדיקות ב-{time.time()-started:.1f} שניות")
     if retried:
         print(f"⟳ {len(retried)} בקשות נדרשו ניסיון חוזר (תקלה חולפת, לא כשל מוצר):")
         for note in retried:
             print(f"  - {note}")
+    if res.unavailable:
+        print(f"לא נבדקו {len(res.unavailable)} (תלות חיצונית לא זמינה):")
+        for item in res.unavailable:
+            print(f"  - {item}")
+
     if res.failures:
         print(f"נכשלו {len(res.failures)}:")
         for f in res.failures:
             print(f"  - {f}")
+        _annotate("error", f"כשל מוצר: {res.failures[0]}")
         return 1
+
+    if res.unavailable:
+        # **יוצא 0 בכוונה.** הפיד של הכנסת עמוס אינו רגרסיה, ומייל
+        # אדום עליו הוא בדיוק מה שגורם להתעלם ממיילים אמיתיים.
+        # הריצה מסומנת באזהרה גלויה ב-GitHub, בלי התראה.
+        print("הבדיקות שרצו עברו; מה שלא רץ הוא תלות חיצונית, לא רגרסיה.")
+        _annotate("warning", f"לא נבדק: {res.unavailable[0]}")
+        return 0
+
     print("הכול עבר.")
     return 0
 
