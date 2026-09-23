@@ -137,6 +137,75 @@ def _strip_addressee(body: str) -> tuple[str, str]:
     return stripped[0].upper() + stripped[1:] if stripped[:1].isascii() else stripped, match.group(0).strip()
 
 
+# ── שומר המקורות ────────────────────────────────────────────────────
+# **הנחיה אינה שומר** (ברק, 23.9.2026). זה בדיוק מה שקרה עם שם
+# השר: ההנחיה אסרה על המודל לנקוב בנמען, והוא נקב בו בכל זאת
+# - פעם אחת מתוך ארבע הרצות של אותה שאלה. הפתרון שם היה
+# _strip_addressee, שומר דטרמיניסטי, והוא הפתרון גם כאן.
+#
+# **מה מותר ומה אסור:** מקור ברקע הוא לגיטימי ורצוי - השאילתות
+# האמיתיות פותחות בדיוק כך ("על-פי פרסומה של הכתבת ורד פלמן
+# מ'כאן 11'"). מה שאסור הוא מקור ש**המודל המציא**. לכן הכלל אינו
+# "בלי מקורות" אלא "רק מקורות שהמשתמש נתן".
+#
+# **ומה קורה כשנמצא כזה: זורקים.** לא מנקים ולא מתקנים בשקט -
+# מסמך שמוגש לכנסת בשם חבר כנסת ובו דיון שלא היה או דוח שלא
+# קיים הוא תקלה שאין ממנה דרך חזרה, ועדיף שהכלי יגיד שהוא לא
+# הצליח מאשר שיחזיר טיוטה שנראית תקינה.
+
+# סוגי המקורות שברק מנה. כל אחד מהם, אם הוא מופיע ברקע, חייב
+# להופיע גם בדברי המשתמש.
+_SOURCE_MARKERS = (
+    "ועד",        # ועדה, ועדת, בוועדת
+    "דיון",
+    "דוח", "דו\"ח", "דו״ח",
+    "כתבה", "כתבת",
+    "פרסום", "פורסם", "פרסמ",
+    "מחקר",
+    "סקר",
+    "מבקר המדינה",
+    "החלטת ממשלה",
+    "בג\"ץ", "בג״ץ",
+    "עתיר",
+)
+_NUMBER_RE = re.compile(r"\d[\d,.]*")
+# תחיליות עבריות נפוצות, כדי ש"בוועדת" ייחשב כאזכור של "ועדת"
+_PREFIXES = "בכלמשהו"
+
+
+def _normalize_for_support(text: str) -> str:
+    """טקסט להשוואה: בלי ניקוד, בלי סימני פיסוק, ובלי תחיליות
+    בתחילת מילה - כך ש"בוועדת הפנים" אצל המודל נחשב נתמך אם
+    המשתמש כתב "ועדת הפנים"."""
+    cleaned = re.sub(r"[^\w\s\"'׳״-]", " ", text or "")
+    words = []
+    for w in cleaned.split():
+        words.append(w)
+        # גם את הצורה בלי התחילית, כדי ששתיהן יימצאו
+        if len(w) > 2 and w[0] in _PREFIXES:
+            words.append(w[1:])
+    return " " + " ".join(words) + " "
+
+
+def unsupported_source_claims(background: str, user_text: str) -> list[str]:
+    """אזכורי מקור ברקע שאין להם זכר בדברי המשתמש.
+
+    מחזירה רשימה של מה שנמצא - ריקה כשהכול נתמך. **פונקציה
+    טהורה**, בלי רשת ובלי מודל, כדי שאפשר יהיה לבדוק אותה."""
+    haystack = _normalize_for_support(user_text)
+    found: list[str] = []
+    for marker in _SOURCE_MARKERS:
+        if marker in (background or "") and marker not in haystack:
+            found.append(marker)
+    # מספר שהומצא הוא מקור מומצא לכל דבר ("על-פי נתוני 2024",
+    # "ב-30% מהמקרים") - אלא אם המשתמש נקב בו בעצמו.
+    user_numbers = set(_NUMBER_RE.findall(user_text or ""))
+    for number in _NUMBER_RE.findall(background or ""):
+        if number not in user_numbers:
+            found.append(number)
+    return sorted(set(found))
+
+
 class QueryDraftError(Exception):
     """שכבת אפליקציה - LLM לא זמין/נכשל, או המודל דיווח שאי אפשר לנסח."""
 
@@ -189,6 +258,21 @@ def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: s
     # מה שהשאילתה הגרועה שברק הראה עשתה.
     body, removed_addressee = _strip_addressee(body_match.group(1).strip())
     body = "\n".join(ln.strip() for ln in body.split("\n") if ln.strip())
+    # **השומר רץ על פסקת הרקע בלבד** - השאלות עצמן אינן טוענות
+    # עובדות, והמגבלה עליהן היא ניסוחית ולא ראייתית.
+    background = body.split(_RETSONI)[0]
+    user_text = "\n".join(t.get("content", "") for t in turns
+                          if t.get("role") == "user")
+    invented = unsupported_source_claims(background, user_text)
+    if invented:
+        raise QueryDraftError(
+            "לא ניתן לנסח שאילתה: הניסוח הסתמך על מקור או נתון שלא "
+            f"מופיעים בדבריכם ({', '.join(invented)}). שאילתה מוגשת "
+            "בשם חבר כנסת, ולכן הרקע שבה חייב להישען על מה שמסרתם. "
+            "הוסיפו את המקור (פרסום, דיון, דוח, נתון) ונסו שוב, או "
+            "בקשו ניסוח כללי בלי מקור."
+        )
+
     limit = _WORD_LIMITS[kind]
     wc = _word_count(body)
     return {

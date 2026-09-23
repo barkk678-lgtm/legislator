@@ -24,9 +24,19 @@ _RANK_SUBSTRING = 2
 _RANK_ALL_TOKENS = 3
 
 
-def _normalize_for_search(text: str) -> str:
+# **ה"א הידיעה בשנה העברית.** ויקיטקסט כותב "חוק העונשין, תשל\"ז-1977"
+# והכנסת (וכל הצעת חוק אמיתית) כותבת "התשל\"ז". נמדד 23.9.2026: עשרה
+# מתוך 23 החוקים שהצעות אמיתיות מתקנות לא נמצאו בקורפוס **רק** בגלל
+# ההפרש הזה - ובהם חוק העונשין, חוק התכנון והבניה וחוק הבחירות לכנסת.
+# הנורמליזציה מורידה את ה"א מצורת השנה בשני הצדדים, ולכן רק מוסיפה
+# התאמות ואינה מבטלת אף אחת.
+_YEAR_HE = re.compile(r"(?<![א-ת])ה(ת[א-ת]{0,3}\")")
+
+
+def normalize_for_search(text: str) -> str:
     n = normalize_text(text)
     n = strip_matres_lectionis(n)
+    n = _YEAR_HE.sub(r"\1", n)
     return re.sub(r"\s+", " ", n).strip()
 
 
@@ -53,7 +63,7 @@ def search_laws(query: str, laws: list[dict], limit: int = 20) -> list[dict]:
     ה-query (מופרדות ברווח) מופיעות בכותרת, בכל סדר. שוויון דירוג -
     לפי אורך כותרת (קצרה יותר = ספציפית יותר), ואז אלפביתי, לשמור
     על סדר דטרמיניסטי."""
-    query_norm = _normalize_for_search(query)
+    query_norm = normalize_for_search(query)
     if not query_norm:
         return []
     query_tokens = [t for t in query_norm.split(" ") if t]
@@ -61,10 +71,15 @@ def search_laws(query: str, laws: list[dict], limit: int = 20) -> list[dict]:
     scored: list[tuple[int, int, str, dict]] = []
     for law in laws:
         title = law.get("title") or ""
-        title_norm = _normalize_for_search(title)
+        title_norm = normalize_for_search(title)
         rank = _rank(query_norm, title_norm, query_tokens)
         if rank is not None:
             scored.append((rank, len(title_norm), title_norm, law))
 
     scored.sort(key=lambda t: (t[0], t[1], t[2]))
     return [law for _, _, _, law in scored[:limit]]
+
+
+# שם פומבי לשכבות שצריכות להשוות שם-חוק לכותרת בקורפוס באותה
+# נורמליזציה בדיוק (apps/api/amended_law.py, בדיקה 1 על מסמך שהועלה).
+_normalize_for_search = normalize_for_search

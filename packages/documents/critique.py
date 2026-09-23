@@ -84,6 +84,11 @@ class BillCritique:
     items: list[CritiqueItem] = field(default_factory=list)   # ליקויים בלבד
     passed: list[int] = field(default_factory=list)
     not_checked: list[int] = field(default_factory=list)
+    # **הסיבה לכל "לא נבדק", לא רק המספר.** מאז שבדיקה 1 רצה על
+    # מסמך שהועלה, הסיבה תלויה במסמך עצמו ("חוק X אינו במאגר") -
+    # ובלי להעביר אותה הלאה, המשתמש רואה "בדיקה לא הורצה" בלי לדעת
+    # על מה. אותו עיקרון של "לא נמצא" מול "לא הצלחתי לבדוק".
+    not_checked_items: list[CritiqueItem] = field(default_factory=list)
     checks_run: tuple[int, ...] = DRAFT_CHECKS
     explained: bool = False
     explain_error: str = ""
@@ -199,11 +204,27 @@ def _explanation_is_anchored(entry: dict, finding: Finding) -> bool:
     return claimed <= set(int(n) for n in _INT_RE.findall(finding.message))
 
 
-def critique_bill(extracted, *, draft_fn=None) -> BillCritique:
+def critique_bill(extracted, *, draft_fn=None, sections_fn=None) -> BillCritique:
     """ביקורת על הצעה שחולצה ממסמך. `draft_fn` מוזרק כדי שהשכבה לא
-    תהיה כבולה לספק LLM מסוים וכדי שהבדיקות ירוצו בלי רשת."""
+    תהיה כבולה לספק LLM מסוים וכדי שהבדיקות ירוצו בלי רשת.
+
+    `sections_fn(bill) -> (מספרי סעיפי החוק המתוקן | None, סיבה)`
+    מוזרק מאותה סיבה: בדיקה 1 על מסמך שהועלה דורשת את החוק מהמאגר,
+    והמאגר אינו עניינה של שכבה זו. בלי ההזרקה הבדיקה מדווחת
+    "לא נבדק" - **לא "עבר"**. כישלון בשליפה גם הוא "לא נבדק" עם
+    הסיבה, ולעולם אינו מפיל את שאר הביקורת."""
     bill = as_render_bill(extracted)
-    findings = validate_draft(bill)
+    law_sections: set[str] | None = None
+    law_note = ""
+    if sections_fn is not None:
+        try:
+            law_sections, law_note = sections_fn(bill)
+        except Exception as exc:  # noqa: BLE001 - ראו הדוקסטרינג
+            law_sections, law_note = None, (
+                f"שליפת החוק המתוקן מהמאגר נכשלה ({type(exc).__name__}), "
+                "ולכן מספרי הסעיפים לא אומתו."
+            )
+    findings = validate_draft(bill, law_sections=law_sections, law_note=law_note)
 
     problems = [f for f in findings if f.status in ("נכשל", "אזהרה")]
     critique = BillCritique(
@@ -214,6 +235,10 @@ def critique_bill(extracted, *, draft_fn=None) -> BillCritique:
         ],
         passed=[f.check_number for f in findings if f.status == "עבר"],
         not_checked=[f.check_number for f in findings if f.status == "לא נבדק"],
+        not_checked_items=[
+            CritiqueItem(f.check_number, f.description, f.severity, f.status, f.message)
+            for f in findings if f.status == "לא נבדק"
+        ],
         extraction_warnings=list(extracted.warnings),
         tracked_changes=dict(getattr(extracted, "tracked_changes", {}) or {}),
     )

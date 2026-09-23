@@ -2359,11 +2359,18 @@ async function runCritique() {
       }
     }
 
+    // **הסיבה לכל בדיקה שלא הורצה מוצגת, לא רק כמה היו.** מאז
+    // שבדיקת מספרי הסעיפים רצה מול החוק שבמאגר, הסיבה תלויה במסמך
+    // ("החוק X אינו במאגר") - ובלעדיה המשתמש לא יודע מה חסר.
+    const reasons = d.not_checked_reasons || [];
     const skipped = d.not_checked.length
       ? `<details class="critique-skipped"><summary>${d.not_checked.length} בדיקות לא הורצו על המסמך הזה</summary>
-           <div class="hint">חלקן דורשות מידע שאינו נמצא במסמך עצמו (החוק שהוא
-           מתקן, מראי המקום), חלקן אינן רלוונטיות לסוג ההצעה, וחלקן ידועות
-           כשגויות על הצעות אמיתיות וממתינות לתיקון.</div></details>`
+           ${reasons.length
+             ? `<ul class="hint">${reasons.map((r) =>
+                 `<li>${escapeHtml(r.description)} — ${escapeHtml(r.message)}</li>`).join("")}</ul>`
+             : `<div class="hint">חלקן דורשות מידע שאינו נמצא במסמך עצמו, וחלקן
+                אינן רלוונטיות לסוג ההצעה.</div>`}
+         </details>`
       : "";
 
     // א7 - **שינויים שטרם התקבלו הם פגם בקובץ, לא הערת חילוץ.**

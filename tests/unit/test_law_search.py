@@ -60,6 +60,20 @@ def main():
     r9 = search_laws("חוק הפטנטים", laws_prefix_test)
     checks.append(("דירוג: prefix-match (a) לפני מוכל-באמצע (b)", [law["id"] for law in r9] == ["a", "b"]))
 
+    # ה"א הידיעה בשנה העברית: ויקיטקסט כותב "תשל\"ז", הכנסת וכל הצעת
+    # חוק כותבות "התשל\"ז". עשרה חוקים מתוך 23 שהצעות אמיתיות מתקנות
+    # לא נמצאו בקורפוס רק בגלל ההפרש הזה (נמדד 23.9.2026).
+    year_laws = [
+        {"id": "p", "title": 'חוק העונשין, תשל"ז–1977'},
+        {"id": "t", "title": 'חוק התכנון והבניה, תשכ"ה–1965'},
+    ]
+    r10 = search_laws('חוק העונשין, התשל"ז–1977', year_laws)
+    checks.append(('שנה עם ה"א מוצאת חוק שנכתב בלעדיה', [law["id"] for law in r10] == ["p"]))
+    r11 = search_laws('חוק התכנון והבנייה, התשכ"ה–1965', year_laws)
+    checks.append(("ה\"א בשנה יחד עם אם קריאה בשם", [law["id"] for law in r11] == ["t"]))
+    r12 = search_laws("התשלומים", [{"id": "x", "title": "חוק התשלומים"}])
+    checks.append(('ה"א נשארת במילה רגילה שמתחילה ב"הת"', [law["id"] for law in r12] == ["x"]))
+
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("OK  " if passed else "FAIL"), name)

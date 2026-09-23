@@ -456,12 +456,22 @@ async def api_critique_document(file: UploadFile = File(...)) -> dict:
     except DocumentExtractError as e:
         raise HTTPException(422, str(e))
 
-    result = critique_bill(bill)
+    # בדיקה 1 דורשת את החוק שההצעה מתקנת - נשלף מהמאגר כאן, לא
+    # בוולידטור (שנשאר טהור). אם לא נמצא, הבדיקה מדווחת "לא נבדק"
+    # עם הסיבה, ולא "עבר".
+    from amended_law import sections_for_bill  # noqa: PLC0415
+
+    result = critique_bill(bill, sections_fn=sections_for_bill)
     return {
         "title": result.title,
         "checks_run": list(result.checks_run),
         "passed": result.passed,
         "not_checked": result.not_checked,
+        "not_checked_reasons": [
+            {"check": it.check_number, "description": it.description,
+             "message": it.message}
+            for it in result.not_checked_items
+        ],
         "explained": result.explained,
         "explain_error": result.explain_error,
         "dropped_explanations": result.dropped_explanations,

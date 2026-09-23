@@ -58,8 +58,17 @@ def main():
     # **נגזר ולא קבוע.** המספר היה 5 ונשבר כשבדיקות 4 ו-7 חזרו
     # לפעול (23.9.2026). בדיקה שנועלת מספר קסם מדווחת על שינוי
     # מכוון כאילו הוא רגרסיה.
+    #
+    # בדיקה 1 יוצאת מן הכלל **במכוון**: היא דורשת את מספרי הסעיפים
+    # של החוק המתוקן, ובלי sections_fn אין לה מול מה לרוץ. היא
+    # מדווחת "לא נבדק" עם סיבה - ולא "עבר" (ראו cited_sections).
+    expected_passed = [n for n in DRAFT_CHECKS if n != 1]
     check(f"הבדיקות שעברו מדווחות ({len(result.passed)})",
-          len(result.passed) == len(DRAFT_CHECKS))
+          sorted(result.passed) == expected_passed)
+    check("בדיקה 1 בלי החוק המתוקן מדווחת 'לא נבדק', לא 'עבר'",
+          1 in result.not_checked and 1 not in result.passed)
+    check("ולסיבה יש ניסוח, לא רק מספר",
+          any(it.check_number == 1 and it.message for it in result.not_checked_items))
 
     # 2. הצעה עם ליקוי אמיתי: הממצא נמצא בקוד, לפני כל מודל.
     result = critique_bill(dirty, draft_fn=lambda **kw: "[]")
