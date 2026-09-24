@@ -638,19 +638,67 @@ function renderInsertionErrors(errors) {
   }
 }
 
+// ח3 (25.9.2026): **"מעדכן..." שנתקע לנצח הוא כשל בפני עצמו.** עד כאן
+// refreshPreview לא טיפלה בשום שגיאה: 500 מהשרת, 504 של Vercel (דף
+// HTML, לא JSON), ניתוק רשת - כל אחד מהם זרק לפני setPreviewPending
+// (false), והחיווי נשאר על המסך בלי הודעה. שוחזר בשלושת המצבים
+// (tests/browser/test_preview_failure.py). עכשיו: תקרת זמן, בדיקת
+// הסטטוס, והודעה גלויה שאומרת מה קרה ומה לעשות.
+const RENDER_TIMEOUT_MS = 45000;
+
+function setPreviewError(message) {
+  const el = document.getElementById("preview-error");
+  if (!el) return;
+  el.textContent = message || "";
+  el.hidden = !message;
+}
+
+async function fetchRender(req) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), RENDER_TIMEOUT_MS);
+  try {
+    const resp = await fetch(`/api/laws/${currentLawId}/render`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+      signal: ctrl.signal,
+    });
+    let data = null;
+    try { data = await resp.json(); } catch { data = null; }
+    if (!resp.ok || !data || !data.tree) {
+      // הודעת השרת מוצגת רק כשהיא שלנו - בעברית (HTTPException).
+      // "Internal Server Error" או דף שגיאה של Vercel אינם הודעה למשתמש.
+      const detail = data && typeof data.detail === "string" ? data.detail : "";
+      const hebrew = /[\u0590-\u05FF]/.test(detail);
+      throw new Error(hebrew ? detail : "השרת לא הצליח לעדכן את הצעת החוק.");
+    }
+    return data;
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("העדכון לקח יותר מדי זמן.");
+    if (e instanceof TypeError) throw new Error("החיבור לשרת נקטע.");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function refreshPreview() {
   if (!currentLawId) return;
   const myGeneration = ++renderGeneration;
   const req = { edits: editsPayload(), insertions: insertionsPayload(), bill: billMeta() };
-  const resp = await fetch(`/api/laws/${currentLawId}/render`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
-  });
-  const data = await resp.json();
+  let data;
+  try {
+    data = await fetchRender(req);
+  } catch (e) {
+    if (myGeneration !== renderGeneration) return;  // בקשה חדשה כבר בדרך
+    setPreviewPending(false);
+    setPreviewError(`${e.message} העריכות שלך נשמרו - נסו לערוך שוב או לרענן את הדף.`);
+    return;
+  }
   // תשובה ישנה שנחסמה על ידי בקשה מאוחרת יותר (למשל: המשתמש כבר
   // המשיך לערוך ושלח בקשה נוספת לפני שזו חזרה) - לא נוגעים ב-DOM.
   if (myGeneration !== renderGeneration) return;
+  setPreviewError("");
 
   // בונים מחדש את כל עץ העריכה רק אם המשתמש לא ממש עכשיו בתוך שדה
   // ניתן-לעריכה - אחרת רינדור-מחדש היה מוחק את התו שהוא הרגע הקליד

@@ -18,9 +18,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpus"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
-from node import LegislativeNode  # noqa: E402
+from node import LegislativeNode, find_parent  # noqa: E402
 from transform import (  # noqa: E402
     Annotation,
+    RepealSection,
     InsertWordsAfter,
     ReplaceMarginTitleWords,
     AppendWordsAtEnd,
@@ -90,6 +91,7 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
     current = before
     annotations: list[Annotation] = []
     edit_statuses: list[EditStatus] = []
+    current, edits, edit_statuses = _apply_section_repeals(before, list(edits), edit_statuses)
 
     for edit in edits:
         field = getattr(edit, "field", "text")
@@ -138,6 +140,69 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
         continue
 
     return _finish(before, current, annotations, edit_statuses, insertions)
+
+
+def _containing_section(root: LegislativeNode, node_id: str) -> LegislativeNode | None:
+    node = _find_by_id(root, node_id)
+    while node is not None and node.node_type != "section":
+        node = find_parent(root, node.id)
+    return node
+
+
+def _text_nodes(section: LegislativeNode) -> list[LegislativeNode]:
+    """כל הצמתים בסעיף שיש בהם נוסח שהמשתמש יכול למחוק."""
+    out = []
+
+    def walk(n):
+        if n is not section and n.is_normative and n.node_type != "raw_block" and n.text.strip():
+            out.append(n)
+        for c in n.children:
+            walk(c)
+    walk(section)
+    return out
+
+
+def _apply_section_repeals(before: LegislativeNode, edits: list, statuses: list):
+    """ח3 (25.9.2026): **מחיקת כל הטקסט של סעיף היא ביטול הסעיף**, לא
+    עריכה. עד כאן כל שדה שהתרוקן נשלח ל-translate_text_edits, שהחזיר
+    Unsupported עם הודעה מטעה ("כנראה כמה עריכות נפרדות"), והוראת
+    התיקון נעלמה מההצעה בשקט; ומחיקת כותרת השוליים הפיקה `במקום "X"
+    יבוא ""` - ניסוח שאינו קיים.
+
+    התנאי: **כל** צומת טקסט בסעיף התרוקן. כותרת השוליים אינה חלק
+    מהתנאי - סעיף שכל תוכנו נמחק מבוטל גם אם הכותרת נשארה, ומחיקתה
+    נבלעת בביטול. סעיף קטן אחד מתוך כמה אינו ביטול של הסעיף (ראו
+    tests/unit/test_repeal_section.py, הבקרה השלילית)."""
+    emptied: dict[str, set[str]] = {}
+    for edit in edits:
+        if getattr(edit, "field", "text") == "text" and not (edit.text or "").strip():
+            section = _containing_section(before, edit.node_id)
+            if section is not None and section.status == "active":
+                emptied.setdefault(section.id, set()).add(edit.node_id)
+
+    repealed: dict[str, LegislativeNode] = {}
+    for section_id, ids in emptied.items():
+        section = _find_by_id(before, section_id)
+        text_ids = {n.id for n in _text_nodes(section)}
+        if text_ids and text_ids <= ids:
+            repealed[section_id] = section
+    if not repealed:
+        return before, edits, statuses
+
+    remaining = []
+    for edit in edits:
+        field = getattr(edit, "field", "text")
+        section = _containing_section(before, edit.node_id)
+        if section is not None and section.id in repealed:
+            node = _find_by_id(before, edit.node_id)
+            original = (node.margin_title or "") if field == "margin_title" else node.text
+            # old_phrase = כל הנוסח המקורי: הלקוח מציג אותו מחוק
+            statuses.append(EditStatus(node_id=edit.node_id, ok=True, field=field,
+                                       old_phrase=original or None, new_phrase=""))
+            continue
+        remaining.append(edit)
+    after, _ = apply(before, [RepealSection(section_number=s.number) for s in repealed.values()])
+    return after, remaining, statuses
 
 
 def _apply_one_operation(current, result, edit, field, is_title, original_node,

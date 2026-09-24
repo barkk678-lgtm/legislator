@@ -176,6 +176,19 @@ class AppendWordsAtEnd:
 
 
 @dataclass
+class RepealSection:
+    """ביטול סעיף שלם - "סעיף N – בטל" (מדריך משפטים §7.13, עמ' 32
+    [PDF 61]). ח3, 25.9.2026: עד כאן מחיקת כל הטקסט של סעיף נעלמה
+    בשקט, ולא הייתה דרך לבטא ביטול בכלל.
+
+    בעץ ה"אחרי" הסעיף מסומן status="repealed" **והילדים נשמרים** - כך
+    הממשק ממשיך להציג את הנוסח שבוטל (מחוק), ולא סעיף ריק שאין ממנו
+    דרך חזרה. amend() קורא את הסטטוס, לא את הילדים."""
+
+    section_number: str
+
+
+@dataclass
 class ReplacementAnnotation:
     """מצביעה על צומת (node_id) שעבר ReplaceWords, עם שני הביטויים
     כפי שנבחרו במפורש - ערוץ נפרד מ-.text, לא סמן מוטבע בתוכו (ראו
@@ -227,7 +240,8 @@ def _find_by_id(node: LegislativeNode, node_id: str) -> LegislativeNode | None:
 def apply(
     before: LegislativeNode,
     transformations: list[
-        InsertAfter
+        RepealSection
+        | InsertAfter
         | InsertSectionAfter
         | DeleteWords
         | InsertWordsBefore
@@ -244,6 +258,12 @@ def apply(
     after = copy.deepcopy(before)
     annotations: list[Annotation] = []
     for t in transformations:
+        if isinstance(t, RepealSection):
+            section = find_sections(after).get(t.section_number)
+            if section is None:
+                raise ValueError(f"סעיף {t.section_number} לא נמצא ב'לפני'")
+            section.status = "repealed"
+            continue
         if isinstance(t, InsertAfter):
             section = _find_section(after, t.section_number)
             if section is None:

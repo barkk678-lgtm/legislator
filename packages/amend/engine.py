@@ -960,6 +960,30 @@ def amend(
             lines.extend(new_lines)
             continue
 
+        # ביטול סעיף שלם (ח3, 25.9.2026) - "סעיף N – בטל", מדריך §7.13.
+        # נבדק לפני _diff_section: לסעיף שבוטל אין "שינוי בתוכן" לנסח,
+        # יש רק ביטול. הוראה יחידה פותחת בשם החוק בלי הקיצור - זה
+        # בדיוק הניסוח שנמצא בהצעות האמיתיות (drafting-rules.md §5.8:
+        # `בחוק הגנת הצרכן, התשמ"א–1981, סעיף 39 – בטל.`), ו-
+        # _drop_principal_law_alias_if_single מסירה את "(להלן...)".
+        if (after_sections[number].status == "repealed"
+                and before_sections[number].status != "repealed"):
+            touched_count += 1
+            if touched_count == 1:
+                repeal_line = Line(
+                    text=f"ב{before.full_title or ''}",
+                    text_after=f"{_PRINCIPAL_ALIAS}, סעיף {number} – בטל.",
+                    footnotes=[law_footnote_key] if law_footnote_key else [],
+                    depth=0,
+                )
+            else:
+                repeal_line = Line(text=f"סעיף {number} לחוק העיקרי – בטל.", depth=0)
+            repeal_line.side_heading = f"ביטול סעיף {number}"
+            repeal_line.number = f"{touched_count}."
+            _stamp_provenance(repeal_line, before_sections[number], before)
+            lines.append(repeal_line)
+            continue
+
         instructions = _diff_section(before_sections[number], after_sections[number])
         # שינוי בכותרת השוליים של הסעיף עצמו (§7.8) - לא נבדק בתוך
         # _diff_section (שמשווה רק ילדים; הכותרת שייכת לסעיף עצמו).
