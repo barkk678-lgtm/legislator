@@ -66,6 +66,8 @@ from rules_expert import (  # noqa: E402
     ask as rules_expert_ask,
     ask_stream as rules_expert_stream,
     source_labels as rules_source_labels,
+    humanize_citations as rules_humanize_citations,
+    CitationHumanizer as RulesCitationHumanizer,
 )
 from service import LLMConfigError, LLMRequestError  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "config"))
@@ -1093,7 +1095,8 @@ def api_rules_ask(req: RulesAskRequestIn) -> dict:
     except RulesExpertError as e:
         raise HTTPException(503, str(e))
     return {
-        "text": result.text,
+        # ת2: "[מקור:law-...]" -> "(תקנון הכנסת, סעיף 52)" גם כאן, לא רק בזרם
+        "text": rules_humanize_citations(result.text),
         "refused": result.refused,
         "refusal_reason": result.refusal_reason,
         "cited_sources": rules_source_labels(result.cited_source_ids),
@@ -1112,13 +1115,22 @@ def api_rules_ask_stream(req: RulesAskRequestIn) -> StreamingResponse:
     שורת שגיאה ({"error": "..."}) נשלחת בתוך הזרם כשהכשל קורה
     אחרי שה-200 כבר יצא - אחרת הוא היה נראה כמו תשובה שנגמרה."""
     def events():
+        # ת2: המודל כותב "[מקור:law-...]" (הפורמט ששומר הציטוט בודק);
+        # המשתמש רואה "(תקנון הכנסת, סעיף 52)". תג שנחתך בין שני קטעים
+        # נשמר בחוצץ עד שהוא נסגר - ראו rules_expert.CitationHumanizer.
+        humanizer = RulesCitationHumanizer()
         try:
             for piece in rules_expert_stream(req.question):
                 if isinstance(piece, str):
-                    yield json.dumps({"delta": piece}, ensure_ascii=False) + "\n"
+                    out = humanizer.feed(piece)
+                    if out:
+                        yield json.dumps({"delta": out}, ensure_ascii=False) + "\n"
                 else:
+                    rest = humanizer.flush()
+                    if rest:
+                        yield json.dumps({"delta": rest}, ensure_ascii=False) + "\n"
                     yield json.dumps({"done": {
-                        "text": piece.text,
+                        "text": rules_humanize_citations(piece.text),
                         "refused": piece.refused,
                         "refusal_reason": piece.refusal_reason,
                         # **שמות בעברית, לא מזהים פנימיים.** מזהה

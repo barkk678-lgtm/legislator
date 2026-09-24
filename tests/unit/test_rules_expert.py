@@ -109,6 +109,71 @@ def test_failed_load_is_not_cached():
     assert rx._sources_cache is None
 
 
+# ── ת2 (25.9.2026): התגים בתוך הטקסט, לא רק רשימת המקורות ──────────
+# task 94 (ג5) תרגם רק את `cited_sources` - הרשימה מתחת לתשובה. התגים
+# `[מקור:law-tkanon-haknesset/52]` בגוף התשובה נשארו גולמיים, בזרם
+# ובטקסט הסופי. ברק ראה אותם; הבדיקה ההיא לא בדקה את מה שהוא רואה.
+
+def _humanized_stream(chunks):
+    rx._sources_cache = SRC
+    h = rx.CitationHumanizer()
+    return "".join(h.feed(c) for c in chunks) + h.flush()
+
+
+def test_inline_citation_becomes_hebrew_name():
+    rx._sources_cache = SRC
+    out = rx.humanize_citations("ההסתייגות מוגשת בוועדה [מקור:law-tkanon-haknesset/86].")
+    assert out == "ההסתייגות מוגשת בוועדה (תקנון הכנסת, סעיף 86).", out
+
+
+def test_adjacent_citations_merge_into_one_parenthesis():
+    rx._sources_cache = SRC
+    out = rx.humanize_citations("כך [מקור:law-tkanon-haknesset/86][מקור:law-2000325/12].")
+    assert out == "כך (תקנון הכנסת, סעיף 86; חוק הכנסת, סעיף 12).", out
+
+
+def test_streamed_text_has_no_raw_tag_even_when_split_across_deltas():
+    """הבאג היה בשני המסלולים; במוזרם יש גם מלכודת נוספת - תג שנחתך
+    בין שני קטעים ("[מקור:law-tk" + "anon-haknesset/86]")."""
+    chunks = ["ההסתייגות מוגשת ", "בוועדה [מקור:law-tk", "anon-haknesset/86]", ". ועוד."]
+    out = _humanized_stream(chunks)
+    assert "[מקור:" not in out and "law-" not in out, out
+    assert "(תקנון הכנסת, סעיף 86)" in out, out
+    assert out.endswith(". ועוד."), out
+
+
+def test_split_adjacent_tags_still_merge():
+    chunks = ["כך [מקור:law-tkanon-haknesset/86]", " [מקור:law-2000325/12]", "."]
+    out = _humanized_stream(chunks)
+    assert out == "כך (תקנון הכנסת, סעיף 86; חוק הכנסת, סעיף 12).", out
+
+
+def test_stream_equals_humanized_full_text_for_every_split_point():
+    """הזרם חייב להיות זהה לטקסט הסופי - אחרת בסוף ההזרמה הלקוח
+    מחליף את הטקסט ברגע, והמשתמש רואה קפיצה. נבדק על **כל** נקודת
+    חיתוך אפשרית, לא על אחת שנבחרה ביד."""
+    rx._sources_cache = SRC
+    full = ("ההסתייגות מוגשת בוועדה [מקור:law-tkanon-haknesset/86] "
+            "[מקור:law-2000325/12]. ובסעיף 5[א] אחר [מקור:law-2000325/12].")
+    want = rx.humanize_citations(full)
+    for i in range(1, len(full)):
+        for j in range(i, len(full), 7):
+            got = _humanized_stream([full[:i], full[i:j], full[j:]])
+            assert got == want, (i, j, got)
+
+
+def test_plain_bracket_that_is_not_a_tag_is_not_swallowed():
+    out = _humanized_stream(["סעיף 5[א] ", "ממשיך"])
+    assert out == "סעיף 5[א] ממשיך", out
+
+
+def test_labels_use_short_law_name_without_year():
+    """"חוק הכנסת, סעיף 12" - לא "חוק הכנסת, התשנ"ד–1994, סעיף 12"."""
+    assert rx.short_law_name('חוק הכנסת, התשנ"ד–1994') == "חוק הכנסת"
+    assert rx.short_law_name("חוק-יסוד: הכנסת") == "חוק-יסוד: הכנסת"
+    assert rx.short_law_name("תקנון הכנסת") == "תקנון הכנסת"
+
+
 for name, fn in sorted(list(globals().items())):
     if name.startswith("test_"):
         fn()

@@ -378,6 +378,35 @@ def journey_research(base, res):
               f"{len(plain.get('rows') or [])} שורות")
 
 
+def _rules_stream(base, question):
+    """התשובה **המוזרמת** של מומחה התקנון, כפי שהלקוח מקבל אותה:
+    (הטקסט שהוזרם, אירוע ה-done)."""
+    req = urllib.request.Request(
+        base + "/api/rules/ask/stream", data=json.dumps({"question": question}).encode(),
+        headers={"Content-Type": "application/json"}, method="POST")
+    _, raw = _request(req, "POST /api/rules/ask/stream")
+    events = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
+    streamed = "".join(e.get("delta", "") for e in events)
+    done = next((e["done"] for e in events if "done" in e), {})
+    return streamed, done
+
+
+def journey_rules_citations(base, res):
+    """ת2 (25.9): task 94 נסגר כעובד, ובפועל התשובה הציגה
+    "[מקור:law-tkanon-haknesset/52]". הבדיקה אז ראתה את רשימת המקורות,
+    לא את הטקסט שהמשתמש קורא. כאן - הטקסט המוזרם עצמו."""
+    print("\n[6א] מומחה התקנון - שמות המקורות בתוך התשובה")
+    streamed, done = _rules_stream(base, "מה ההבדל בין הצעה לסדר היום להצעה דחופה?")
+    res.check("התשובה המוזרמת נענתה", bool(streamed) and done.get("refused") is False,
+              done.get("refusal_reason") or f"{len(streamed)} תווים")
+    res.check("אין \"[מקור:\" בתשובה המוזרמת", "[מקור:" not in streamed,
+              f"{streamed.count('[מקור:')} מופעים")
+    res.check("אין \"law-\" בתשובה המוזרמת", "law-" not in streamed,
+              f"{streamed.count('law-')} מופעים")
+    res.check("יש \"תקנון הכנסת, סעיף\" בתשובה המוזרמת", "תקנון הכנסת, סעיף" in streamed)
+    res.check("גם הטקסט הסופי נקי", "[מקור:" not in (done.get("text") or ""))
+
+
 def journey_chat(base, res):
     print("\n[6] כלי הצ'אט")
     status, body = _post(base, "/api/rules/ask",
@@ -493,6 +522,7 @@ def main():
     if args.with_llm:
         run("כלי המחקר", journey_research, base, res)
         run("כלי הצ'אט", journey_chat, base, res)
+        run("מומחה התקנון - מקורות", journey_rules_citations, base, res)
     else:
         print("\n(דילוג על כלי ה-LLM - הרץ עם --with-llm)")
 

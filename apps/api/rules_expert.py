@@ -80,6 +80,80 @@ _EXTRA_INSTRUCTIONS = (
 )
 
 
+# ", התשנ"ד–1994" / ", תשכ"א–1961" בסוף שם החוק. בתשובה ברק רוצה
+# "חוק הכנסת, סעיף 12" - השנה אינה מוסיפה כלום כשיש רק חוק כנסת אחד.
+_LAW_YEAR_SUFFIX = re.compile(r",\s*ה?תש[^,]*[–-]\d{4}\s*$")
+
+
+def short_law_name(full_title: str) -> str:
+    return _LAW_YEAR_SUFFIX.sub("", full_title).strip()
+
+
+# ── ת2 (25.9.2026): תגי המקור בתוך התשובה ────────────────────────────
+# המודל כותב `[מקור:law-tkanon-haknesset/52]` - זה הפורמט ששומר הציטוט
+# בודק, ולכן הוא לא משתנה בהנחיה. **מה שמשתנה הוא מה שהמשתמש רואה**:
+# כל תג הופך ל-"(תקנון הכנסת, סעיף 52)", ותגים צמודים מתאחדים לסוגריים
+# אחד. עד 25.9 רק רשימת המקורות שמתחת לתשובה תורגמה (task 94), והתגים
+# בגוף הטקסט הגיעו למסך כמו שהם - בזרם ובטקסט הסופי כאחד.
+_TAG = r"\[מקור:\s*([^\]]+?)\s*\]"
+_TAG_RUN = re.compile(rf"\s*{_TAG}(?:\s*{_TAG})*")
+_TAG_ONE = re.compile(_TAG)
+_TAG_PREFIX = "[מקור:"
+
+
+def humanize_citations(text: str) -> str:
+    """`[מקור:id]` -> `(שם בעברית)`. מזהה לא מוכר - השומר ממילא יפסול
+    את התשובה; עד אז הוא לא מוצג כמזהה גולמי אלא נשמט."""
+    by_id = {c.id: c.label for c in sources()} if _TAG_PREFIX in text else {}
+
+    def repl(m: re.Match) -> str:
+        labels = [by_id[i.strip()] for i in _TAG_ONE.findall(m.group(0)) if i.strip() in by_id]
+        return f" ({'; '.join(dict.fromkeys(labels))})" if labels else ""
+
+    return _TAG_RUN.sub(repl, text)
+
+
+class CitationHumanizer:
+    """אותה המרה על זרם. הקושי: תג יכול להיחתך בין שני קטעים
+    ("[מקור:law-tk" + "anon-haknesset/52]"), ותגים צמודים יכולים להגיע
+    בקטעים נפרדים. לכן נשמר בחוצץ כל מה שאולי עוד יהפוך לתג: '[' פתוח
+    בלי ']', וגם רצף תגים בסוף החוצץ (אולי יבוא עוד תג צמוד)."""
+
+    def __init__(self) -> None:
+        self._buf = ""
+
+    def _cut(self) -> int:
+        buf = self._buf
+        cut = len(buf)
+        start = buf.rfind("[")
+        if start >= 0 and "]" not in buf[start:]:
+            tail = buf[start:]
+            # '[' שעדיין יכול להפוך ל-"[מקור:" - מחכים; אחרת לא תג
+            if _TAG_PREFIX.startswith(tail[: len(_TAG_PREFIX)]) or tail.startswith(_TAG_PREFIX):
+                cut = start
+        last = None
+        for last in _TAG_RUN.finditer(buf, 0, cut):
+            pass
+        if last is not None and not buf[last.end():cut].strip():
+            cut = last.start()
+        # רווח שלפני תג שעוד לא נסגר שייך להחלפה (_TAG_RUN בולע אותו).
+        # אם הוא יוצא עכשיו, התוצאה היא רווח כפול, והזרם שונה מהטקסט
+        # הסופי שהלקוח מציג בסוף - קפיצה שהמשתמש רואה.
+        while cut > 0 and buf[cut - 1].isspace():
+            cut -= 1
+        return cut
+
+    def feed(self, piece: str) -> str:
+        self._buf += piece
+        cut = self._cut()
+        out, self._buf = self._buf[:cut], self._buf[cut:]
+        return humanize_citations(out)
+
+    def flush(self) -> str:
+        out, self._buf = self._buf, ""
+        return humanize_citations(out)
+
+
 def _tokenize(text: str) -> set[str]:
     return {w for w in _WORD_RE.findall(text.lower()) if len(w) > 1}
 
@@ -95,7 +169,7 @@ def _load_sources() -> list[SourceChunk]:
             root = load_law(law_id)
         except LawNotFoundError:
             continue  # תקנון הכנסת עדיין לא נטען - לא שגיאה, רק פחות מקורות
-        law_title = root.full_title or law_id
+        law_title = short_law_name(root.full_title or law_id)
         for number, section in find_sections(root).items():
             text = collect_text(section)
             if not text:
