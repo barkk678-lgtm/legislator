@@ -35,7 +35,8 @@ _SECT = (
 
 
 def _t(text: str) -> str:
-    return f'<w:t xml:space="preserve">{escape(text)}</w:t>'
+    from render_bill import xml_safe  # noqa: PLC0415 - אותו סינון תווים (ח8)
+    return f'<w:t xml:space="preserve">{escape(xml_safe(text))}</w:t>'
 
 
 def _run(text: str, *, bold: bool = False) -> str:

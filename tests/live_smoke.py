@@ -30,6 +30,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packages" / "render"))
+from docx_check import structural_problems  # noqa: E402
+
 DEFAULT_BASE = "https://legislator-tau.vercel.app"
 TIMEOUT = 120
 
@@ -276,9 +279,31 @@ def journey_docx(base, res, law_id, payload):
         res.check("מכיל word/document.xml", "word/document.xml" in names)
         text = z.read("word/document.xml").decode("utf-8")
     res.check("הנוסח שנערך נמצא בקובץ", "ובכפוף לכל דין" in text)
+    # ח8 (25.9): "נפתח כ-ZIP" אינו הוכחה - Word פתח כל הצעת חוק עם
+    # "Word מצא תוכן שאינו ניתן לקריאה" והבדיקה הזו עברה. עכשיו: אימות
+    # מבני (packages/render/docx_check.py).
+    problems = structural_problems(raw)
+    res.check("קובץ ה-Word תקין מבנית (לא יפתח אזהרה בוורד)", not problems,
+              "; ".join(problems[:3]) or "נקי")
     # **דברי ההסבר נוצרים אף שהשדה הוסר מהממשק** (ברק, 21.9) -
     # זו בדיוק הדרישה שאומתה אז, וכאן היא ננעלת מול האתר החי.
     res.check("דברי הסבר נוצרו אוטומטית", "דברי הסבר" in text)
+
+
+def journey_query_docx(base, res):
+    """הלקוח מוריד שאילתה כקובץ Word. הייצוא עצמו בלי LLM - חינמי."""
+    print("\n[2א] הורדת שאילתה כקובץ Word")
+    req = urllib.request.Request(
+        base + "/api/query/export",
+        data=json.dumps({"kind": "רגילה", "minister": "השר לביטחון לאומי",
+                         "mk_name": "ישראל ישראלי", "subject": "בדיקה",
+                         "body": "רקע.\nרצוני לשאול:\n1. שאלה?"}).encode(),
+        headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        raw = r.read()
+    problems = structural_problems(raw)
+    res.check("קובץ השאילתה תקין מבנית", raw[:2] == b"PK" and not problems,
+              "; ".join(problems[:3]) or f"{len(raw):,} בייטים")
 
 
 # `17.04.1968` - הפורמט האחיד של המערכת (apps/api/dates.py, ב7).
@@ -463,6 +488,7 @@ def main():
         law_id, payload = edited
         run("הורדת Word", journey_docx, base, res, law_id, payload)
         run("פרסומי החוק", journey_citations, base, res, law_id)
+    run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)
     if args.with_llm:
         run("כלי המחקר", journey_research, base, res)

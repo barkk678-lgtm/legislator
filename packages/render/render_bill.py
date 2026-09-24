@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import zipfile
 from dataclasses import dataclass, field
@@ -47,7 +48,20 @@ EN_DASH = "\u2013"
 
 
 # ── בניית runs ───────────────────────────────────────────────────────────
+# תווים שאסורים ב-XML 1.0 (כל תווי הבקרה חוץ מ-\t \n \r). escape() לא
+# מסנן אותם, ותו אחד כזה הופך את document.xml ללא-תקין - Word לא פותח
+# את הקובץ בכלל. המקור המעשי: טקסט שהמשתמש מדביק מוורד, שבו ירידת
+# שורה ידנית היא \x0b (ח8, 25.9.2026). בקורפוס עצמו נמדדו 0 מקרים.
+_XML_INVALID = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
+
+
+def xml_safe(text: str) -> str:
+    """\x0b (ירידת שורה ידנית של וורד) הופך לרווח; שאר התווים האסורים נמחקים."""
+    return _XML_INVALID.sub(lambda m: " " if m.group(0) == "\x0b" else "", text)
+
+
 def _t(text: str) -> str:
+    text = xml_safe(text)
     sp = ' xml:space="preserve"' if text != text.strip() else ""
     return f"<w:t{sp}>{escape(text)}</w:t>"
 
@@ -173,10 +187,17 @@ def render_line(ln: Line, fn_ids: dict[str, int], n_steps: int, tail_w: int) -> 
     cells.append(cell(STEP_W, "TableText", run(ln.number) if ln.number else ""))
 
     if ln.inner_heading or ln.inner_number:
-        # דפוס הסעיף הפנימי: 3 + 1 + 2
+        # דפוס הסעיף הפנימי: כותרת (3) + מספר (1) + גוף (כל השאר).
+        # סכום ה-gridSpan בשורה חייב להיות שווה למספר עמודות הרשת
+        # (n_steps + 2) - אחרת Word מסמן את הקובץ כפגום (ח8, 25.9).
+        # עד 25.9 הגוף קיבל span=2 קבוע, מול רשת של 7 עמודות: 8 מול 7.
+        # בקבצים האמיתיים (tests/fixtures/real-bills) הגוף הוא 1 ברשת
+        # של 7 ו-2 ברשת של 8 - תמיד "כל השאר".
+        body_span = (n_steps + 2) - (1 + 1 + 3 + 1)  # כותרת שוליים, מספר, 3, מספר פנימי
         cells.append(cell(STEP_W * 3, "TableInnerSideHeading", run(ln.inner_heading), span=3))
         cells.append(cell(STEP_W, "TableText", run(ln.inner_number)))
-        cells.append(cell(tail_w + STEP_W, ln.style, body, span=2, tabs=True))
+        cells.append(cell(tail_w + STEP_W * (body_span - 1), ln.style, body,
+                          span=body_span, tabs=True))
     else:
         for _ in range(d):
             cells.append(cell(STEP_W, "TableText"))
@@ -200,7 +221,8 @@ def render_document(bill: Bill, fn_ids: dict[str, int]) -> str:
         + f'<w:gridCol w:w="{STEP_W}"/>' * n_steps
         + f'<w:gridCol w:w="{tail_w}"/>'
     )
-    tbl = (
+    # טבלה בלי אף <w:tr> - Word מסמן כפגום (ח8). בלי שורות אין טבלה.
+    tbl = "" if not bill.lines else (
         "<w:tbl><w:tblPr><w:bidiVisual/>"
         f'<w:tblW w:w="{TABLE_W}" w:type="dxa"/>'
         '<w:tblLayout w:type="fixed"/>'
@@ -262,6 +284,11 @@ def render_footnotes(refs: dict[str, str]) -> tuple[str, dict[str, int]]:
         '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:pPr>'
         '<w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>'
         "<w:r><w:continuationSeparator/></w:r></w:p></w:footnote>"
+        # continuationNotice (id=1): settings.xml של ה-skeleton מכריז
+        # עליה ב-<w:footnotePr>. עד 25.9 היא נמחקה כאן, וההפניה
+        # מההגדרות נשארה תלויה באוויר - זה מה שגרם ל-Word לפתוח כל
+        # הצעת חוק עם "Word מצא תוכן שאינו ניתן לקריאה" (ח8).
+        '<w:footnote w:type="continuationNotice" w:id="1"><w:p/></w:footnote>'
     )
     ids, body = {}, []
     for i, (key, text) in enumerate(refs.items(), start=2):
