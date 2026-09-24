@@ -482,10 +482,32 @@ function renderNode(node, depth) {
 }
 
 function rebuildTree(tree) {
-  fieldElements = {};
+  // ח2 (25.9.2026): **תפריט הוספה פתוח שורד את הבנייה מחדש.** עד כאן
+  // תשובת רענון שחזרה כשהתפריט פתוח (עריכה ואז "+" מיד - באתר החי
+  // התשובה לוקחת שניות) מחקה אותו עם כל מה שהוקלד בו, והמשתמש לחץ
+  // "הוסף" על כלום. אחרי רענון הדף אין עדכון בדרך - ולכן "זה עבד".
+  // מזיזים את אותו אלמנט (עם המטפלים והטקסט שלו) לעוגן בעץ החדש.
   const treeContainer = document.getElementById("law-tree");
+  const openMenu = treeContainer.querySelector(".insert-menu");
+  const anchorId = openMenu ? openMenu.closest(".node")?.dataset.nodeId : null;
+  const focused = openMenu && openMenu.contains(document.activeElement) ? document.activeElement : null;
+  const caret = focused && "selectionStart" in focused
+    ? [focused.selectionStart, focused.selectionEnd] : null;
+
+  fieldElements = {};
   treeContainer.innerHTML = "";
   treeContainer.appendChild(renderNode(tree, 0));
+
+  if (openMenu && anchorId) {
+    const host = findNodeWrapperById(anchorId)?.querySelector(":scope > .insert-host");
+    if (host) {
+      host.appendChild(openMenu);
+      if (focused) {
+        focused.focus();
+        if (caret) focused.setSelectionRange(caret[0], caret[1]);
+      }
+    }
+  }
 }
 
 function onFieldFocus(ev) {
@@ -818,13 +840,22 @@ function showInsertForm(menu, node, level, label) {
   titleInput.value = "";
 
   const submitBtn = menu.querySelector(".insert-submit-btn");
+  const formError = menu.querySelector(".insert-form-error");
+  const showFormError = (msg, field) => {
+    // ח2: עד כאן שדה חובה ריק רק העביר פוקוס, בלי שום הודעה - הלחיצה
+    // על "הוסף" נראתה כאילו לא קרה כלום.
+    formError.textContent = msg;
+    formError.hidden = false;
+    field.focus();
+  };
+  formError.hidden = true;
   submitBtn.onclick = async () => {
     if (level === "section" && !titleInput.value.trim()) {
-      titleInput.focus();
+      showFormError("נא למלא כותרת שוליים לסעיף החדש.", titleInput);
       return;
     }
     if (!textInput.value.trim()) {
-      textInput.focus();
+      showFormError("נא למלא את תוכן ההוספה.", textInput);
       return;
     }
     const clientId = `ins-${++insertionCounter}`;
