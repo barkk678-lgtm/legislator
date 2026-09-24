@@ -24,7 +24,6 @@
       <button data-t="proto"><span class="ico">≡</span>תקציר הצעה</button>
       <button data-t="critique"><span class="ico">✓</span>בודק הניסוח</button>
       <button data-t="reservations"><span class="ico">≠</span>הסתייגויות</button>
-      <button data-t="research"><span class="ico">◎</span>מחקר</button>
     </div>
   </nav>
 
@@ -63,11 +62,6 @@
     </div>
     <div class="topbar" data-bar="proto" hidden>
       <h1>תקציר הצעת חוק</h1><span class="sub">מה ההצעה עושה, למה, ועל מה לשים לב</span>
-    </div>
-    <div class="topbar" data-bar="research" hidden>
-      <h1>מחקר</h1><span class="sub">איתור סעיפים בשפה חופשית - לפי משמעות, לא לפי מילים</span>
-      <div class="grow"></div>
-      <span class="coverage-badge" id="coverage-badge" hidden></span>
     </div>
 
     <div class="stage">
@@ -314,15 +308,9 @@
             <div class="body" id="research-ask-results"></div>
           </section>
 
-          <section class="card" style="max-width:980px;margin:0 auto;width:100%">
-            <header><h2>חיפוש סמנטי בחקיקה</h2><span>תארו את הנושא במילים שלכם</span></header>
-            <div class="composer">
-              <input id="research-input" class="inp" type="text"
-                     placeholder="לדוגמה: מה קורה כשקבוצת אנשים תובעת יחד חברה על אותו נזק?" />
-              <button id="research-send-btn" class="primary">חיפוש</button>
-            </div>
-            <div class="body" id="research-results"></div>
-          </section>
+          <!-- החיפוש הסמנטי הוסר (25.9.2026). הלשונית כולה אינה
+               בתפריט; כרטיס השאלות הסטטיסטיות נשאר כאן כדי שהקוד שלו
+               יישאר שלם לחזרה עתידית. ראו DECISION_HISTORY. -->
         </div>
       </div>
     </div>

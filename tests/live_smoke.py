@@ -354,30 +354,6 @@ def journey_static(base, res):
         res.check(f"הודעת מפתח הוסרה: {phrase!r}", phrase not in html)
 
 
-def journey_research(base, res):
-    """כלי המחקר. **הבדיקה החשובה כאן היא הסירוב** - שאלה עם
-    מגבלה שאי אפשר להחיל חייבת לא לענות על שאלה אחרת (ברק,
-    22.9). זו קריאת LLM, ולכן רק עם --with-llm."""
-    print("\n[5] כלי המחקר - מגבלה שאי אפשר להחיל")
-    status, body = _post(base, "/api/research/ask",
-                         {"question": "מי היוזמים הפוריים ביותר בכנסת הנוכחית?"})
-    data = json.loads(body)
-    res.check("הכלי אינו עונה על שאלה אחרת", data.get("answered") is False,
-              f"answered={data.get('answered')}")
-    reason = data.get("reason") or ""
-    res.check("הנימוק אינו חושף מזהה תבנית פנימי",
-              not any(t in reason for t in ("top_initiators", "bills_on_topic", "pass_rates")),
-              reason[:70])
-    res.check("מוצעת שאלה חלופית", bool(data.get("answerable_instead")),
-              data.get("answerable_instead", ""))
-
-    status, body = _post(base, "/api/research/ask",
-                         {"question": "מי היוזמים הפוריים ביותר?"})
-    plain = json.loads(body)
-    res.check("אותה שאלה בלי ההגבלה כן נענית", plain.get("answered") is True,
-              f"{len(plain.get('rows') or [])} שורות")
-
-
 def _rules_stream(base, question):
     """התשובה **המוזרמת** של מומחה התקנון, כפי שהלקוח מקבל אותה:
     (הטקסט שהוזרם, אירוע ה-done)."""
@@ -520,7 +496,6 @@ def main():
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)
     if args.with_llm:
-        run("כלי המחקר", journey_research, base, res)
         run("כלי הצ'אט", journey_chat, base, res)
         run("מומחה התקנון - מקורות", journey_rules_citations, base, res)
     else:

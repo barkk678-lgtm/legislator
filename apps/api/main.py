@@ -157,6 +157,13 @@ def _dedupe_by_section(results: list[dict]) -> list[dict]:
     return list(best.values())
 
 
+# **החיפוש הסמנטי הוסר** (ברק, 25.9.2026 - ביצועים, ערך למשתמש). שלוש
+# הנקודות מחזירות 410 ולא נמחקו: כך שום דבר - לא לקוח ישן ולא ריצה
+# מתוזמנת - לא יכול למלא את search_chunks מחדש, והקוד שמתחת נשאר
+# לחזרה עתידית. ראו DECISION_HISTORY "חיפוש סמנטי ולשונית מחקר".
+_SEMANTIC_REMOVED = "החיפוש הסמנטי הוסר מהמערכת (25.9.2026)."
+
+
 @app.get("/api/semantic-search")
 def api_semantic_search(q: str = "", limit: int = 10) -> dict:
     """חיפוש סמנטי היברידי (משימה א, 1.3, 2026-09-16/17) - **שונה
@@ -172,6 +179,7 @@ def api_semantic_search(q: str = "", limit: int = 10) -> dict:
     ב-semantic_search.py כי זו השכבה שכבר מכירה גם את חיפוש-השמות
     (search_law_titles) וגם את החיפוש הסמנטי - אין צורך במימוש שני
     של התאמת-שמות."""
+    raise HTTPException(410, _SEMANTIC_REMOVED)
     try:
         # שולפים יותר מהמבוקש ואז מאחדים לפי סעיף: סעיף ארוך מפוצל
         # לכמה chunks, ובלי האיחוד אותו סעיף מופיע פעמיים-שלוש ברשימה
@@ -203,6 +211,7 @@ def api_openai_check() -> dict:
     אחד למחרוזת קבועה וקצרה (עלות זניחה - שברי-שבר סנט) - לא כותב
     כלום, רק מדווח אם הקריאה ל-api.openai.com הצליחה מכאן (מ-Vercel),
     בניגוד לסביבת ה-agent (חסום שם ברמת proxy, ראו night-report.md)."""
+    raise HTTPException(410, _SEMANTIC_REMOVED)
     import time as _time
 
     start = _time.monotonic()
@@ -367,6 +376,7 @@ def api_admin_ingest_chunks(
     (false) משאירה את המגבלה בתוקף לכל קריאה אחרת.
 
     507 = שומר המרווח עצר: נותר פחות מ-50MB עד תקרת ה-Free tier."""
+    raise HTTPException(410, _SEMANTIC_REMOVED)
     try:
         return run_ingest_batch(
             secret=x_ingest_secret,
