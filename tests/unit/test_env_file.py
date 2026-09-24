@@ -8,6 +8,10 @@
 2. **שום ערך אינו דולף** - לא בהודעת שגיאה, לא ב-loaded_names,
    לא ב-repr של החריגה.
 3. **קובץ חסר אינו שגיאה** - זה המצב התקין בפרודקשן.
+4. **כינוי הוא שם נוסף לאותו משתנה** (24.9.2026): סביבת הענן מוחקת
+   את ANTHROPIC_API_KEY, והמפתח מוגדר שם כ-LEGISLATOR_ANTHROPIC_API_KEY.
+   הסביבה גוברת על הקובץ גם בין השמות, ו-`isolate()` מנתקת גם אותו -
+   אחרת בדיקות היחידה היו קוראות למודל האמיתי בכל מכונה שמוגדר בה.
 
 הטסט **אינו** נוגע בקובץ האמיתי: הוא כותב קובץ זמני ומצביע אליו
 דרך LEGISLATOR_ENV_FILE.
@@ -101,7 +105,9 @@ def main() -> int:
     _restore(saved)
 
     # 7. אף קובץ בריפו אינו קורא os.environ למפתח ישירות
+    #    כולל הכינויים - קריאה ישירה לכינוי עוקפת את סדר העדיפויות.
     root = Path(__file__).resolve().parents[2]
+    aliases = getattr(env_file, "ALIASES", {})
     offenders = []
     for path in list(root.glob("apps/**/*.py")) + list(root.glob("packages/**/*.py")) \
             + list(root.glob("tools/*.py")):
@@ -109,7 +115,8 @@ def main() -> int:
             continue
         text = path.read_text(encoding="utf-8")
         for secret in ("SUPABASE_SERVICE_ROLE_KEY", "ANTHROPIC_API_KEY",
-                       "OPENAI_API_KEY", "INGEST_SECRET", "SUPABASE_URL"):
+                       "OPENAI_API_KEY", "INGEST_SECRET", "SUPABASE_URL",
+                       *(a for names in aliases.values() for a in names)):
             if f'environ.get("{secret}")' in text or f'getenv("{secret}")' in text:
                 offenders.append(f"{path.relative_to(root)}:{secret}")
     checks.append((f"אין קריאה ישירה ל-os.environ למפתח ({offenders})", not offenders))
@@ -117,6 +124,56 @@ def main() -> int:
     # 8. הקובץ האמיתי אינו בתוך הריפו
     inside = list(root.rglob("legislator.env")) + list(root.rglob("*.env"))
     checks.append((f"אין קובץ .env בתוך הריפו ({[str(p) for p in inside]})", not inside))
+
+    # 9. כינוי (ברק, 24.9.2026): סביבת הענן מוחקת את ANTHROPIC_API_KEY,
+    #    והמפתח מוגדר שם בשם LEGISLATOR_ANTHROPIC_API_KEY.
+    canon, alias = "ANTHROPIC_API_KEY", "LEGISLATOR_ANTHROPIC_API_KEY"
+    checks.append(("הכינוי רשום ב-ALIASES", alias in aliases.get(canon, ())))
+
+    _, saved = _with_file("", {canon: None, alias: _SECRET})
+    checks.append(("כינוי בסביבה נקרא דרך השם המקורי", env_file.get(canon) == _SECRET))
+    _restore(saved)
+
+    _, saved = _with_file("", {canon: "מקורי", alias: "כינוי"})
+    checks.append(("שם מקורי גובר על כינוי מאותו מקור", env_file.get(canon) == "מקורי"))
+    _restore(saved)
+
+    # הסביבה גוברת על הקובץ גם בין השמות. _with_file כבר טען את הקובץ,
+    # כלומר השם המקורי יושב ב-os.environ - וזה בדיוק המצב שבו מימוש
+    # נאיבי היה מחזיר את ערך הקובץ, ורק אם מישהו קרא ל-load() קודם.
+    _, saved = _with_file(f"{canon}=מהקובץ\n", {canon: None, alias: "מהסביבה"})
+    checks.append(("כינוי בסביבה גובר על שם מקורי מהקובץ",
+                   env_file.get(canon) == "מהסביבה"))
+    _restore(saved)
+
+    _, saved = _with_file(f"{canon}=מהקובץ\n", {canon: None, alias: None})
+    checks.append(("שם מקורי מהקובץ נקרא כשאין כינוי", env_file.get(canon) == "מהקובץ"))
+    _restore(saved)
+
+    _, saved = _with_file(f"T_SIX={_SECRET}\n", {canon: None, alias: None, "T_SIX": None})
+    message = ""
+    try:
+        env_file.require(canon)
+    except env_file.MissingSecret as e:
+        message = str(e) + repr(e)
+    checks.append(("חסר בכל השמות -> ההודעה נוקבת גם בכינוי", alias in message))
+    checks.append(("...ובלי ערך", bool(message) and _SECRET not in message))
+    _restore(saved)
+
+    # isolate() חייבת לנתק גם כינוי. אחרת כל בדיקה שמניחה "אין מפתח"
+    # קוראת למודל האמיתי בכל מכונה שבה הכינוי מוגדר - כמו סביבת הענן.
+    # **ריק אינו עבר:** בלי כינויים אין כאן מה לבדוק, וזה כישלון.
+    sys.path.insert(0, str(root / "tests" / "support"))
+    from isolate_env import SECRET_NAMES, isolate  # noqa: E402, PLC0415
+    all_aliases = [(c, a) for c, names in aliases.items() for a in names]
+    saved = {k: os.environ.get(k) for k in ("LEGISLATOR_ENV_FILE", *SECRET_NAMES,
+                                            *aliases, *(a for _, a in all_aliases))}
+    for _, a in all_aliases:
+        os.environ[a] = _SECRET
+    isolate()
+    checks.append(("isolate() מנתקת גם כינויים",
+                   bool(all_aliases) and all(env_file.get(c) is None for c, _ in all_aliases)))
+    _restore(saved)
 
     ok = all(passed for _, passed in checks)
     for name, passed in checks:

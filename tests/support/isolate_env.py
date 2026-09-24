@@ -18,6 +18,9 @@ import os
 SECRET_NAMES = (
     "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY",
     "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "INGEST_SECRET",
+    # כינוי ל-ANTHROPIC_API_KEY (env_file.ALIASES). בלעדיו כל בדיקה
+    # שמניחה "אין מפתח" קוראת למודל האמיתי בסביבת הענן, שבה הוא מוגדר.
+    "LEGISLATOR_ANTHROPIC_API_KEY",
 )
 
 _NO_FILE = "/nonexistent/legislator-tests/never.env"

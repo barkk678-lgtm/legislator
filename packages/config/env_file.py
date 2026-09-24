@@ -18,6 +18,12 @@
 **אף פונקציה כאן לא מחזירה ולא מדפיסה ערך של מפתח בהודעת שגיאה,
 בלוג או ב-repr.** `loaded_names()` מחזירה שמות בלבד. זה נבדק
 ב-tests/unit/test_env_file.py.
+
+**כינויים (ברק, 24.9.2026):** סביבת הענן של הסשנים מוחקת את השם
+`ANTHROPIC_API_KEY`, ולכן המפתח מוגדר שם בשם
+`LEGISLATOR_ANTHROPIC_API_KEY`. הקוד ממשיך לבקש `ANTHROPIC_API_KEY` -
+זה השם ב-Vercel - ו-`ALIASES` הופך את הכינוי לשם נוסף לאותו משתנה.
+סדר העדיפויות נשמר גם בין השמות: הסביבה, בכל שמותיה, ואז הקובץ.
 """
 
 from __future__ import annotations
@@ -27,6 +33,13 @@ from pathlib import Path
 
 DEFAULT_PATH = Path("/root/.claude/legislator.env")
 PATH_OVERRIDE = "LEGISLATOR_ENV_FILE"
+
+# השם שהקוד מבקש -> שמות נוספים לאותו משתנה, לפי סדר עדיפות.
+# כל כינוי חדש חייב להיכנס גם ל-tests/support/isolate_env.py -
+# test_env_file נכשל אם לא.
+ALIASES: dict[str, tuple[str, ...]] = {
+    "ANTHROPIC_API_KEY": ("LEGISLATOR_ANTHROPIC_API_KEY",),
+}
 
 _loaded_from: Path | None = None
 _names: tuple[str, ...] = ()
@@ -85,12 +98,24 @@ def load(*, force: bool = False) -> tuple[str, ...]:
 
 
 def get(name: str, default: str | None = None) -> str | None:
-    """הערך מהסביבה, ואם אינו שם - מהקובץ. `None` אם אין בשניהם."""
-    value = os.environ.get(name)
-    if value:
-        return value
+    """הערך מהסביבה, ואם אינו שם - מהקובץ. `None` אם אין בשניהם.
+
+    לשם שיש לו כינוי: הסביבה נבדקת בכל השמות **לפני** הקובץ, ובתוך
+    אותו מקור השם המקורי קודם. `_names` מבדיל בין סביבה אמיתית לבין
+    מה שהקובץ כבר הכניס ל-`os.environ` - בלעדיו, שם מקורי מהקובץ היה
+    גובר על כינוי מהסביבה רק אם מישהו קרא ל-`load()` קודם, כלומר
+    התוצאה הייתה תלויה בסדר הקריאות."""
+    names = (name, *ALIASES.get(name, ()))
+    for candidate in names:
+        value = os.environ.get(candidate)
+        if value and candidate not in _names:
+            return value
     load()
-    return os.environ.get(name) or default
+    for candidate in names:
+        value = os.environ.get(candidate)
+        if value:
+            return value
+    return default
 
 
 def require(name: str, *, used_for: str = "") -> str:
@@ -102,8 +127,10 @@ def require(name: str, *, used_for: str = "") -> str:
     if value:
         return value
     suffix = f" נדרש ל{used_for}." if used_for else ""
+    aliases = ALIASES.get(name, ())
+    also = f" (או {', '.join(aliases)})" if aliases else ""
     raise MissingSecret(
-        f"חסר {name}.{suffix} הוא נקרא מהסביבה, ואם אינו שם - מ-"
+        f"חסר {name}{also}.{suffix} הוא נקרא מהסביבה, ואם אינו שם - מ-"
         f"{env_path()} (הרשאות 600, מחוץ לריפו). ראו CLAUDE.md."
     )
 
