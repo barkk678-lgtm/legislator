@@ -22,6 +22,7 @@ _RANK_EXACT = 0
 _RANK_PREFIX = 1
 _RANK_SUBSTRING = 2
 _RANK_ALL_TOKENS = 3
+_RANK_COMPACT = 4
 
 
 # **ה"א הידיעה בשנה העברית.** ויקיטקסט כותב "חוק העונשין, תשל\"ז-1977"
@@ -33,11 +34,36 @@ _RANK_ALL_TOKENS = 3
 _YEAR_HE = re.compile(r"(?<![א-ת])ה(ת[א-ת]{0,3}\")")
 
 
+# **מקף בין מילים = רווח** (ח6, 25.9.2026). השם הרשמי הוא "חוק-יסוד:
+# הכנסת" והמשתמש מקליד "חוק יסוד: הכנסת" - אפס תוצאות. נמדד: 16 חוקי
+# יסוד, ו-59 שמות חוקים בסך הכול עם מילה מקופת (ארץ-ישראל, בין-לאומי,
+# בן-גוריון, קופת-חולים, שעת-חירום). מקף עברי (־) כבר הופך ל-"-"
+# ב-normalize_text. רק מקף **בין שתי אותיות** - ה-en-dash של השנה
+# ("התשנ"ד–1994") ומספרים לא נוגעים.
+_WORD_HYPHEN = re.compile(r"(?<=[א-ת])-(?=[א-ת])")
+# נקודתיים, נקודה-פסיק ופסיק - מפרידים ולא חלק מהשם לצורך חיפוש.
+_SEPARATORS = re.compile(r"[:;,]")
+_FINALS = str.maketrans("ךםןףץ", "כמנפצ")
+
+
 def normalize_for_search(text: str) -> str:
     n = normalize_text(text)
+    # **המקף מומר לפני הסרת אמות הקריאה, לא אחרי.** strip_matres_
+    # lectionis מסירה י/ו רק באמצע מילה - ו"יסוד" שאחרי מקף נחשבה
+    # אמצע מילה: "חוק-יסוד" -> "חק-סד" (הי' הראשונה נמחקה), מול
+    # "חוק יסוד" -> "חק יסד". זו הסיבה האמיתית לאפס התוצאות, ולא רק
+    # ההבדל בין מקף לרווח.
+    n = _WORD_HYPHEN.sub(" ", n)
+    n = _SEPARATORS.sub(" ", n)
     n = strip_matres_lectionis(n)
     n = _YEAR_HE.sub(r"\1", n)
     return re.sub(r"\s+", " ", n).strip()
+
+
+def _compact(norm: str) -> str:
+    """בלי רווחים ובלי אותיות סופיות: "בינלאומית" מול "בין-לאומית"
+    (שנבדלים גם ב-ן/נ). שכבת התאמה אחרונה, לא תחליף לשאר."""
+    return norm.replace(" ", "").translate(_FINALS)
 
 
 def _rank(query_norm: str, title_norm: str, query_tokens: list[str]) -> int | None:
@@ -50,6 +76,9 @@ def _rank(query_norm: str, title_norm: str, query_tokens: list[str]) -> int | No
         return _RANK_SUBSTRING
     if query_tokens and all(tok in title_norm for tok in query_tokens):
         return _RANK_ALL_TOKENS
+    compact_q = _compact(query_norm)
+    if len(compact_q) >= 4 and compact_q in _compact(title_norm):
+        return _RANK_COMPACT
     return None
 
 
@@ -74,10 +103,15 @@ def search_laws(query: str, laws: list[dict], limit: int = 20) -> list[dict]:
         title_norm = normalize_for_search(title)
         rank = _rank(query_norm, title_norm, query_tokens)
         if rank is not None:
-            scored.append((rank, len(title_norm), title_norm, law))
+            # באותה דרגה: כותרת שבה כל מילות החיפוש הן **מילים שלמות**
+            # קודמת. "חוק יסוד" - חוקי היסוד לפני "חוק יסודות המשפט",
+            # שבו "יסוד" הוא רק תחילת מילה.
+            words = set(title_norm.split(" "))
+            partial = not all(tok in words for tok in query_tokens)
+            scored.append((rank, partial, len(title_norm), title_norm, law))
 
-    scored.sort(key=lambda t: (t[0], t[1], t[2]))
-    return [law for _, _, _, law in scored[:limit]]
+    scored.sort(key=lambda t: (t[0], t[1], t[2], t[3]))
+    return [law for *_, law in scored[:limit]]
 
 
 # שם פומבי לשכבות שצריכות להשוות שם-חוק לכותרת בקורפוס באותה

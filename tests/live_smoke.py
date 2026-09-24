@@ -290,6 +290,18 @@ def journey_docx(base, res, law_id, payload):
     res.check("דברי הסבר נוצרו אוטומטית", "דברי הסבר" in text)
 
 
+def journey_basic_law_search(base, res):
+    """ח6 (25.9): "חוק יסוד: הכנסת" - השם המדויק, ברווח במקום מקף -
+    החזיר אפס תוצאות. 23 מתוך 59 שמות מקופים לא נמצאו כך."""
+    print("\n[1א] חיפוש חוק יסוד")
+    for q in ("חוק יסוד: הכנסת", "חוק יסוד הכנסת"):
+        _, body = _get(base, "/api/laws/search?q=" + urllib.parse.quote(q))
+        hits = json.loads(body)
+        res.check(f'"{q}" מוצא את חוק-יסוד: הכנסת',
+                  bool(hits) and hits[0].get("title") == "חוק-יסוד: הכנסת",
+                  hits[0].get("title") if hits else "אפס תוצאות")
+
+
 def journey_query_docx(base, res):
     """הלקוח מוריד שאילתה כקובץ Word. הייצוא עצמו בלי LLM - חינמי."""
     print("\n[2א] הורדת שאילתה כקובץ Word")
@@ -493,6 +505,7 @@ def main():
         law_id, payload = edited
         run("הורדת Word", journey_docx, base, res, law_id, payload)
         run("פרסומי החוק", journey_citations, base, res, law_id)
+    run("חיפוש חוק יסוד", journey_basic_law_search, base, res)
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)
     if args.with_llm:
