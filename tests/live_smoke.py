@@ -313,7 +313,9 @@ def journey_explanatory(base, res, law_id, payload):
     print("\n[2ב] דברי ההסבר ברקע")
     status, body = _post(base, f"/api/laws/{law_id}/explanatory", payload)
     paras = json.loads(body).get("explanatory") or []
-    res.check("דברי ההסבר נכתבו", status == 200 and bool(paras) and all(p.startswith("מוצע") for p in paras),
+    # ההנחיה מתירה אזכור סעיף לפני "מוצע" ("בסעיף 2 לחוק מוצע לקבוע...") -
+    # "מוצע" במשפט הראשון, לא בהכרח בתחילתו.
+    res.check("דברי ההסבר נכתבו", status == 200 and bool(paras) and all("מוצע" in p.split(".")[0] for p in paras),
               (paras[0][:80] if paras else "ריק"))
 
 
