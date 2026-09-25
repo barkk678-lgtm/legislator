@@ -141,13 +141,26 @@ class QueryExportRequestIn(BaseModel):
 
 class AgendaDraftRequestIn(BaseModel):
     """בקשה לניסוח הצעה לסדר היום (משימה ז, 2026-09-16) - ראו
-    agenda_tool.py. זהה מבנית ל-QueryDraftRequestIn בלי kind (הצעה
-    לסדר אינה מסווגת רגילה/דחופה/ישירה כמו שאילתה). **בלי ייצוא**
-    (ברק, במפורש: "זהה ל-ו' בלי ייצוא") - אין AgendaExportRequestIn
-    בכוונה, לא השמטה."""
+    agenda_tool.py. ס3 (26.9.2026): יש סוג - דחופה או רגילה, כמו בטופס של
+    הכנסת (AGN_Type) - ויש ייצוא לוורד (ברק, 26.9 - במקום "בלי ייצוא")."""
 
     topic_description: str
     mk_name: str
+    kind: Literal["דחופה", "רגילה"] = "דחופה"
+
+
+class AgendaExportRequestIn(BaseModel):
+    """ס3: ייצוא לוורד על שלד הטופס של הכנסת. בלי state בשרת - הלקוח שולח
+    את הטיוטה. היו"ר מגיע עם הטיוטה (ס4 - נשלף כשנוסחה), כדי שההורדה לא
+    תמתין למאגר הכנסת; בלי יו"ר - השרת משתמש במטמון/בגיבוי."""
+
+    kind: Literal["דחופה", "רגילה"] = "דחופה"
+    mk_name: str
+    subject: str
+    explanation: list[str]
+    gender: Literal["זכר", "נקבה"] | None = None          # של חבר/ת הכנסת
+    speaker_name: str | None = None
+    speaker_gender: Literal["זכר", "נקבה"] | None = None
 
 
 class RulesAskRequestIn(BaseModel):

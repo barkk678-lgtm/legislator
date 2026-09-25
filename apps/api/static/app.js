@@ -2172,15 +2172,20 @@ function draftFromTurn(turn, conv) {
 }
 
 function attachQueryExport(bubble, draft) {
+  addWordAction(bubble, "ייצוא השאילתה לקובץ Word", (btn) => exportQueryDraft(draft, btn));
+}
+
+// אייקון הוורד על הודעה - משותף לשאילתה ולהצעה לסדר (ס3).
+function addWordAction(bubble, label, onClick) {
   const btn = document.createElement("button");
   btn.className = "msg-action";
   btn.type = "button";
   btn.title = "ייצוא לוורד";
-  btn.setAttribute("aria-label", "ייצוא השאילתה לקובץ Word");
+  btn.setAttribute("aria-label", label);
   btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>' +
     '<path d="M14 3v5h5"/><path d="M9 13l1.5 4L12 13l1.5 4L15 13"/></svg>';
-  btn.addEventListener("click", () => exportQueryDraft(draft, btn));
+  btn.addEventListener("click", () => onClick(btn));
   bubble.classList.add("has-action");
   // **בראש הבועה, ליד אייקון ההעתקה** (ש3). float משמאל עובד רק על מה
   // שבא לפני הטקסט: appendChild שם אותו אחרי תיבת הטיוטה - משמאל, אבל
@@ -2194,16 +2199,66 @@ let agendaTopicHistory = [];
 let currentAgendaDraft = null;
 let agendaTurns = [];   // ס2: לשיחות השמורות - כמו queryTurns
 
-function renderAgendaDraft(chat, data) {
-  return appendMsg(
-    chat,
-    "a",
-    `הנה נוסח מוצע.` +
-      `<div class="draft"><div class="to">הצעה לסדר היום</div>` +
-      `<b>הנושא:</b> ${escapeHtml(data.subject)}<br><br>` +
-      `${escapeHtml(data.reasoning)}<br><br>${escapeHtml(data.request_text)}</div>`
-  );
+// ס3 (26.9.2026): **בצ'אט - אותו מבנה כמו בקובץ** (הטופס של הכנסת, ראו
+// packages/render/agenda_doc.py): לכבוד / יו"ר / פנייה / משפט הבקשה / נושא /
+// דברי הסבר / בכבוד רב / חתימה. בלי תאריך ומספר - הכנסת מוסיפה אותם.
+function agendaExplanation(data) {
+  // טיוטה ששמורה מלפני ס3: נימוק + בקשה
+  return data.explanation || [data.reasoning, data.request_text].filter(Boolean);
 }
+
+function agendaDraftHtml(data) {
+  const sp = data.speaker || {};
+  const hello = sp.gender === "נקבה" ? "גבירתי היושבת ראש" : "אדוני היושב ראש";
+  const title = { "זכר": "חבר הכנסת", "נקבה": "חברת הכנסת" }[data.mk_gender] || "חבר/ת הכנסת";
+  const urgent = (data.kind || "דחופה") === "דחופה" ? "דחופה " : "";
+  return `<div class="draft agenda-draft">` +
+    `<div>לכבוד</div><div>יו"ר הכנסת, ח"כ ${escapeHtml(sp.name || "")}</div><br>` +
+    `<div>${hello},</div><br>` +
+    `<div>אבקש להעלות על סדר יומה של הכנסת הצעה ${urgent}בנושא:</div>` +
+    `<div><u>${escapeHtml(data.subject || "")}</u></div><br>` +
+    `<div><u>דברי הסבר</u>:</div>` +
+    agendaExplanation(data).map((p) => `<div>${escapeHtml(p)}</div>`).join("") + `<br>` +
+    `<div>בכבוד רב,</div><div>${title} ${escapeHtml(data.mk_name || "")}</div></div>`;
+}
+
+function renderAgendaDraft(chat, data) {
+  const bubble = appendMsg(chat, "a", `ניסחתי הצעה לפי הטופס של הכנסת.` + agendaDraftHtml(data));
+  addWordAction(bubble, "ייצוא ההצעה לסדר לקובץ Word", (btn) => exportAgendaDraft(data, btn));
+  return bubble;
+}
+
+async function exportAgendaDraft(data, btn) {
+  const original = btn ? btn.getAttribute("title") : "";
+  try {
+    if (btn) { btn.disabled = true; btn.setAttribute("title", "מייצא…"); }
+    const gender = data.mk_gender || await mkGenderForExport(data.mk_name);
+    const sp = data.speaker || {};
+    const resp = await fetch("/api/agenda/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: data.kind || "דחופה", mk_name: data.mk_name, subject: data.subject,
+        explanation: agendaExplanation(data), gender, speaker_name: sp.name || null,
+        speaker_gender: sp.gender || null }),
+    });
+    if (!resp.ok) throw new Error("export");
+    const url = URL.createObjectURL(await resp.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "הצעה לסדר היום.docx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    appendMsg(document.getElementById("agenda-chat"), "err",
+              "הייצוא לוורד נכשל. הנוסח עצמו נשאר כאן - אפשר להעתיק אותו.");
+  } finally {
+    if (btn) { btn.disabled = false; btn.setAttribute("title", original || "ייצוא לוורד"); }
+  }
+}
+
+document.getElementById("agenda-mk-input").addEventListener("change", (ev) => mkGenderLookup(ev.target.value));
 
 async function sendAgendaMessage() {
   const input = document.getElementById("agenda-composer-input");
@@ -2228,7 +2283,8 @@ async function sendAgendaMessage() {
     const resp = await fetch("/api/agenda/draft", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic_description: agendaTopicHistory.join("\n"), mk_name: mkName }),
+      body: JSON.stringify({ topic_description: agendaTopicHistory.join("\n"), mk_name: mkName,
+                             kind: document.getElementById("agenda-kind-input").value }),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
@@ -2245,6 +2301,8 @@ async function sendAgendaMessage() {
       agendaHistory.save();
       return;
     }
+    // צ5 בהצעה לסדר: המגדר של חבר/ת הכנסת - לחתימה בצ'אט ובקובץ
+    data.mk_gender = await mkGenderForExport(mkName);
     currentAgendaDraft = data;
     renderAgendaDraft(chat, data);
     agendaTurns.push({ role: "assistant", content: `נושא: ${data.subject}`, draft: { ...data } });
@@ -2265,11 +2323,13 @@ const agendaHistory = mountConvHistory({
     const firstUser = turns.find((t) => t.role === "user");
     return (currentAgendaDraft && currentAgendaDraft.subject) || (firstUser ? firstUser.content.slice(0, 60) : "");
   },
-  getExtra: () => ({ mk: document.getElementById("agenda-mk-input").value.trim() }),
+  getExtra: () => ({ mk: document.getElementById("agenda-mk-input").value.trim(),
+                     kind: document.getElementById("agenda-kind-input").value }),
   restore: (conv) => {
     agendaTurns = conv.turns || [];
     currentAgendaDraft = null;
     document.getElementById("agenda-mk-input").value = conv.mk || "";
+    if (conv.kind) document.getElementById("agenda-kind-input").value = conv.kind;
     const chat = document.getElementById("agenda-chat");
     chat.innerHTML = "";
     // מה שנשלח למודל בהמשך: הודעות המשתמש, בלי אלה שנענו כחולין (ת4)

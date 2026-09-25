@@ -39,6 +39,8 @@ from apply_changes import apply_pending_changes  # noqa: E402
 from explanatory_draft import draft_explanatory_notes  # noqa: E402
 from insert_preview import preview_insertion_label  # noqa: E402
 from agenda_tool import AgendaDraftError, draft_agenda  # noqa: E402
+from agenda_doc import write_agenda_docx  # noqa: E402
+from knesset_speaker import current_speaker  # noqa: E402
 from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
 from query_tool import QueryDraftError, draft_query, write_query_docx  # noqa: E402
@@ -109,6 +111,7 @@ from tree_view import as_of_display, node_view, touched_section_numbers  # noqa:
 from dates import display_date  # noqa: E402
 from schemas import (  # noqa: E402
     AgendaDraftRequestIn,
+    AgendaExportRequestIn,
     BillMetaIn,
     DraftRequestIn,
     InsertPreviewRequestIn,
@@ -1159,9 +1162,34 @@ def api_agenda_draft(req: AgendaDraftRequestIn) -> dict:
     if side:
         return {"chat_reply": side[1], "chat_kind": side[0]}
     try:
-        return draft_agenda(topic_description=req.topic_description, mk_name=req.mk_name)
+        result = draft_agenda(topic_description=req.topic_description, mk_name=req.mk_name,
+                              kind=req.kind)
     except AgendaDraftError as e:
         raise HTTPException(422, str(e))
+    # ס4: היו"ר מהמאגר (במטמון 12 שעות), או הגיבוי הידני - מגיע עם הטיוטה
+    result["speaker"] = current_speaker()
+    return result
+
+
+@app.get("/api/agenda/speaker")
+def api_agenda_speaker() -> dict:
+    """ס4: יו"ר הכנסת הנוכחי - name, gender, source ("feed"/"fallback")."""
+    return current_speaker()
+
+
+@app.post("/api/agenda/export")
+def api_agenda_export(req: AgendaExportRequestIn):
+    speaker = ({"name": req.speaker_name, "gender": req.speaker_gender} if req.speaker_name
+               else current_speaker())
+    out_path = Path(tempfile.mkstemp(suffix=".docx")[1])
+    write_agenda_docx(out=out_path, kind=req.kind, subject=req.subject, explanation=req.explanation,
+                      speaker_name=speaker["name"], speaker_gender=speaker.get("gender"),
+                      mk_name=req.mk_name, mk_gender=req.gender)
+    return FileResponse(
+        out_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename="הצעה לסדר היום.docx",
+    )
 
 
 # ── מומחה התקנון (ברק, 2026-09-17) ──────────────────────────────────────

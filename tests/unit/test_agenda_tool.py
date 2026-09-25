@@ -17,22 +17,25 @@ def main():
     def _set(reply):
         agenda_tool.draft = lambda **kw: reply
 
-    # --- פרסור תקין: נושא:/נימוק:/בקשה: ---
+    # --- פרסור תקין: נושא: / דברי הסבר: (ס3 - המבנה של הטופס של הכנסת) ---
     _set(
         "נושא: מצוקת דיור לזוגות צעירים\n"
-        "נימוק: מחירי הדיור עלו משמעותית בשנים האחרונות, ורבים מהזוגות הצעירים מתקשים לרכוש דירה ראשונה.\n"
-        "בקשה: מוצע כי הכנסת תדון בצעדים להנגשת דיור לזוגות צעירים."
+        "דברי הסבר: מחירי הדיור עלו משמעותית בשנים האחרונות.\n"
+        "רבים מהזוגות הצעירים מתקשים לרכוש דירה ראשונה."
     )
     try:
         a = draft_agenda(topic_description="מחירי הדיור גבוהים מדי לזוגות צעירים", mk_name="דנה לוי")
         passed = (
             a["subject"] == "מצוקת דיור לזוגות צעירים"
-            and a["reasoning"].startswith("מחירי הדיור עלו")
-            and a["request_text"].startswith("מוצע כי הכנסת תדון")
-            and a["mk_name"] == "דנה לוי"
+            and a["explanation"] == ["מחירי הדיור עלו משמעותית בשנים האחרונות.",
+                                     "רבים מהזוגות הצעירים מתקשים לרכוש דירה ראשונה."]
+            and a["mk_name"] == "דנה לוי" and a["kind"] == "דחופה"
         )
         ok = ok and passed
-        print(("OK " if passed else "FAIL"), "פרסור תקין: נושא/נימוק/בקשה ->", a if not passed else "")
+        print(("OK " if passed else "FAIL"), "פרסור תקין: נושא/דברי הסבר, פסקה לכל שורה ->", a if not passed else "")
+        passed = draft_agenda(topic_description="x", mk_name="y", kind="רגילה")["kind"] == "רגילה"
+        ok = ok and passed
+        print(("OK " if passed else "FAIL"), "הסוג עובר לטיוטה (דחופה/רגילה)")
     finally:
         agenda_tool.draft = original_draft
 

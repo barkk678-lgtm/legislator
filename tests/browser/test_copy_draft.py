@@ -69,8 +69,9 @@ def main() -> int:
         page.keyboard.press("Enter")
         page.wait_for_selector("#agenda-chat .msg.a .draft", timeout=15000)
         text = copied(page, "#agenda-chat")
-        results.append(("הצעה לסדר - בלי 'הנה נוסח מוצע'", "הנה נוסח" not in text, text))
-        results.append(("הצעה לסדר - שורה לכל חלק", text.split("\n")[0] == "הצעה לסדר היום"
+        results.append(("הצעה לסדר - בלי משפט הפתיחה של הצ'אט", "ניסחתי" not in text and "הנה נוסח" not in text, text))
+        # ס3: המבנה של הטופס של הכנסת; הטיוטה המדומה כאן בצורה שלפני ס3 (נימוק+בקשה)
+        results.append(("הצעה לסדר - שורה לכל חלק", text.split("\n")[0] == "לכבוד"
                         and "\nאבקש לדון בנושא במליאה." in text, repr(text)))
 
         # ס1: הכפתור הכחול "העתקה" בפינה ירד - האייקון בהודעה הוא ההעתקה

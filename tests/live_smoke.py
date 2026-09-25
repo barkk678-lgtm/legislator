@@ -385,6 +385,29 @@ def journey_word_swap(base, res):
     res.check("העריכה האחרת נקלטה", good.get("ok") is True, str(good)[:160])
 
 
+def journey_agenda_form(base, res):
+    """ס3+ס4 (26.9): יו"ר הכנסת מהמאגר, והצעה לסדר כקובץ Word על שלד הטופס
+    של הכנסת - בלי תאריך ומספר."""
+    print("\n[2ב] הצעה לסדר - יו\"ר וקובץ Word")
+    _, body = _get(base, "/api/agenda/speaker")
+    sp = json.loads(body)
+    res.check("יו\"ר הכנסת - שם ומגדר", bool(sp.get("name")) and sp.get("gender") in ("זכר", "נקבה"), str(sp))
+    res.check("יו\"ר הכנסת - מהמאגר, לא מהגיבוי", sp.get("source") == "feed", str(sp))
+    payload = {"kind": "דחופה", "mk_name": "בדיקה חיה", "subject": "נושא לבדיקה",
+               "explanation": ["פסקה ראשונה.", "פסקה שנייה."], "gender": None}
+    status, data = _post(base, "/api/agenda/export", payload)
+    import io
+    import zipfile
+    try:
+        doc = zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml").decode("utf-8")
+    except (zipfile.BadZipFile, KeyError):
+        doc = ""
+    text = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", doc))
+    res.check("קובץ Word - נושא, דברי הסבר וחתימה", "נושא לבדיקה" in text and "פסקה שנייה." in text
+              and "בדיקה חיה" in text, text[:160])
+    res.check("קובץ Word - בלי תאריך ובלי מספר", not re.search(r"\d{4}|התשפ", text), text[:160])
+
+
 def journey_rules_reading(base, res):
     """ת3 (25.9): התקנון פתוח לקריאה לצד הצ'אט. שלושת המקורות, ובתקנון -
     סעיף 52 במזהה שהמודל מצטט (law-tkanon-haknesset/52); אחרת תגית או
@@ -623,6 +646,7 @@ def main():
     run("התקנון לקריאה", journey_rules_reading, base, res)
     run("תיקון בסעיף קטן", journey_subsection_locator, base, res)
     run("החלפת סדר מילים", journey_word_swap, base, res)
+    run("הצעה לסדר - טופס", journey_agenda_form, base, res)
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)
     if args.with_llm:
