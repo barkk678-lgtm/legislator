@@ -314,9 +314,14 @@ def _find_template(text: str, start: int) -> _Call:
     return _Call(name=parts[0], args=parts[1:], end=i)
 
 
-def _flatten(text: str) -> str:
+def _flatten(text: str, *, clean: bool = True) -> str:
     """מיישר תבניות הפניה מקוננות ({{ח:חיצוני}}/{{ח:פנימי}}/{{ח:הערה}})
-    לטקסט תצוגה שטוח. תבניות לא-מוכרות נשארות כפי שהן (גולמי)."""
+    לטקסט תצוגה שטוח. תבניות לא-מוכרות נשארות כפי שהן (גולמי).
+
+    clean=False - בלי ניקוי הסימון של ח16-ב (26.9). **רק לגזירת מזהים**
+    (_lookahead_content): מזהה של פריט בלי מספר נגזר מ-hash של תוכנו, ובלי
+    זה כל תיקון תצוגה היה מחליף מזהים - 377 מזהים ב-42 חוקים בהרצת הבדיקה,
+    כלומר provenance וטיוטות שמורות שמצביעות על צמתים שכבר אינם."""
     out = []
     i = 0
     while i < len(text):
@@ -324,9 +329,28 @@ def _flatten(text: str) -> str:
             call = _find_template(text, i)
             if call.name in ("ח:חיצוני", "ח:פנימי"):
                 display = call.args[-1] if len(call.args) > 1 else call.args[0]
-                out.append(_flatten(display))
+                out.append(_flatten(display, clean=clean))
             elif call.name == "ח:הערה":
-                out.append(_flatten(call.args[0]))
+                piece = _flatten(call.args[0], clean=clean)
+                # "לפי העניין {{ח:הערה|<s>של הכנסת</s>}}, הוראות" - ההערה כולה
+                # נוסח מחוק, והרווח שלפניה היה נשאר לפני הפסיק.
+                nxt = text[call.end : call.end + 1]
+                if (clean and not piece.strip() and _flatten(call.args[0], clean=False).strip()
+                        and out and out[-1] == " " and (not nxt or nxt in " ,.;:)]")):
+                    out.pop()
+                out.append(piece)
+            elif clean and call.name in _CONTENT_DEPTH:
+                # ח16-ב (26.9): תבנית עומק באמצע טקסט - בתוספות, בתוך תאי
+                # טבלה ורשימות שהמבנה לא מפרק ("{{ח:ת}} יוצא מן הכלל:"). 316
+                # צמתים ב-7 חוקים הציגו "{{ח:ת}}" כפי שהוא. התווית (אם יש)
+                # נשארת - "{{ח:תת|(1)}}" -> "(1)"; בלי תווית - כלום, כולל
+                # הרווח שאחריה.
+                label = next((a.strip() for a in call.args if "=" not in a and a.strip()), "")
+                if label:
+                    out.append(_flatten(label))
+                elif text[call.end : call.end + 1] == " ":
+                    i = call.end + 1
+                    continue
             else:
                 # **תבניות עיצוב של ויקיפדיה שדלפו לנוסח החוק**
                 # ({{מוקטן}}, {{טורים שווים}}, {{ש}}...) - 2,157
@@ -338,15 +362,65 @@ def _flatten(text: str) -> str:
                 # ההשוואה הזו הייתה כאן רקורסיה אינסופית.
                 raw = text[i : call.end]
                 rendered = render(raw)
-                out.append(_flatten(rendered) if rendered != raw else raw)
+                out.append(_flatten(rendered, clean=clean) if rendered != raw else raw)
             i = call.end
         else:
             out.append(text[i])
             i += 1
-    return "".join(out)
+    joined = "".join(out)
+    return _clean_inline_markup(joined) if clean else joined
 
 
-def _is_pure_note(remainder: str) -> str | None:
+# --- ח16-ב (26.9): סימון HTML ותמונות שהגיעו לנוסח ---
+# 1,652 צמתים הציגו תגים כפי שהם ("Benzyl<wbr>piper<wbr>azine",
+# "1<sup>1</sup><span ...>⁄</span><sub>4</sub>"), ו-16 - "[[Image:...]]".
+# **רק תגים מוכרים**: "55 מ"מ < LVEDD" ו-"4.5 < PH" הם טקסט, לא תגים.
+# <math> ו-<table>/<tr>/<td> בתוך טקסט (2+1 חוקים) - לא נוגעים: אין להם
+# ייצוג טקסט נאמן. סוגריים מרובעים שבורים ("[[סעיפים 10 עד 12],") - שגיאה
+# במקור, ומדיה-ויקי מציגה אותה כך; לא "מתקנים" נוסח מקור.
+_SUP = str.maketrans("0123456789+-=()ni", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱ")
+_SUB = str.maketrans("0123456789+-=()aeoxhklmnpst", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₒₓₕₖₗₘₙₚₛₜ")
+_SUP_CHARS, _SUB_CHARS = set("0123456789+-=()ni"), set("0123456789+-=()aeoxhklmnpst")
+_STRUCK_RE = re.compile(r"(\s?)<(s|strike|del)\b[^>]*>(.*?)</\2\s*>", re.S | re.I)
+_SCRIPT_RE = re.compile(r"<(sup|sub)\b[^>]*>(.*?)</\1\s*>", re.S | re.I)
+_DROP_TAG_RE = re.compile(r"</?(?:wbr|nowiki)\b[^>]*>", re.I)
+_BR_RE = re.compile(r"<br\b[^>]*>", re.I)
+# תגי עיצוב בלבד - התג יורד, התוכן נשאר.
+_FORMAT_TAG_RE = re.compile(r"</?(?:span|div|i|u|b|small|big|font|center|em|strong)\b[^>]*>", re.I)
+_IMAGE_RE = re.compile(r"\[\[\s*(?:Image|File|קובץ|תמונה)\s*:\s*([^|\]]+?)(?:\.(?:png|jpe?g|gif|svg|tiff?))?\s*(?:\|[^\]]*|\s+link=[^\]]*)?\]\]", re.I)
+
+
+def _unstrike(match: re.Match) -> str:
+    """<s>...</s> - נוסח שאינו בתוקף (מחוק במקור): "בפסולת <s>בפסולת</s>",
+    "<s>איגוד ערים ...</s> (פורק)", סעיף שבוטל בבג"ץ, "פרט <s>(</s>5<s>)</s>".
+    התוכן יורד. הרווח שלפניו יורד רק כשאחריו רווח/פיסוק/סוף - כך
+    "העניין <s>של הכנסת</s>, הוראות" -> "העניין, הוראות", ו-"פרט <s>(</s>5"
+    -> "פרט 5" (לא "פרט5")."""
+    lead = match.group(1)
+    rest = match.string[match.end() : match.end() + 1]
+    if lead and (not rest or rest.isspace() or rest in ",.;:)]"):
+        return ""
+    return lead
+
+
+def _script(match: re.Match) -> str:
+    tag, inner = match.group(1).lower(), match.group(2)
+    table, chars = (_SUP, _SUP_CHARS) if tag == "sup" else (_SUB, _SUB_CHARS)
+    return inner.translate(table) if inner and set(inner) <= chars else inner
+
+
+def _clean_inline_markup(text: str) -> str:
+    if "<" not in text and "[[" not in text:
+        return text
+    text = _IMAGE_RE.sub(lambda m: f"[תמונה: {m.group(1).strip()}]", text)
+    text = _STRUCK_RE.sub(_unstrike, text)
+    text = _SCRIPT_RE.sub(_script, text)
+    text = _DROP_TAG_RE.sub("", text)
+    text = _BR_RE.sub("\n", text)
+    return _FORMAT_TAG_RE.sub("", text)
+
+
+def _is_pure_note(remainder: str, *, clean: bool = True) -> str | None:
     """אם remainder (אחרי הסרת תבנית העומק המובילה) הוא במלואו קריאת
     {{ח:הערה|...}} אחת - מחזיר את תוכנה השטוח. אחרת None."""
     stripped = remainder.strip()
@@ -354,7 +428,7 @@ def _is_pure_note(remainder: str) -> str | None:
         return None
     call = _find_template(stripped, 0)
     if call.name == "ח:הערה" and call.end == len(stripped):
-        return _flatten(call.args[0])
+        return _flatten(call.args[0], clean=clean)
     return None
 
 
@@ -540,8 +614,9 @@ def _lookahead_content(lines: list[str], from_index: int) -> str | None:
         if call.name not in _CONTENT_DEPTH:
             return None
         remainder = line[call.end :]
-        note_text = _is_pure_note(remainder)
-        flattened = note_text if note_text is not None else _flatten(remainder).strip()
+        # clean=False: המזהה נגזר מהתוכן כפי שהיה לפני ניקוי הסימון - ראו _flatten.
+        note_text = _is_pure_note(remainder, clean=False)
+        flattened = note_text if note_text is not None else _flatten(remainder, clean=False).strip()
         return flattened or None
     return None
 
