@@ -301,6 +301,11 @@ def journey_docx(base, res, law_id, payload):
     # **דברי ההסבר נוצרים אף שהשדה הוסר מהממשק** (ברק, 21.9) -
     # זו בדיוק הדרישה שאומתה אז, וכאן היא ננעלת מול האתר החי.
     res.check("דברי ההסבר שנכתבו מראש נכנסו לקובץ", "דברי הסבר" in text and "בכפוף לכל דין" in text)
+    # ח16 (26.9): "מספר פנימי: ????????" בראש כל קובץ; ושאריות תבניות
+    plain = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", text))
+    res.check('אין "פנימי" ואין שאריות תבניות בקובץ',
+              "פנימי" not in plain and not any(m in plain for m in ("{{", "}}", "[[", "&lt;span")),
+              plain[:80])
 
 
 def journey_explanatory(base, res, law_id, payload):

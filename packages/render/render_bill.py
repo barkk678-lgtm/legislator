@@ -235,8 +235,12 @@ def render_document(bill: Bill, fn_ids: dict[str, int]) -> str:
         + "</w:tbl>"
     )
 
+    # ח16 (26.9.2026): "מספר פנימי" - הכנסת נותנת אותו. placeholder ("????????")
+    # הופיע בראש כל קובץ; מודפס רק מספר אמיתי (הצעה שהועלתה מקובץ).
+    internal = (para("a", run(f"מספר פנימי: {bill.internal_number}"))
+                if bill.internal_number.strip().isdigit() else "")
     head = (
-        para("a", run(f"מספר פנימי: {bill.internal_number}"))
+        internal
         + para("HeadHatzaotHok", run(bill.knesset))
         + para("a", "")
         + para("David", run("יוזם:") + '<w:r><w:rPr><w:rtl/></w:rPr><w:tab/></w:r>'
