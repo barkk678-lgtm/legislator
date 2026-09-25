@@ -2479,13 +2479,9 @@ async function sendRulesMessage() {
     ensureBubble();
     body.innerHTML = rulesAnswerHtml(done.text || acc);
     body.classList.add("rules-answer");
+    // הסעיפים שאוזכרו - תגיות מעל התקנון וקישורים בתוך התשובה (ת3). השורה
+    // "מקורות: ..." שהייתה כאן חזרה על שניהם, והורדה (ברק, 26.9).
     addRulesCited([...(done.cited_ids || []), ...linkifyRulesCitations(body)]);
-    if ((done.cited_sources || []).length) {
-      const cites = document.createElement("div");
-      cites.className = "word-count";
-      cites.textContent = `מקורות: ${done.cited_sources.join(" · ")}`;
-      bubble.appendChild(cites);
-    }
   } catch {
     if (bubble) bubble.remove();
     appendMsg(chat, "err", "החיבור נקטע לפני שהתשובה הושלמה. נסו שוב.");

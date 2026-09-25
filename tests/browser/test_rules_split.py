@@ -75,6 +75,10 @@ def main() -> int:
                         links == ["תקנון הכנסת, סעיף 52", "חוק הכנסת, סעיף 12"]
                         and "סעיף 9999" in page.inner_text("#rules-chat"), str(links)))
 
+        # הכרעת ברק 26.9: השורה "מקורות: ..." מתחת לתשובה חוזרת על התגיות - יורדת
+        results.append(("אין שורת 'מקורות:' מתחת לתשובה", "מקורות:" not in page.inner_text("#rules-chat"),
+                        page.inner_text("#rules-chat")[-120:]))
+
         page.locator("#rules-cited-chips .pq-chip", has_text="סעיף 99").click()
         page.wait_for_timeout(300)
         st = page.evaluate(VISIBLE, f"{TK}/99")
