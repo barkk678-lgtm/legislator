@@ -28,13 +28,17 @@ import random
 from dataclasses import dataclass
 from typing import Literal
 
-from client import LLMConfigError, LLMRequestError, complete, complete_stream
+from client import DEFAULT_MODEL, LLMConfigError, LLMRequestError, complete, complete_stream
 
 Kind = Literal["chitchat", "insult", "substantive"]
 
 # מהיר וזול - סיווג של מילה אחת לפני כל הודעה. ראו CLAUDE.md, מזהי מודלים.
 CLASSIFIER_MODEL = "claude-haiku-4-5-20251001"
-REPLY_MODEL = "claude-haiku-4-5-20251001"
+# צ4 (26.9.2026): **התשובה עצמה - המודל הראשי, לא הקטן.** על המודל הקטן
+# נמדדו 30 תשובות (tools/chitchat_sample.py) ורובן בעברית מביכה: "מה כולך
+# חושב?" (ברק), "בעצם בחרתי!", "אני כאן וחדשפני", "אתה גם בהנאה", "טוב
+# לשמוע מך", "בפרלמנט". הסיווג על המודל הקטן היה נכון ב-30 מתוך 30 - נשאר.
+REPLY_MODEL = DEFAULT_MODEL
 
 _CLASSIFIER_SYSTEM = (
     "אתה מסווג הודעות שנשלחות לצ'אטבוט בכלי עבודה פרלמנטרי (ניסוח שאילתות, "
@@ -60,6 +64,9 @@ _CHITCHAT_SYSTEM = (
     "אתה {tool} בארגז הכלים הפרלמנטרי. המשתמש כתב הודעת חולין - תודה, מחמאה, "
     "ברכה או שאלה עליך. ענה בעברית, בחום ובקצרה (משפט או שניים), בגוף ראשון, "
     "ומותר אימוג'י אחד. אפשר להזכיר במשפט אחד במה אתה יכול לעזור: {can_do}.\n"
+    "**עברית תקנית וטבעית**, כמו שדובר עברית כותב להודעה - לא תרגום מאנגלית "
+    "ובלי צירופים מומצאים. סלנג יומיומי מותר, שגיאות לא. \"הכנסת\", לא "
+    "\"הפרלמנט\". בלי שאלות המשך מאולצות.\n"
     "**אסור לציין שום עובדה** על חוקים, תקנון, נתונים או הליכים - התשובה הזו "
     "אינה עוברת בדיקת מקורות. בלי כותרות, בלי כוכביות ובלי סימני markdown."
 )

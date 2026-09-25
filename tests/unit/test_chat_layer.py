@@ -48,6 +48,17 @@ def main() -> int:
                    cl.chitchat_reply("תודה", tool="t", can_do="c", complete_fn=boom) == "תודה! 😊"))
     sys_prompt = cl._chitchat_system("מומחה התקנון", "שאלות על התקנון")
     checks.append(("הנחיית החולין אוסרת עובדות", "אסור לציין שום עובדה" in sys_prompt))
+    # צ4 (26.9): "מה כולך חושב?" - התשובה נכתבה במודל הקטן. 30 דגימות
+    # (tools/chitchat_sample.py): רובן בעברית מביכה. הסיווג - נשאר קטן.
+    seen = {}
+
+    def spy(**kw):
+        seen["model"] = kw.get("model")
+        return fake("בשמחה! 😊")(**kw)
+    cl.chitchat_reply("תודה", tool="t", can_do="c", complete_fn=spy)
+    checks.append(("צ4: תשובת חולין - המודל הראשי, לא הקטן",
+                   seen.get("model") == cl.DEFAULT_MODEL and seen.get("model") != cl.CLASSIFIER_MODEL))
+    checks.append(("צ4: ההנחיה דורשת עברית תקנית ו'הכנסת'", "עברית תקנית" in sys_prompt and "הפרלמנט" in sys_prompt))
 
     failed = 0
     for name, ok in checks:
