@@ -195,6 +195,78 @@ def sources(*, refresh: bool = False) -> list[SourceChunk]:
     return _sources_cache
 
 
+# ── ת3 (25.9.2026): התקנון פתוח לקריאה ליד הצ'אט ──────────────────────
+# אותם שלושה חוקים, בסדר המסמך: כותרות חלק/פרק/סימן, וכל סעיף עם כותרת
+# השוליים והיחידות שבו (עם התוויות - "(א)", "(1)"). **המזהה של כל סעיף
+# זהה למזהה המקור שהמודל מצטט** (law_id/מספר, find_sections - הראשון בסדר
+# המסמך כשיש מספר כפול), ולכן תגית או אזכור בתשובה מגיעים בדיוק לסעיף
+# שהשומר בדק. סעיף כפול נוסף מוצג בלי מזהה - כטקסט בלבד.
+_HEADING_TYPES = {"part", "chapter", "siman", "sign", "subchapter", "title"}
+_reading_cache: list[dict] | None = None
+
+
+def _unit_lines(section, depth: int = 0) -> list[dict]:
+    out = []
+    for child in section.children:
+        text = child.text or ""
+        if child.node_type == "raw_block":
+            text = re.sub(r"<[^>]+>", " ", text)
+            text = re.sub(r"\s+", " ", text).strip()
+        if text or child.number:
+            out.append({"depth": depth, "label": child.number or "", "text": text})
+        out.extend(_unit_lines(child, depth + 1))
+    return out
+
+
+def reading_items(root, law_id: str) -> list[dict]:
+    """העץ של חוק אחד כרשימה שטוחה לקריאה: {"kind": "heading", "text"} או
+    {"kind": "section", "id", "number", "title", "text", "units"}."""
+    anchors = {id(node): number for number, node in find_sections(root).items()}
+    items: list[dict] = []
+
+    def walk(node):
+        if node.node_type == "section":
+            number = anchors.get(id(node))
+            items.append({
+                "kind": "section",
+                "id": f"{law_id}/{number}" if number is not None else None,
+                "number": node.number or "",
+                "title": node.margin_title or "",
+                "text": node.text or "",
+                "units": _unit_lines(node),
+            })
+            return
+        if node is not root and node.node_type in _HEADING_TYPES:
+            heading = node.margin_title or node.number or ""
+            if heading:
+                items.append({"kind": "heading", "text": heading})
+        for child in node.children:
+            walk(child)
+
+    walk(root)
+    return items
+
+
+def reading_view(*, refresh: bool = False) -> list[dict]:
+    """שלושת המקורות לקריאה, פעם אחת לכל תהליך (כמו sources()). חוק שלא
+    נטען - נשמט; כישלון מלא אינו נשמר במטמון."""
+    global _reading_cache
+    if refresh or not _reading_cache:
+        docs = []
+        for law_id in SOURCE_LAW_IDS:
+            try:
+                root = load_law(law_id)
+            except LawNotFoundError:
+                continue
+            docs.append({"law_id": law_id,
+                         "name": short_law_name(root.full_title or law_id),
+                         "items": reading_items(root, law_id)})
+        if not docs:
+            return []
+        _reading_cache = docs
+    return _reading_cache
+
+
 class RulesExpertError(Exception):
     """שכבת אפליקציה - LLM לא זמין/נכשל (ANTHROPIC_API_KEY חסר/רשת),
     אותו דפוס כמו QueryDraftError/AgendaDraftError - סוג אחד ל-

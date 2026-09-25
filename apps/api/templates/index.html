@@ -212,14 +212,22 @@
       </div>
 
       <div class="tab" id="rules">
-        <div class="cols" style="grid-template-columns:1fr">
-          <section class="card" style="max-width:880px;margin:0 auto;width:100%">
+        <div class="cols rules-cols">
+          <section class="card">
             <header><h2>מומחה התקנון</h2><span>שאלו על סדרי עבודת הכנסת</span></header>
             <div class="chat" id="rules-chat"></div>
             <div class="composer">
               <textarea id="rules-composer-input" class="inp composer-input" rows="1" placeholder="לדוגמה: כמה חתימות נדרשות להצעת אי-אמון?"></textarea>
               <button id="rules-send-btn" class="primary">שליחה</button>
             </div>
+          </section>
+          <!-- ת3: המקורות פתוחים לקריאה; תגיות הסעיפים שאוזכרו - מעליהם -->
+          <section class="card rules-source-card">
+            <header><h2>התקנון</h2><div class="rules-doc-tabs" id="rules-doc-tabs" role="tablist"></div></header>
+            <div class="rules-cited" id="rules-cited" hidden>
+              <span class="pq-knesset-note">סעיפים שאוזכרו:</span><span id="rules-cited-chips"></span>
+            </div>
+            <div class="body rules-doc" id="rules-doc"><div class="hint">טוען את התקנון…</div></div>
           </section>
         </div>
       </div>

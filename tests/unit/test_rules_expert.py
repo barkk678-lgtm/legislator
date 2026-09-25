@@ -174,6 +174,22 @@ def test_labels_use_short_law_name_without_year():
     assert rx.short_law_name("תקנון הכנסת") == "תקנון הכנסת"
 
 
+def test_reading_items_ids_match_cited_source_ids():
+    """ת3: מזהה כל סעיף בחלונית הקריאה = מזהה המקור שהמודל מצטט - אחרת
+    תגית או אזכור בתשובה לא מגיעים לסעיף. כותרות פרק נשמרות בסדר, ותוויות
+    היחידות ("(א)") מוצגות. חוק המאבק בארגוני פשיעה (fixture) - בפרקים."""
+    from node import find_sections
+    root = rx.load_law("maavak-2003")
+    items = rx.reading_items(root, "maavak-2003")
+    secs = [i for i in items if i["kind"] == "section"]
+    assert {i["id"] for i in secs if i["id"]} == {f"maavak-2003/{n}" for n in find_sections(root)}
+    kinds = [i["kind"] for i in items]
+    assert "heading" in kinds and kinds.index("heading") < kinds.index("section"), kinds[:5]
+    s2 = next(i for i in secs if i["id"] == "maavak-2003/2")
+    assert [u["label"] for u in s2["units"] if u["depth"] == 0][:2] == ["(א)", "(ב)"], s2["units"][:3]
+    assert s2["title"], s2
+
+
 for name, fn in sorted(list(globals().items())):
     if name.startswith("test_"):
         fn()

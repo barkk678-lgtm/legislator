@@ -68,6 +68,7 @@ from rules_expert import (  # noqa: E402
     ask as rules_expert_ask,
     ask_stream as rules_expert_stream,
     source_labels as rules_source_labels,
+    reading_view as rules_reading_view,
     humanize_citations as rules_humanize_citations,
     CitationHumanizer as RulesCitationHumanizer,
 )
@@ -1159,7 +1160,19 @@ def api_rules_ask(req: RulesAskRequestIn) -> dict:
         "refused": result.refused,
         "refusal_reason": result.refusal_reason,
         "cited_sources": rules_source_labels(result.cited_source_ids),
+        "cited_ids": list(result.cited_source_ids),
     }
+
+
+@app.get("/api/rules/reading")
+def api_rules_reading() -> dict:
+    """ת3: שלושת המקורות של מומחה התקנון לקריאה בחלונית שליד הצ'אט -
+    כותרות, סעיפים עם כותרות שוליים ויחידות. מזהה כל סעיף = מזהה המקור
+    שהמודל מצטט (ראו rules_expert.reading_items)."""
+    docs = rules_reading_view()
+    if not docs:
+        raise HTTPException(503, "לא הצלחתי לטעון את התקנון כרגע. נסו שוב בעוד רגע.")
+    return {"docs": docs}
 
 
 @app.post("/api/rules/ask/stream")
@@ -1214,6 +1227,8 @@ def api_rules_ask_stream(req: RulesAskRequestIn) -> StreamingResponse:
                         # **שמות בעברית, לא מזהים פנימיים.** מזהה
                         # כמו law-2000325/12 הוא פרט מימוש שדלף.
                         "cited_sources": rules_source_labels(piece.cited_source_ids),
+                        # ת3: המזהים - לתגיות מעל התקנון ולגלילה לסעיף
+                        "cited_ids": list(piece.cited_source_ids),
                     }}, ensure_ascii=False) + "\n"
         except RulesExpertError as e:
             yield json.dumps({"error": str(e)}, ensure_ascii=False) + "\n"

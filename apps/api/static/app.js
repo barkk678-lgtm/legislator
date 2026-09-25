@@ -1575,6 +1575,7 @@ window.addEventListener("beforeunload", flushDraftSave);
 /* ═══ ניווט לשוניות (משימה ח, 2026-09-16) - בלי state בשרת, כל
  * לשונית מסתירה/מציגה DOM בלבד. bills נשארת ברירת המחדל. ═══ */
 function switchTab(tabName) {
+  if (tabName === "rules") loadRulesDocs();   // ת3 - התקנון לצד הצ'אט
   for (const btn of document.querySelectorAll(".nav button[data-t]")) {
     btn.classList.toggle("on", btn.dataset.t === tabName);
   }
@@ -2245,6 +2246,156 @@ function rulesAnswerHtml(text) {
   }).join("\n");
 }
 
+/* ═══ ת3 - התקנון פתוח לקריאה לצד הצ'אט ═══
+ * משמאל: שלושת המקורות (/api/rules/reading), נטענים פעם אחת בכניסה
+ * ללשונית. מעליהם - תגית לכל סעיף שאוזכר בתשובות, בסגנון תגיות הכנסות
+ * בשאילתות. לחיצה על תגית או על אזכור בתוך התשובה ("תקנון הכנסת, סעיף
+ * 52") פותחת את המקור, גוללת לסעיף ומסמנת אותו. המזהה של כל סעיף הוא
+ * מזהה המקור ששומר הציטוט בדק - אותו law_id/מספר. */
+let rulesDocs = null;
+let rulesDocsLoading = null;
+let rulesDocShown = null;
+const rulesCitedIds = [];
+
+function loadRulesDocs() {
+  if (rulesDocs) return Promise.resolve(rulesDocs);
+  if (rulesDocsLoading) return rulesDocsLoading;
+  const box = document.getElementById("rules-doc");
+  box.innerHTML = `<div class="hint">טוען את התקנון…</div>`;
+  rulesDocsLoading = (async () => {
+    try {
+      const resp = await fetch("/api/rules/reading");
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !Array.isArray(data.docs) || !data.docs.length) {
+        throw new Error(typeof data.detail === "string" ? data.detail : "");
+      }
+      rulesDocs = data.docs;
+      renderRulesDocTabs();
+      showRulesDoc(rulesDocs[0].law_id);
+      renderRulesCited();
+      linkifyRulesChat();
+      return rulesDocs;
+    } catch (e) {
+      box.innerHTML = `<div class="msg err">${escapeHtml(e.message || "לא הצלחתי לטעון את התקנון.")}
+        <button type="button" class="subtle" id="rules-doc-retry">נסו שוב</button></div>`;
+      document.getElementById("rules-doc-retry").addEventListener("click", loadRulesDocs);
+      return null;
+    } finally {
+      rulesDocsLoading = null;
+    }
+  })();
+  return rulesDocsLoading;
+}
+
+function rulesSectionById(id) {
+  for (const doc of rulesDocs || []) {
+    for (const it of doc.items) if (it.kind === "section" && it.id === id) return [doc, it];
+  }
+  return [null, null];
+}
+
+function renderRulesDocTabs() {
+  const box = document.getElementById("rules-doc-tabs");
+  box.innerHTML = rulesDocs.map((d) =>
+    `<button type="button" class="pq-chip" role="tab" data-law="${escapeHtml(d.law_id)}">${escapeHtml(d.name)}</button>`).join("");
+  box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => showRulesDoc(b.dataset.law)));
+}
+
+function showRulesDoc(lawId) {
+  const doc = (rulesDocs || []).find((d) => d.law_id === lawId);
+  if (!doc) return;
+  document.querySelectorAll("#rules-doc-tabs button").forEach((b) => {
+    b.classList.toggle("on", b.dataset.law === lawId);
+    b.setAttribute("aria-selected", b.dataset.law === lawId ? "true" : "false");
+  });
+  if (rulesDocShown === lawId) return;
+  rulesDocShown = lawId;
+  const box = document.getElementById("rules-doc");
+  box.innerHTML = doc.items.map((it) => {
+    if (it.kind === "heading") return `<h3>${escapeHtml(it.text)}</h3>`;
+    const units = it.units.map((u) => `<div class="rules-unit" style="padding-inline-start:${u.depth * 18}px">` +
+      (u.label ? `<span class="lbl">${escapeHtml(u.label)}</span>` : "") + escapeHtml(u.text) + "</div>").join("");
+    return `<div class="rules-sec"${it.id ? ` data-sec="${escapeHtml(it.id)}"` : ""}>` +
+      `<div class="rules-sec-head"><span class="num">${escapeHtml(it.number)}.</span>${escapeHtml(it.title)}</div>` +
+      (it.text ? `<div class="rules-unit">${escapeHtml(it.text)}</div>` : "") + units + "</div>";
+  }).join("");
+  box.scrollTop = 0;
+}
+
+async function goToRulesSection(id) {
+  if (!(await loadRulesDocs())) return;
+  const [doc] = rulesSectionById(id);
+  if (!doc) return;
+  showRulesDoc(doc.law_id);
+  const el = [...document.querySelectorAll("#rules-doc .rules-sec[data-sec]")].find((e) => e.dataset.sec === id);
+  if (!el) return;
+  document.querySelectorAll("#rules-doc .rules-hit").forEach((e) => e.classList.remove("rules-hit"));
+  el.classList.add("rules-hit");
+  // גלילה בתוך חלונית התקנון בלבד - לא של כל הדף
+  const box = document.getElementById("rules-doc");
+  box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - 12;
+  document.querySelectorAll("#rules-cited-chips .pq-chip").forEach((c) =>
+    c.classList.toggle("on", c.dataset.sec === id));
+}
+
+function rulesChipLabel(id) {
+  const [doc, sec] = rulesSectionById(id);
+  if (!doc) return null;
+  return doc.law_id === rulesDocs[0].law_id ? `סעיף ${sec.number}` : `${doc.name} ${sec.number}`;
+}
+
+function addRulesCited(ids) {
+  for (const id of ids) if (id && !rulesCitedIds.includes(id)) rulesCitedIds.push(id);
+  renderRulesCited();
+}
+
+function renderRulesCited() {
+  const wrap = document.getElementById("rules-cited");
+  const box = document.getElementById("rules-cited-chips");
+  if (!rulesDocs) return;
+  const chips = rulesCitedIds.map((id) => [id, rulesChipLabel(id)]).filter(([, l]) => l);
+  wrap.hidden = !chips.length;
+  box.innerHTML = chips.map(([id, label]) => {
+    const [, sec] = rulesSectionById(id);
+    return `<button type="button" class="pq-chip" data-sec="${escapeHtml(id)}"
+      title="${escapeHtml(sec.title)}">${escapeHtml(label)}</button>`;
+  }).join("");
+  box.querySelectorAll(".pq-chip").forEach((c) => c.addEventListener("click", () => goToRulesSection(c.dataset.sec)));
+}
+
+// "(תקנון הכנסת, סעיף 52; חוק הכנסת, סעיף 12)" -> קישורים. רק סעיף שקיים
+// במקורות הופך לקישור; מה שלא מזוהה נשאר טקסט. מחזיר את המזהים שנמצאו.
+function linkifyRulesCitations(el) {
+  if (!rulesDocs || el.dataset.linked) return [];
+  const names = rulesDocs.map((d) => d.name).sort((a, b) => b.length - a.length);
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${names.map((n) => esc(escapeHtml(n))).join("|")}), סעיף (\\d+[א-ת]?)`, "g");
+  const found = [];
+  el.innerHTML = el.innerHTML.replace(re, (m, name, num) => {
+    const doc = rulesDocs.find((d) => escapeHtml(d.name) === name);
+    const id = `${doc.law_id}/${num}`;
+    if (!rulesSectionById(id)[1]) return m;
+    found.push(id);
+    return `<a class="rules-cite" data-sec="${escapeHtml(id)}" role="button" tabindex="0">${m}</a>`;
+  });
+  el.dataset.linked = "1";
+  return found;
+}
+
+// תשובות שהגיעו לפני שהתקנון נטען - מקושרות כשהוא נטען
+function linkifyRulesChat() {
+  document.querySelectorAll("#rules-chat .rules-answer").forEach((el) => addRulesCited(linkifyRulesCitations(el)));
+}
+
+document.getElementById("rules-chat").addEventListener("click", (ev) => {
+  const a = ev.target.closest("a.rules-cite");
+  if (a) { ev.preventDefault(); goToRulesSection(a.dataset.sec); }
+});
+document.getElementById("rules-chat").addEventListener("keydown", (ev) => {
+  const a = ev.target.closest && ev.target.closest("a.rules-cite");
+  if (a && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); goToRulesSection(a.dataset.sec); }
+});
+
 async function sendRulesMessage() {
   const input = document.getElementById("rules-composer-input");
   const text = input.value.trim();
@@ -2327,6 +2478,8 @@ async function sendRulesMessage() {
     }
     ensureBubble();
     body.innerHTML = rulesAnswerHtml(done.text || acc);
+    body.classList.add("rules-answer");
+    addRulesCited([...(done.cited_ids || []), ...linkifyRulesCitations(body)]);
     if ((done.cited_sources || []).length) {
       const cites = document.createElement("div");
       cites.className = "word-count";

@@ -725,3 +725,28 @@ button.undo-btn svg {
   width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2;
   stroke-linecap: round; stroke-linejoin: round;
 }
+
+/* ת3: מומחה התקנון - צ'אט מימין, המקורות משמאל */
+.rules-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.rules-doc-tabs { display: flex; gap: 6px; margin-inline-start: auto; flex-wrap: wrap; }
+.rules-doc-tabs .pq-chip { font-size: 12px; }
+.rules-cited {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+  padding: 8px 16px; border-bottom: 1px solid var(--rule); font-size: 12px; flex: 0 0 auto;
+  max-height: 84px; overflow: auto;
+}
+.rules-cited[hidden] { display: none; }
+#rules-cited-chips { display: contents; }
+.rules-doc { line-height: 1.75; font-size: 14px; padding: 16px 22px 48px; }
+.rules-doc h3 { font-size: 13.5px; color: var(--navy); margin: 22px 0 8px; }
+.rules-doc h3:first-child { margin-top: 0; }
+.rules-sec { padding: 6px 8px; margin: 0 -8px 4px; border-radius: 6px; scroll-margin-top: 12px;
+  transition: background-color .4s; }
+.rules-sec-head { font-weight: 700; color: var(--ink); }
+.rules-sec-head .num { color: var(--flag); margin-inline-end: 6px; }
+.rules-unit { margin: 2px 0; }
+.rules-unit .lbl { color: var(--soft); margin-inline-end: 4px; }
+.rules-sec.rules-hit { background: #FFF4CC; box-shadow: inset -3px 0 0 #E0A800; }
+a.rules-cite { color: var(--flag); text-decoration: underline; text-decoration-style: dotted;
+  text-underline-offset: 3px; cursor: pointer; }
+a.rules-cite:hover { text-decoration-style: solid; }
