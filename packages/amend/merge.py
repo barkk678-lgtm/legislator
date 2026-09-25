@@ -34,7 +34,7 @@ from parse_instructions import (  # noqa: E402
     AmendmentPlan, AppendAtEnd, InsertUnit, RelabelAndInsert, ReplaceWords,
 )
 from transform import (  # noqa: E402
-    AddFirstSubsection, InsertAfter, ReplaceWords as ReplaceWordsTransform, apply,
+    AddFirstParagraph, AddFirstSubsection, InsertAfter, ReplaceWords as ReplaceWordsTransform, apply,
 )
 
 _PARENS = re.compile(r"^\s*[(״\"']?\s*(?P<label>.+?)\s*[)״\"']?\s*$")
@@ -268,6 +268,8 @@ def _apply_relabel(current, unit, index):
         return current, None, (
             f"ההצעה מתקנת את סעיף {unit.section}, ואין סעיף כזה בנוסח החוק שברשותי."
         )
+    if unit.container:
+        return _apply_relabel_in_subsection(current, section, unit, index)
     if _label(unit.relabeled_label) != "א" or _label(unit.new_label) != "ב":
         return current, None, (
             f'ההצעה מסמנת את הקיים כ-({_label(unit.relabeled_label)}) ומוסיפה '
@@ -291,6 +293,37 @@ def _apply_relabel(current, unit, index):
         kind="relabel", node_id=new_id, anchor_id=section.id,
         label=f"({_label(unit.new_label)})", text=unit.new_text,
         source_line=unit.source_line,
+    ), ""
+
+
+def _apply_relabel_in_subsection(current, section, unit, index):
+    """ח11-ב: 'בסעיף 34(א), האמור בו יסומן "(1)" ואחריו יבוא: "(2) ..."' -
+    התקדים מרשומות (הצעת חוק הממשלה 1924, עמ' 676). transform.AddFirstParagraph
+    קובעת "(1)"/"(2)" בעצמה; התוויות בהוראה נבדקות, לא מוזנות."""
+    if _label(unit.relabeled_label) != "1" or _label(unit.new_label) != "2":
+        return current, None, (
+            f'ההצעה מסמנת את הנוסח של סעיף קטן ({unit.container}) כ-({_label(unit.relabeled_label)}) '
+            f'ומוסיפה ({_label(unit.new_label)}). הדפוס הזה מוחל על (1) ו-(2) בלבד, ולא אנחש '
+            "מה נכון מחוץ לו."
+        )
+    target, reason = _descendant_by_label(section, _label(unit.container))
+    if target is None:
+        return current, None, f"סעיף קטן ({unit.container}) בסעיף {unit.section}: {reason}."
+    new_id = f"{target.id}/merged-{index}"
+    new_child = LegislativeNode(
+        id=new_id, node_type="paragraph", number="", margin_title=None, text=unit.new_text,
+    )
+    try:
+        current, _ = apply(current, [AddFirstParagraph(
+            section_number=section.number, unit_id=target.id, new_child=new_child,
+        )])
+    except (ValueError, NotImplementedError) as exc:
+        return current, None, (
+            f"לא ניתן להחיל את הוראת המספור מחדש על סעיף {unit.section}({unit.container}): {exc}"
+        )
+    return current, AppliedChange(
+        kind="relabel", node_id=new_id, anchor_id=target.id,
+        label="(2)", text=unit.new_text, source_line=unit.source_line,
     ), ""
 
 

@@ -49,7 +49,10 @@ _INSERT_AFTER_RE = re.compile(
     r"\((?P<label>[^)]+)\)\s+יבוא\s*:?\s*$")
 
 # '"(3)\tהילד נמצא..."' - התווית בפתח הנוסח החדש
-_NEW_UNIT_RE = re.compile(r'^\s*[״"”]\s*\((?P<label>[^)]+)\)\s*(?P<text>.+?)\s*[״"”]?\s*$', re.S)
+# הסיום - מרכאות ואחריהן "." או ";" (`"(ב) ...".`), כמו שהמנוע כותב וכמו
+# בהצעות אמיתיות. עד 26.9 הסימן שאחרי המרכאות לא הותר, ו-`".` נשאר בנוסח
+# המשולב, בסוף היחידה החדשה.
+_NEW_UNIT_RE = re.compile(r'^\s*[״"”]\s*\((?P<label>[^)]+)\)\s*(?P<text>.+?)\s*[״"”]?\s*[.;]?\s*$', re.S)
 
 # 'במקום "לחלוטין" יבוא "במידה רבה"' - הדפוס הנפוץ ביותר בהצעות
 # אמיתיות. בלי "המילים" (מדריך משפטים §7.10.2, ראו drafting-rules
@@ -130,6 +133,8 @@ class RelabelAndInsert:
     new_label: str          # "ב"
     new_text: str
     source_line: int
+    # ח11-ב: 'בסעיף 34(א), האמור בו יסומן "(1)"' - הסעיף הקטן שבתוכו, או "".
+    container: str = ""
 
 
 @dataclass
@@ -215,6 +220,7 @@ def parse_instructions(lines: list[tuple[str, str]]) -> AmendmentPlan:
                 new_label=unit.group("label").strip(),
                 new_text=_strip_quotes(unit.group("text")),
                 source_line=index,
+                container=(section_match.group("sub") or "").strip(),
             ))
             index += 2
             continue

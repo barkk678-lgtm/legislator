@@ -41,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpu
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend"))
 from node import LegislativeNode, find_parent, find_sections  # noqa: E402
 from numbering import next_appended_label, next_inserted_label, sort_section_numbers  # noqa: E402
-from transform import AddFirstSubsection, InsertAfter, InsertSectionAfter  # noqa: E402
+from transform import AddFirstParagraph, AddFirstSubsection, InsertAfter, InsertSectionAfter  # noqa: E402
 
 _FRESH_ID_COUNTER = {"n": 0}
 
@@ -214,6 +214,20 @@ def _resolve(root: LegislativeNode, node_id: str, level: str) -> _Resolution:
         # אותו סעיף קטן), לא מכל פסקאות הסעיף: מספור פסקאות מתאפס בכל
         # סעיף קטן, ולכן "אחרי פסקה (2)" בתוך סעיף קטן (א) מתייחס
         # לפסקאות של (א) בלבד.
+        if (current_node is not None and current_node.node_type == "subsection"
+                and current_node.number and current_node.text.strip()
+                and not any(c.is_normative for c in current_node.children)):
+            # ח11-ב (26.9): סעיף קטן בלי פסקאות - "(א) הופך ל-(א)(1)": הנוסח
+            # הקיים הופך לפסקה (1), והחדש - (2). transform.AddFirstParagraph.
+            anchor_section = _ancestor_of_type(root, node_id, "section")
+            if anchor_section is None:
+                return _Resolution(supported=False, reason="לא נמצא סעיף אב")
+            if _unnumbered_ancestor(root, node_id) is not None:
+                return _Resolution(supported=False, reason="בשרשרת שמעל הסעיף הקטן יש יחידה בלי מספר")
+            return _Resolution(
+                supported=True, label="(2)", kind="add_first_paragraph",
+                section_number=anchor_section.number, anchor_id=current_node.id,
+            )
         if current_node is None or current_node.node_type != "paragraph" or parent is None:
             return _Resolution(
                 supported=False,
@@ -344,6 +358,14 @@ def build_insertion_transform(
             margin_title=None, text=text,
         )
         return AddFirstSubsection(section_number=r.section_number, new_child=new_child), None
+
+    if r.kind == "add_first_paragraph":
+        new_child = LegislativeNode(
+            id=new_id or _fresh_id("paragraph"), node_type="paragraph", number="",
+            margin_title=None, text=text,
+        )
+        return AddFirstParagraph(section_number=r.section_number, unit_id=r.anchor_id,
+                                 new_child=new_child), None
 
     if r.kind == "insert_after":
         # r.label כבר מחושב על ידי _resolve (numbering.next_inserted_label/

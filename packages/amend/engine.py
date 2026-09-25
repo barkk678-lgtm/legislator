@@ -301,6 +301,10 @@ def _scan_level(
         if child.status == "repealed" and prior.status != "repealed":
             mutations.append(_Removal(before_node=prior))
             continue
+        relabel = _first_paragraph_relabel(prior, child)
+        if relabel is not None:
+            mutations.append(relabel)
+            continue
         if prior.children or child.children:
             _scan_level(prior, child, insertions, mutations)
         if prior.text != child.text:
@@ -317,6 +321,30 @@ def _scan_level(
                     "בלבד, לא לעריכה תכנותית."
                 )
             mutations.append(_Mutation(before_node=prior, before_text=prior.text, after_text=child.text))
+
+
+def _first_paragraph_relabel(prior: LegislativeNode, child: LegislativeNode) -> "_RelabelAndInsert | None":
+    """ח11-ב (26.9): סעיף קטן בלי פסקאות קיבל את הראשונה - הנוסח שלו עבר
+    לפסקה (1) בלי שינוי, ופסקה (2) חדשה אחריו (transform.AddFirstParagraph).
+    בלי הזיהוי הזה ההשוואה הייתה רואה "הטקסט של (א) נמחק" ושתי הוספות.
+
+    הניסוח - התקדים מהצעת חוק הממשלה 1924 (רשומות עמ' 676, פריט (8)):
+    `בסעיף 34(א), האמור בו יסומן "(1)" ואחריו יבוא: "(2) ..."` - המקבילה
+    ברמת הסעיף הקטן של §7.10.6(ד). נבדק במפורש שהנוסח עבר **כמו שהוא**:
+    אם הוא גם השתנה, זה דפוס אחר (החוברת מפצלת אותו לשתי הוראות), לא זה."""
+    if prior.node_type != "subsection" or not prior.text or child.text:
+        return None
+    if any(c.is_normative for c in prior.children):
+        return None
+    kids = [c for c in child.children if c.is_normative]
+    if len(kids) != 2 or kids[0].number != "(1)" or kids[1].number != "(2)":
+        return None
+    if kids[0].text != prior.text:
+        raise NotImplementedError(
+            "סעיף קטן שנוסחו הפך לפסקה (1) וגם השתנה - החוברת מפצלת זאת לשתי "
+            "הוראות (§7.10.6(ד), הערה) - לא נתמך בכלי העריכה."
+        )
+    return _RelabelAndInsert(before_node=prior, relabeled_number="(1)", new_node=kids[1])
 
 
 def _wrap_new_content(
@@ -1253,14 +1281,18 @@ def amend(
             # שהתלכדות _Mutation למעלה מתלכדת - ראו שם.
             item = instructions[0]
             footnote = footnotes_by_id.get(item.new_node.id)
+            # ח11-ב: ברמת הסעיף הקטן - הכתובת נושאת את הסעיף הקטן כמכולה
+            # ("בסעיף 6(א)", כמו בתקדים "בסעיף 34(א), האמור בו יסומן "(1)"").
+            # ברמת הסעיף - התוכן הקיים בלי מספר, והסיומת ריקה.
+            locator = number + _container_suffix(before_sec, item.before_node, inclusive=True)
             if touched_count == 1:
                 relabel_lines = _render_relabel_and_insert(
-                    number, item, footnote,
+                    locator, item, footnote,
                     full_title=before.full_title or "",
                     law_footnote_key=law_footnote_key,
                 )
             else:
-                relabel_lines = _render_relabel_and_insert(number, item, footnote)
+                relabel_lines = _render_relabel_and_insert(locator, item, footnote)
             relabel_lines[0].side_heading = f"תיקון סעיף {number}"
             relabel_lines[0].number = f"{touched_count}."
             for relabel_line in relabel_lines:
@@ -1331,6 +1363,20 @@ def amend(
                 for insertion_line in insertion_lines:
                     _stamp_provenance(insertion_line, before_anchor, before)
                 lines.extend(insertion_lines)
+            elif isinstance(instruction, _RelabelAndInsert):
+                # ח11-ב, כפריט ברשימה (§7.10.8): `(n) בסעיף קטן (א), האמור בו
+                # יסומן "(1)" ואחריו יבוא:` ואחריו התוכן המצוטט.
+                node = instruction.before_node
+                footnote = footnotes_by_id.get(instruction.new_node.id)
+                relabel_lines = _render_relabel_and_insert(number, instruction, footnote)
+                _as_item(relabel_lines[0], i + 1,
+                         _item_address(before_sec, node, inclusive=True), terminator)
+                labeled = f"{instruction.new_node.number} {instruction.new_node.text}"
+                (relabel_lines[1].text, relabel_lines[1].text_after,
+                 relabel_lines[1].footnotes) = _wrap_new_content(labeled, terminator, footnote)
+                for relabel_line in relabel_lines:
+                    _stamp_provenance(relabel_line, node, before)
+                lines.extend(relabel_lines)
             elif isinstance(instruction, _MarginTitleMutation):
                 found = replacements_by_id.get(instruction.node_id) or []
                 title_line = _render_margin_title_mutation(

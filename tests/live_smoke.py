@@ -362,6 +362,26 @@ def journey_subsection_locator(base, res):
               " | ".join(lines)[:200])
 
 
+def journey_first_paragraph(base, res):
+    """ח11-ב (26.9): "(א) הופך ל-(א)(1)" - פסקה ראשונה בסעיף קטן בלי פסקאות.
+    חוק-יסוד: הכנסת, 6(א). הניסוח - כמו התקדים ברשומות (הצעת חוק הממשלה
+    1924, עמ' 676): `בסעיף 34(א), האמור בו יסומן "(1)" ואחריו יבוא:`."""
+    print("\n[1ה] פסקה ראשונה בסעיף קטן")
+    new_text = "על אף האמור בפסקה (1), בדיקה חיה."
+    payload = {"edits": [], "insertions": [
+        {"kind": "paragraph", "anchor_node_id": "law-2000037/s6/א", "text": new_text,
+         "client_id": "live-first-paragraph"},
+    ], "bill": {"title": "", "initiator": "", "explanatory": []}}
+    status, body = _post(base, "/api/laws/law-2000037/render", payload)
+    data = json.loads(body) if status == 200 else {}
+    lines = [ln.get("text", "") + (ln.get("text_after") or "") for ln in data.get("lines", [])]
+    joined = " | ".join(lines)
+    res.check('"בסעיף 6(א), האמור בו יסומן "(1)" ואחריו יבוא:"',
+              any('בסעיף 6(א), האמור בו יסומן "(1)" ואחריו יבוא:' in x for x in lines), joined[:200])
+    res.check('"(2) <הנוסח>" במרכאות', any(x.startswith(f'"(2) {new_text}"') for x in lines), joined[:200])
+    res.check("אין כשל הוספה", not data.get("insertion_errors"), str(data.get("insertion_errors"))[:200])
+
+
 def journey_word_swap(base, res):
     """ח19 (26.9): החלפת סדר של שתי מילים ("אדם קייטנה" -> "קייטנה אדם")
     הפילה את /render (500, "השרת לא הצליח לעדכן"). עכשיו - עריכה שלא נקלטה,
@@ -660,6 +680,7 @@ def main():
     run("התקנון לקריאה", journey_rules_reading, base, res)
     run("תיקון בסעיף קטן", journey_subsection_locator, base, res)
     run("החלפת סדר מילים", journey_word_swap, base, res)
+    run("פסקה ראשונה בסעיף קטן", journey_first_paragraph, base, res)
     run("הצעה לסדר - טופס", journey_agenda_form, base, res)
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)

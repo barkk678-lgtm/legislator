@@ -66,6 +66,32 @@ class AddFirstSubsection:
 
 
 @dataclass
+class AddFirstParagraph:
+    """ח11-ב (ברק, 26.9): סעיף קטן שאין בו עדיין פסקאות מקבל את הראשונה
+    שלו - הנוסח הקיים שלו הופך לפסקה (1) [בלי שום שינוי בטקסט], והחדש
+    לפסקה (2). "(א) הופך ל-(א)(1)".
+
+    המקבילה ברמת הסעיף - AddFirstSubsection, §7.10.6(ד). ברמת הסעיף
+    הקטן אין דוגמה בחוברת; **יש תקדים אמיתי**: הצעת חוק הממשלה 1924,
+    רשומות עמ' 676 (reference/reshumot-1924-government-bills.pdf, עמ'
+    PDF 71), פריט (8): `בסעיף 34(א), האמור בו יסומן "(1)" ואחריו יבוא:
+    "(2) על אף האמור בפסקה (1), ..."`.
+
+    בעץ: בסעיף קטן בלי פסקאות הנוסח יושב על הצומת עצמו (text). אחרי
+    הטרנספורמציה הנוסח עובר לילד חדש - פסקה (1), מזהה `<id>/1` - והטקסט
+    של הסעיף הקטן מתרוקן. engine._scan_level מזהה את הצורה הזו ומנסח
+    "האמור בו יסומן "(1)" ואחריו יבוא:".
+
+    unit_id: הסעיף הקטן (מספר, טקסט, בלי ילדים נורמטיביים).
+    new_child: התוכן החדש - מקבל number="(2)" ו-node_type="paragraph"."""
+
+    section_number: str
+    unit_id: str
+    new_child: LegislativeNode
+    footnotes: list[tuple[str, str]] = field(default_factory=list)
+
+
+@dataclass
 class InsertSectionAfter:
     """מוסיף סעיף ראשי חדש (לא סעיף קטן/פסקה בתוך סעיף קיים, אלא ילד
     חדש ברמת שורש החוק עצמו) מיד אחרי הסעיף עם after_section_number -
@@ -261,6 +287,7 @@ def apply(
         | InsertWordsBefore
         | AppendWordsAtEnd
         | AddFirstSubsection
+        | AddFirstParagraph
         | InsertWordsAfter
         | ReplaceWords
         | ReplaceMarginTitleWords
@@ -419,6 +446,38 @@ def apply(
                         node_id=new_child.id, offset=pos + len(anchor_substring), key=key
                     )
                 )
+        elif isinstance(t, AddFirstParagraph):
+            section = _find_section(after, t.section_number)
+            if section is None:
+                raise ValueError(f"סעיף {t.section_number} לא נמצא ב'לפני'")
+            unit = _find_by_id(section, t.unit_id)
+            if (unit is None or unit.node_type != "subsection" or not unit.number
+                    or not unit.text.strip()
+                    or any(c.is_normative for c in unit.children)):
+                raise ValueError(
+                    f"AddFirstParagraph דורש סעיף קטן ממוספר עם נוסח ובלי פסקאות - "
+                    f"{t.unit_id!r} בסעיף {t.section_number} לא עומד בכך."
+                )
+            existing = LegislativeNode(
+                id=f"{unit.id}/1", node_type="paragraph", number="(1)",
+                margin_title=None, text=unit.text, text_raw=unit.text_raw,
+            )
+            unit.text = ""
+            unit.text_raw = ""
+            new_child = copy.deepcopy(t.new_child)
+            new_child.number = "(2)"
+            new_child.node_type = "paragraph"
+            unit.children[0:0] = [existing, new_child]
+            for anchor_substring, key in t.footnotes:
+                count = new_child.text.count(anchor_substring)
+                if count != 1:
+                    raise ValueError(
+                        f"'{anchor_substring}' מופיע {count} פעמים בטקסט {new_child.id} - "
+                        "צריך מופע אחד בדיוק כדי לקבוע מיקום בלי לנחש."
+                    )
+                annotations.append(FootnoteAnnotation(
+                    node_id=new_child.id,
+                    offset=new_child.text.find(anchor_substring) + len(anchor_substring), key=key))
         elif isinstance(t, InsertWordsAfter):
             target = _find_by_id(after, t.target_id)
             if target is None:
