@@ -19,6 +19,7 @@ answer_with_sources()) - תואם את הכרעת המוצר המתועדת ב-C
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -27,23 +28,61 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "corpu
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "render"))
 from service import LLMConfigError, LLMRequestError, draft  # noqa: E402
 from node import LegislativeNode, find_sections  # noqa: E402
+from chunking import collect_text  # noqa: E402
 from render_bill import Line  # noqa: E402
 from bill_title import default_bill_title, strip_law_own_year  # noqa: E402
 from explanatory_draft import draft_explanatory_notes  # noqa: E402
 
 _EXPLANATORY_INSTRUCTIONS = (
-    "אתה מנסח דברי הסבר להצעת חוק ישראלית, בעברית, בסגנון הנהוג במסמכי "
-    "'דברי הסבר' רשמיים לכנסת. כתוב בין 2 ל-5 פסקאות קצרות, כל פסקה "
-    "כמה משפטים. השתמש בלשון 'מוצע לקבוע'/'מוצע לתקן'/'מוצע להוסיף' "
-    "וכיו\"ב - לשון הצעה ענינית, לא גוף ראשון ולא לשון אישית. אסור "
-    "בהחלט להשתמש בלשון פוגענית, מאשימה, פוליטית או שיפוטית כלפי אדם "
-    "או גורם כלשהו - רק תיאור עובדתי-ענייני של התיקון ותכליתו. אתה "
-    "כותב אך ורק את הטקסט המלווה (דברי ההסבר עצמם) - אסור לך לצטט "
-    "מחדש, לשנות, לסכם-כניסוח-חדש או להמציא נוסח סעיפים; הוראות "
-    "התיקון המדויקות מובאות לך כרפרנס לצורך הבנת השינוי בלבד, לא "
-    "לשכתוב. החזר רק את הפסקאות עצמן, מופרדות בשורה ריקה - בלי כותרת "
-    "'דברי הסבר', בלי מספור."
+    "אתה מנסח דברי הסבר להצעת חוק ישראלית, בעברית, בסגנון 'דברי הסבר' "
+    "רשמיים לכנסת. קיבלת את שם החוק, ולכל סעיף שמשתנה: מספרו, כותרת "
+    "השוליים שלו, הנוסח לפני ואחרי, והוראת התיקון.\n\n"
+    "**תאר את מהות השינוי בדין - לא את הפעולה על המילים.** מה ההסדר היום, "
+    "ומה הוא יהיה. למשל: אם בסעיף 'מקום המושב' הוחלף 'ירושלים' ב'תל אביב' - "
+    "'מוצע לקבוע כי מקום מושבה של הכנסת יהיה בתל אביב, במקום בירושלים.' "
+    "ולא 'מוצע להחליף בסעיף 2 את המילה ירושלים'. היעזר בכותרת השוליים כדי "
+    "להבין במה עוסק הסעיף.\n\n"
+    "**אל תחזור על הוראות התיקון** ואל תכתוב רשימה 'תיקון סעיף 5: ...'. "
+    "אזכור מספר הסעיף מותר, בתוך המשפט ('בסעיף 2 לחוק מוצע לקבוע...').\n\n"
+    "**אל תמציא סיבות.** לא ניתן לך שום נימוק - ולכן אסור לכתוב למה השינוי "
+    "נעשה: לא 'בשל', 'לאור', 'נוכח', 'על מנת', 'במטרה', 'כדי ל', 'מתוך "
+    "הכרה', 'הצורך ב'. רק מה משתנה. את הנימוק יוסיף המנסח בעצמו.\n\n"
+    "לשון: 'מוצע לקבוע', 'מוצע לבטל', 'מוצע להוסיף'. פסקה קצרה אחת לכל שינוי "
+    "מהותי (שינויים באותו עניין - בפסקה אחת). ענייני בלבד. החזר רק את "
+    "הפסקאות, מופרדות בשורה ריקה - בלי כותרת, בלי מספור, בלי סימני עיצוב."
 )
+
+# **שומר דטרמיניסטי נגד נימוק מומצא** (ח9) - אותו עיקרון כמו בשאילתות
+# (query_tool.unsupported_source_claims): הנחיה אינה שומר. המשתמש לא נותן
+# כאן נימוק בכלל, ולכן כל אחד מהצירופים האלה הוא המצאה של המודל.
+_INVENTED_REASON = re.compile(
+    r"(?:^|[\s(\-–,])(?:ו?(?:בשל|לאור|נוכח|עקב|בעקבות|על\s+מנת|במטרה|כדי\s+ל|מתוך\s+הכרה|"
+    r"בשים\s+לב|הצורך\s+ב|מתוך\s+רצון|בהתאם\s+למגמה|תכלית\s+התיקון|מטרת\s+התיקון))"
+)
+_REWRITE_WITHOUT_REASON = (
+    "כתבת נימוק שלא ניתן לך ({found}). כתוב מחדש את אותן פסקאות - רק מה "
+    "משתנה בדין, בלי שום 'למה'."
+)
+
+
+def _phrases_in(text: str) -> set[str]:
+    return {m.group(0).strip(" (-–,") for m in _INVENTED_REASON.finditer(text)}
+
+
+def _sentences(paragraph: str) -> list[str]:
+    return [x for x in re.split(r"(?<=[.!?])\s+", paragraph.strip()) if x]
+
+
+def _drop_reason_sentences(paragraphs: list[str], allowed: set[str] = frozenset()) -> list[str]:
+    """המוצא האחרון: משפט עם נימוק מומצא יורד, המהות נשארת."""
+    out = []
+    for p in paragraphs:
+        kept = [x for x in _sentences(p)
+                if not (_phrases_in(x) - allowed)]
+        if kept:
+            out.append(" ".join(kept))
+    return out
+
 
 _TITLE_INSTRUCTIONS = (
     "אתה מנסח את חלק ה'מהות' בשם הצעת חוק ישראלית, שמופיע בפורמט "
@@ -56,19 +95,32 @@ _TITLE_INSTRUCTIONS = (
 )
 
 
-def _sections_context(before: LegislativeNode, after: LegislativeNode, touched_numbers: set[str]) -> str:
-    """נוסח לפני/אחרי לכל סעיף שנגע בו - לא רק הוראת התיקון המנוסחת,
-    גם הנוסח הישיר, כדי שה-LLM יבין את מהות השינוי בלי לנחש מהניסוח
-    המשפטי-פורמלי של הוראת התיקון בלבד."""
+def _sections_context(before: LegislativeNode, after: LegislativeNode, touched_numbers: set[str],
+                      lines: list[Line] | None = None) -> str:
+    """לכל סעיף שנגע בו: מספר, **כותרת השוליים**, הנוסח **המלא** לפני ואחרי
+    (כולל סעיפים קטנים - node.text של סעיף עם סעיפים קטנים ריק), והוראת
+    התיקון שלו. בלי כותרת השוליים המודל לא יודע שסעיף 2 הוא "מקום המושב"."""
     before_sections = find_sections(before)
     after_sections = find_sections(after)
+    by_heading: dict[str, list[str]] = {}
+    for ln in lines or []:
+        if ln.side_heading:
+            by_heading.setdefault(ln.side_heading, []).append(f"{ln.text}{ln.text_after}".strip())
     parts = []
-    for number in sorted(touched_numbers):
-        before_node = before_sections.get(number)
-        after_node = after_sections.get(number)
-        before_text = before_node.text if before_node else "(סעיף חדש - לא היה קיים)"
-        after_text = after_node.text if after_node else "(הוסר)"
-        parts.append(f"סעיף {number}:\nלפני: {before_text}\nאחרי: {after_text}")
+    for number in sorted(touched_numbers, key=lambda n: (len(n), n)):
+        b = before_sections.get(number)
+        a = after_sections.get(number)
+        title = (a or b).margin_title if (a or b) else None
+        head = f"סעיף {number}" + (f" (כותרת השוליים: {title})" if title else "")
+        if b and a and b.margin_title and a.margin_title and b.margin_title != a.margin_title:
+            head += f" - כותרת השוליים משתנה ל: {a.margin_title}"
+        before_text = collect_text(b) if b else "(סעיף חדש - לא היה קיים)"
+        after_text = (collect_text(a) if a and a.status != "repealed" else "(הסעיף מבוטל)") if a else "(הסעיף מבוטל)"
+        instr = [x for h, xs in by_heading.items() if number in h.split() for x in xs]
+        block = f"{head}:\nלפני: {before_text}\nאחרי: {after_text}"
+        if instr:
+            block += "\nהוראת התיקון: " + " ".join(instr)
+        parts.append(block)
     return "\n\n".join(parts)
 
 
@@ -84,18 +136,32 @@ def _lines_context(lines: list[Line]) -> str:
 
 
 def draft_explanatory_llm(
-    lines: list[Line], before: LegislativeNode, after: LegislativeNode, touched_numbers: set[str]
+    lines: list[Line], before: LegislativeNode, after: LegislativeNode, touched_numbers: set[str],
+    *, draft_fn=None,
 ) -> list[str]:
-    """2-5 פסקאות בסגנון דברי הסבר. נופלת חזרה ל-explanatory_draft.
-    draft_explanatory_notes (הדטרמיניסטי) אם ה-LLM לא זמין/נכשל -
-    לא זורקת, לעולם מחזירה טיוטה כלשהי (גם אם פחות עשירה)."""
+    """פסקאות דברי הסבר: מהות השינוי בדין, בלי נימוק מומצא (ח9). נופלת
+    חזרה ל-explanatory_draft.draft_explanatory_notes (הדטרמיניסטי) אם
+    ה-LLM לא זמין/נכשל - לא זורקת, לעולם מחזירה טיוטה כלשהי.
+
+    draft_fn: הזרקה לבדיקות אופליין (ברירת מחדל - service.draft)."""
+    run = draft_fn or draft
     try:
         content = (
-            f"הוראות התיקון שכבר נוסחו:\n{_lines_context(lines)}\n\n"
-            f"נוסח הסעיפים לפני/אחרי:\n{_sections_context(before, after, touched_numbers)}"
+            f"שם החוק: {before.full_title or ''}\n\n"
+            f"{_sections_context(before, after, touched_numbers, lines)}"
         )
-        text = draft(instructions=_EXPLANATORY_INSTRUCTIONS, content=content, max_tokens=1000)
+        text = run(instructions=_EXPLANATORY_INSTRUCTIONS, content=content, max_tokens=1000)
         paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        # צירוף שמופיע בנוסח החוק עצמו ("... כדי לקבל היתר") הוא תוכן, לא נימוק.
+        found = sorted({m.group(0).strip(" (-–,") for p in paragraphs
+                        for m in _INVENTED_REASON.finditer(p)} - _phrases_in(content))
+        if found:
+            # קודם מנסחים מחדש, ורק אז מורידים משפטים - כמו בשאילתות.
+            retry = run(instructions=_EXPLANATORY_INSTRUCTIONS,
+                        content=content + "\n\n" + _REWRITE_WITHOUT_REASON.format(found=", ".join(found)),
+                        max_tokens=1000)
+            paragraphs = [p.strip() for p in retry.split("\n\n") if p.strip()]
+            paragraphs = _drop_reason_sentences(paragraphs, allowed=_phrases_in(content))
         if paragraphs:
             return paragraphs
     except (LLMConfigError, LLMRequestError):

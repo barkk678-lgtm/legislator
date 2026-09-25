@@ -96,6 +96,74 @@ def main():
     finally:
         llm_draft.draft = original_draft
 
+    # ── ח9 (25.9.2026): מהות השינוי, בלי נימוק מומצא ──────────────
+    def tree(section_text, title="מקום המושב", full="חוק-יסוד: הכנסת"):
+        root = LegislativeNode(id="law-y", node_type="law", number="", margin_title=None, text="",
+                               full_title=full)
+        sec = LegislativeNode(id="law-y/s2", node_type="section", number="2", margin_title=title, text="")
+        sec.children.append(LegislativeNode(id="law-y/s2/p0", node_type="subsection", number="",
+                                            margin_title=None, text=section_text))
+        root.children.append(sec)
+        return root
+    before_t, after_t = tree("מקום מושבה של הכנסת הוא ירושלים."), tree("מקום מושבה של הכנסת הוא תל אביב.")
+    one_line = [Line(side_heading="תיקון סעיף 2", number="1.",
+                     text='בחוק-יסוד: הכנסת, בסעיף 2, במקום "ירושלים" יבוא "תל אביב".', text_after="")]
+
+    seen = []
+    def capture(**kw):
+        seen.append(kw["content"])
+        return "מוצע לקבוע כי מקום מושבה של הכנסת יהיה תל אביב."
+    llm_draft.draft = capture
+    try:
+        llm_draft.draft_explanatory_llm(one_line, before_t, after_t, {"2"})
+        c = seen[0]
+        passed = ("חוק-יסוד: הכנסת" in c and "מקום המושב" in c and "ירושלים" in c
+                  and "תל אביב" in c and 'במקום "ירושלים"' in c)
+        ok = ok and passed
+        print(("OK " if passed else "FAIL"), "ח9: ההקשר כולל שם חוק, כותרת שוליים, נוסח מלא (גם סעיף קטן) והוראת התיקון", "" if passed else c)
+    finally:
+        llm_draft.draft = original_draft
+
+    calls = []
+    def invents_then_clean(**kw):
+        calls.append(kw["content"])
+        if len(calls) == 1:
+            return "מוצע לקבוע כי מקום מושבה של הכנסת יהיה תל אביב, על מנת לקרב את הכנסת לציבור."
+        return "מוצע לקבוע כי מקום מושבה של הכנסת יהיה תל אביב, במקום ירושלים."
+    llm_draft.draft = invents_then_clean
+    try:
+        paras = llm_draft.draft_explanatory_llm(one_line, before_t, after_t, {"2"})
+        passed = len(calls) == 2 and "על מנת" in calls[1] and paras == [
+            "מוצע לקבוע כי מקום מושבה של הכנסת יהיה תל אביב, במקום ירושלים."]
+        ok = ok and passed
+        print(("OK " if passed else "FAIL"), "ח9: נימוק מומצא ('על מנת') -> ניסוח מחדש בלעדיו", "" if passed else paras)
+    finally:
+        llm_draft.draft = original_draft
+
+    llm_draft.draft = lambda **kw: ("מוצע לקבוע כי מקום מושבה של הכנסת יהיה תל אביב. "
+                                    "זאת בשל הצורך בקירוב הכנסת למרכז הכלכלי.")
+    try:
+        paras = llm_draft.draft_explanatory_llm(one_line, before_t, after_t, {"2"})
+        passed = paras == ["מוצע לקבוע כי מקום מושבה של הכנסת יהיה תל אביב."]
+        ok = ok and passed
+        print(("OK " if passed else "FAIL"), "ח9: נימוק שחזר גם בניסוח השני -> המשפט יורד, המהות נשארת", "" if passed else paras)
+    finally:
+        llm_draft.draft = original_draft
+
+    b2, a2 = tree("יש לפנות לשר כדי לקבל היתר."), tree("יש לפנות לשר או לממונה כדי לקבל היתר.")
+    calls.clear()
+    def content_phrase(**kw):
+        calls.append(1)
+        return "מוצע לקבוע כי ניתן לפנות גם לממונה, ולא רק לשר, כדי לקבל היתר."
+    llm_draft.draft = content_phrase
+    try:
+        paras = llm_draft.draft_explanatory_llm(one_line, b2, a2, {"2"})
+        passed = len(calls) == 1 and paras == ["מוצע לקבוע כי ניתן לפנות גם לממונה, ולא רק לשר, כדי לקבל היתר."]
+        ok = ok and passed
+        print(("OK " if passed else "FAIL"), "ח9: 'כדי ל' שמופיע בנוסח החוק עצמו - תוכן, לא נימוק", "" if passed else paras)
+    finally:
+        llm_draft.draft = original_draft
+
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1
 

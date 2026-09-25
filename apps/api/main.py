@@ -1061,6 +1061,13 @@ def api_insert_preview(law_id: str, req: InsertPreviewRequestIn) -> dict:
 def api_docx(law_id: str, req: RenderRequest):
     before, result, lines, bill, findings = _render(law_id, req)
     cfg = get_law_config(law_id, before)
+    # ח9: **דברי ההסבר בקובץ - מהמודל, לא הרשימה הדטרמיניסטית.** עד כאן
+    # הקובץ קיבל תמיד את draft_explanatory_notes ("מוצע לתקן את סעיף 5.")
+    # - חזרה על הטבלה. כאן, ולא ב-/render: הורדה היא פעולה אחת, והתצוגה
+    # החיה לא תחכה למודל בכל הקלדה. כשל -> הדטרמיניסטי (בתוך הפונקציה).
+    if lines and not req.bill.explanatory:
+        bill.explanatory = draft_explanatory_llm(
+            lines, before, result.after, touched_section_numbers(before, result.after))
     refs = {cfg.footnote_key: cfg.known_source_ref or ""} if req.include_footnotes else {}
 
     out_path = Path(tempfile.mkstemp(suffix=".docx")[1])
