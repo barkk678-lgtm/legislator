@@ -1736,6 +1736,21 @@ function rulesRefusalText(question, reason) {
 // היחיד מהמצב הקודם, והוא מטופל במפורש: כשהפסק הוא refused,
 // הבועה שהוזרמה **מוחלפת** בהודעה - אסור להשאיר על המסך תשובה
 // שהשומר פסל.
+// ת1 - **הצגת התשובה, לא סימני Markdown.** עד כאן body.textContent: כל
+// "#" ו-"**" מהמודל הופיעו כמות שהם. קודם מבריחים את כל ה-HTML, ורק אז
+// ממירים: **x** -> בולד אמיתי, __x__ -> קו תחתון; "#" בראש שורה - נמחק
+// (בלי כותרות, ברק); "* " / "- " בראש שורה -> "•". "**" שנשאר בלי זוג
+// (באמצע הזרמה, או סתם) - נמחק, כדי שלא יהבהב על המסך.
+function rulesAnswerHtml(text) {
+  return String(text || "").split("\n").map((line) => {
+    let h = escapeHtml(line.replace(/^\s*#{1,6}\s*/, "").replace(/^(\s*)[*-]\s+/, "$1• "));
+    h = h.replace(/\*\*(\S(?:[^*]*?\S)?)\*\*/g, "<b>$1</b>")
+         .replace(/__(\S(?:[^_]*?\S)?)__/g, "<u>$1</u>")
+         .replace(/\*\*/g, "");
+    return h;
+  }).join("\n");
+}
+
 async function sendRulesMessage() {
   const input = document.getElementById("rules-composer-input");
   const text = input.value.trim();
@@ -1789,7 +1804,7 @@ async function sendRulesMessage() {
         if (ev.delta) {
           ensureBubble();
           acc += ev.delta;
-          body.textContent = acc;
+          body.innerHTML = rulesAnswerHtml(acc);
           follower.update();   // צ1 - לא scrollHeight בכל קטע
         } else if (ev.done) {
           done = ev.done;
@@ -1817,7 +1832,7 @@ async function sendRulesMessage() {
       return;
     }
     ensureBubble();
-    body.textContent = done.text || acc;
+    body.innerHTML = rulesAnswerHtml(done.text || acc);
     if ((done.cited_sources || []).length) {
       const cites = document.createElement("div");
       cites.className = "word-count";
