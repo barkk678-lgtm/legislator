@@ -310,12 +310,16 @@ def test_expansion_failure_has_empty_domain():
 
 
 # ── ש4, סבב 2: מה שנמדד באתר החי אחרי התיקון הראשון ─────────────
-def test_short_stem_does_not_match_inside_a_word():
-    """"מור" ב"חמור": "מחסור חמור במוסכניקים" נכנס לנושא על מורים."""
+def test_short_term_is_a_whole_word():
+    """"מור" ב"חמור" (מוסכניקים לנושא על מורים), ו"תקנ" ב"התקנת מצלמות"
+    (לנושא על תקני שוטרים) - שניהם נמדדו באתר החי."""
     assert not kq.term_in("מור", "מחסור חמור במוסכניקים")
     assert not kq.term_in("מור", "מחסור בשופטים והפגיעה החמורה בהליכים משפטיים")
-    assert kq.term_in("מור", "מחסור במורים במערכת החינוך")
-    assert kq.term_in("מור", "המורים שובתים")
+    assert not kq.term_in("תקנ", 'שימוש המשטרה במצלמות ע"פ חוק התקנת מצלמות')
+    assert not kq.term_in("תקן", 'שימוש המשטרה במצלמות ע"פ חוק התקנת מצלמות')
+    assert kq.term_in("תקן", "חריגה מהתקן במשטרה") and kq.term_in("תקן", "בתקן")
+    assert kq.term_in("תקנים", "דוח מבקר המדינה מצביע על חוסר תקנים משטרתיים באגף התנועה")
+    assert kq.term_in("מורים", "מחסור במורים במערכת החינוך")
 
 
 def test_multi_word_term_matches_word_by_word():
@@ -328,10 +332,10 @@ def test_multi_word_term_matches_word_by_word():
 def test_unit_local_filter_drops_short_stem_false_hits():
     kq._unit_cache.clear()
     rows = [{"Id": 1, "Name": "מחסור חמור במוסכניקים", "KnessetNum": 25},
-            {"Id": 2, "Name": "מחסור משמעותי במורים", "KnessetNum": 25}]
+            {"Id": 2, "Name": "מחסור משמעותי במורה", "KnessetNum": 25}]
     original = with_fetch(lambda *a, **k: rows)
     try:
-        out = kq.run_unit(["מחסור", "מור"])
+        out = kq.run_unit(["מחסור", "מורה"])
         assert [r["query_id"] for r in out["rows"]] == [2], out["rows"]
     finally:
         kq.fetch = original

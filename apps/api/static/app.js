@@ -2079,14 +2079,14 @@ function pqNorm(text) {
     .replace(/[-־]/g, " ").split(/\s+/).filter(Boolean).join(" ");
 }
 // מונח מופיע בכותרת - ברמת המילה (knesset_queries.term_in): "בתי ספר"
-// נמצא ב"בבתי הספר"; גזע של עד 3 אותיות פותח מילה אחרי עד שלוש אותיות
-// שימוש - "מור" נמצא ב"במורים" ולא ב"חמור".
+// נמצא ב"בבתי הספר"; מונח של עד 3 אותיות הוא מילה שלמה אחרי עד שלוש
+// אותיות שימוש - "תקן" נמצא ב"בתקן" ולא ב"התקנת", "מור" לא ב"חמור".
 function pqTermIn(term, title) {
   const t = pqNorm(title);
   return pqNorm(term).split(" ").filter(Boolean).every((w) => {
     if (w.length > 3) return t.includes(w);
     const esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(?:^|[^א-ת])[והבלמשכ]{0,3}${esc}`).test(t);
+    return new RegExp(`(?:^|[^א-ת])[והבלמשכ]{0,3}${esc}(?![א-ת])`).test(t);
   });
 }
 // domain = היבטים (הגוף/התחום, ומקום אם נקבו בו): מונח אחד לפחות מכל היבט.
