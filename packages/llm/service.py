@@ -38,13 +38,22 @@ from client import (  # noqa: F401 (re-exported)
 _CITATION_RE = re.compile(r"\[מקור:([^\]]+)\]")
 
 
+_ID_PREFIX_RE = re.compile(r"^מקור:\s*")
+
+
+def citation_ids(tag_body: str) -> list[str]:
+    """המזהים שבתוכן של תג אחד (מה שבין "[מקור:" ל-"]"). **תג אחד יכול לשאת
+    כמה מזהים** - "law-tkanon-haknesset/54, law-tkanon-haknesset/53" - וגם
+    "law-tkanon-haknesset/52, מקור:law-tkanon-haknesset/53", עם "מקור:"
+    לפני כל מזהה (שניהם נצפו בבדיקה החיה, 26.9). עד כאן המזהה השני נקרא
+    "מקור:law-..." - מזהה לא מוכר - והתשובה, תקינה, הוחלפה בסירוב. מזהים
+    אינם מכילים פסיק."""
+    return [_ID_PREFIX_RE.sub("", part.strip()) for part in tag_body.split(",") if part.strip()]
+
+
 def _cited_ids(text: str) -> list[str]:
-    """המזהים שצוטטו, לפי הסדר. **תג אחד יכול לשאת כמה מזהים** -
-    "[מקור:law-tkanon-haknesset/54, law-tkanon-haknesset/53]" (נצפה בבדיקה
-    החיה, 26.9): עד כאן כל התג נקרא כמזהה אחד לא מוכר, והתשובה - תקינה -
-    הוחלפה בסירוב. מזהים אינם מכילים פסיק."""
-    return [part.strip() for tag in _CITATION_RE.findall(text)
-            for part in tag.split(",") if part.strip()]
+    """המזהים שצוטטו, לפי הסדר - ראו citation_ids."""
+    return [i for tag in _CITATION_RE.findall(text) for i in citation_ids(tag) if i]
 _NO_SOURCES_REFUSAL = "אין מקורות רלוונטיים סופקו - לא ניתן לענות בלי עיגון בקורפוס."
 _MODEL_REFUSAL_PREFIX = "אין מקור מספיק:"
 

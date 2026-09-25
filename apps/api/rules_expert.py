@@ -42,6 +42,7 @@ from service import (  # noqa: E402
     SourceChunk,
     answer_with_sources,
     answer_with_sources_stream,
+    citation_ids,
 )
 
 from law_registry import LawNotFoundError, load_law  # noqa: E402
@@ -115,8 +116,8 @@ def humanize_citations(text: str) -> str:
     by_id = {c.id: c.label for c in sources()} if _TAG_PREFIX in text else {}
 
     def repl(m: re.Match) -> str:
-        # תג אחד יכול לשאת כמה מזהים, מופרדים בפסיק (ראו service._cited_ids)
-        ids = [p.strip() for tag in _TAG_ONE.findall(m.group(0)) for p in tag.split(",")]
+        # תג אחד יכול לשאת כמה מזהים, מופרדים בפסיק (ראו service.citation_ids)
+        ids = [i for tag in _TAG_ONE.findall(m.group(0)) for i in citation_ids(tag)]
         labels = [by_id[i] for i in ids if i in by_id]
         return f" ({group_citation_labels(list(dict.fromkeys(labels)))})" if labels else ""
 

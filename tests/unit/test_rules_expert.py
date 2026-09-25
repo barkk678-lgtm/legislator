@@ -132,6 +132,13 @@ def test_adjacent_citations_merge_into_one_parenthesis():
     assert out == "כך (תקנון הכנסת, סעיף 86; חוק הכנסת, סעיף 12).", out
 
 
+def test_multi_id_tag_with_repeated_prefix():
+    """'[מקור:A, מקור:B]' (נצפה בבדיקה החיה, 26.9) - שני האזכורים, לא רק הראשון."""
+    rx._sources_cache = SRC
+    out = rx.humanize_citations("כך [מקור:law-tkanon-haknesset/86, מקור:law-2000325/12].")
+    assert out == "כך (תקנון הכנסת, סעיף 86; חוק הכנסת, סעיף 12).", out
+
+
 def test_streamed_text_has_no_raw_tag_even_when_split_across_deltas():
     """הבאג היה בשני המסלולים; במוזרם יש גם מלכודת נוספת - תג שנחתך
     בין שני קטעים ("[מקור:law-tk" + "anon-haknesset/86]")."""
