@@ -43,6 +43,7 @@ application/msword), אף שהוא חסום מסביבת ה-agent.
 from __future__ import annotations
 
 import json
+import random
 import sys
 import time
 from pathlib import Path
@@ -211,6 +212,16 @@ def default_knesset_nums() -> list[int]:
     return [current, current - 1] if current else []
 
 
+# **מטמון לפי צירוף** (ש2, 25.9.2026). מאגר השאילתות משתנה לאט - אין
+# סיבה לשאול את הפיד את אותו צירוף פעמיים באותו יום, וכל בקשה שנחסכת
+# היא בקשה שלא נחסמת. בזיכרון התהליך: ב-Vercel מופע חם משרת בקשות
+# רבות. מטמון משותף בדאטהבייס - אחרי ניקוי המקום (task 130).
+_WAF_MAX_CONTAINS = 3
+_UNIT_CACHE_TTL = 6 * 3600
+_UNIT_CACHE_MAX = 500
+_unit_cache: dict[tuple, tuple[float, dict]] = {}
+
+
 def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None = None) -> dict:
     """יחידת חיפוש אחת = קריאה אחת לפיד. **כל** מילות היחידה חייבות
     להופיע בכותרת (and, לא or) - זה מה שמונע את "מצוקת" לבדה.
@@ -221,15 +232,30 @@ def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None
     words = [w.strip() for w in words if w and w.strip()]
     if not words:
         return {"words": [], "rows": [], "count": 0}
-    clause = " and ".join(f"contains(Name,'{escape(w)}')" for w in words)
+    # **ה-WAF של הכנסת חוסם 4 תנאי contains() ומעלה** (ש2, 25.9.2026).
+    # נמדד: 4 מילים -> HTTP 473 **תמיד**, גם בבקשה בודדת עם הפסקות וגם
+    # עם מילים של אות אחת; 3 -> תמיד עובר. זו הייתה הסיבה ל"4 מתוך 11
+    # מקורות נבדקו", לא מגבלת קצב: הורדת המקביליות ל-2 והוספת ניסיונות
+    # חוזרים לא שינו דבר (86/94 מול 84/92). כל יחידה של 4 מילים מהמודל
+    # נכשלה, בכל חיפוש. עכשיו: לפיד נשלחות 3 המילים הארוכות (הספציפיות
+    # ביותר), ו**כל** המילים נבדקות מקומית על השמות שחזרו - אותה
+    # משמעות בדיוק, כי contains הוא תת-מחרוזת בשני המקומות.
+    feed_words = sorted(words, key=len, reverse=True)[:_WAF_MAX_CONTAINS]
+    clause = " and ".join(f"contains(Name,'{escape(w)}')" for w in feed_words)
     if knesset_nums:
         ors = " or ".join(f"KnessetNum eq {int(n)}" for n in knesset_nums)
         clause = f"({clause}) and ({ors})"
+    cache_key = (tuple(words), tuple(sorted(knesset_nums or [])), top)
+    cached = _unit_cache.get(cache_key)
+    if cached and time.time() - cached[0] < _UNIT_CACHE_TTL:
+        return cached[1]
     # **הפיד מגביל קצב.** נמדד: מעל ~4 בקשות בו-זמנית הוא מחזיר
-    # HTTP 473, וכשל כזה מתבטא כ"מקור שלא נבדק" אצל המשתמש. שני
-    # ניסיונות חוזרים עם השהיה גדלה מכסים את הרוב; מה שנשאר נספר
-    # ונאמר במפורש, ולא נבלע כתוצאה ריקה.
-    for attempt in range(3):
+    # HTTP 473, וכשל כזה מתבטא כ"מקור שלא נבדק" אצל המשתמש. ש2
+    # (25.9.2026): עד כאן שני ניסיונות חוזרים בהשהיה קבועה, ו-8 מתוך
+    # 95 מקורות לא נבדקו על עשרה חיפושים באתר החי. עכשיו ארבעה
+    # ניסיונות חוזרים בהשהיה כפולה עם פיזור אקראי - כדי שבקשות שנחסמו
+    # יחד לא יחזרו שוב יחד. מה שנשאר נספר ונאמר, ולא נבלע.
+    for attempt in range(5):
         try:
             rows = fetch(
                 "KNS_Query",
@@ -240,10 +266,12 @@ def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None
             )
             break
         except OdataError as e:
-            if attempt == 2 or "473" not in str(e):
+            if attempt == 4 or "473" not in str(e):
                 raise
-            time.sleep(0.8 * (attempt + 1))
-    return {
+            time.sleep(min(0.5 * 2 ** attempt, 4.0) + random.uniform(0, 0.4))
+    if len(feed_words) < len(words):
+        rows = [r for r in rows if all(w in (r.get("Name") or "") for w in words)]
+    result = {
         "words": words,
         "count": len(rows),
         "too_broad": len(rows) > GENERIC_CAP,
@@ -257,6 +285,10 @@ def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None
             "person_id": r.get("PersonID"),
         } for r in rows],
     }
+    _unit_cache[cache_key] = (time.time(), result)
+    if len(_unit_cache) > _UNIT_CACHE_MAX:
+        _unit_cache.pop(next(iter(_unit_cache)))   # הישן ביותר
+    return result
 
 
 def _person_names(person_ids: list[int]) -> dict[int, str]:

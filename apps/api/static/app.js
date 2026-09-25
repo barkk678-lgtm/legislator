@@ -2014,9 +2014,34 @@ function pqUnitBudget(count) {
   if (count <= PQ_HOLD_ABOVE) return 6;
   return 0;                      // רחב - מוחזק לסוף, רק ההצלבה מוצגת
 }
-const PQ_CONCURRENCY = 3;        // + בדיקת הפתיחה = 4 בו-זמנית. נמדד: הפיד
-                                 // מחזיר HTTP 473 מעל כך; run_unit מנסה שוב, ומה
-                                 // שנשאר נספר ונאמר, לא נבלע.
+// ש2 (25.9.2026): **4 בקשות בו-זמנית, סך הכול** - בדיקות הפתיחה בתוך
+// אותו תור, לא בנוסף לו (עד כאן יצאו עד 7). אבל **המקביליות לא הייתה
+// הסיבה** ל"4 מתוך 11 מקורות נבדקו": ה-WAF של הכנסת חוסם כל סינון עם
+// 4 תנאי contains() ומעלה, תמיד (ראו knesset_queries.run_unit). נמדד
+// על עשרה חיפושים: 2 בו-זמנית בלי תיקון ה-WAF - 86/94, אותם כשלים;
+// עם התיקון - 2 בו-זמנית 89/89 ב-154 שניות, 4 בו-זמנית 93/93 ב-99.
+const PQ_CONCURRENCY = 4;
+const PQ_CACHE_KEY = "legislator.pq-units.v1";
+const PQ_CACHE_MAX = 150;
+
+// מטמון יומי לפי צירוף + כנסות. מאגר השאילתות משתנה לאט - אין סיבה
+// לשאול את הפיד את אותו דבר פעמיים באותו יום.
+function pqCacheGet(key) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PQ_CACHE_KEY) || "{}");
+    const hit = all[key];
+    return hit && hit.day === new Date().toDateString() ? hit.data : null;
+  } catch { return null; }
+}
+function pqCachePut(key, data) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PQ_CACHE_KEY) || "{}");
+    all[key] = { day: new Date().toDateString(), data };
+    const keys = Object.keys(all);
+    for (const k of keys.slice(0, Math.max(0, keys.length - PQ_CACHE_MAX))) delete all[k];
+    localStorage.setItem(PQ_CACHE_KEY, JSON.stringify(all));
+  } catch { /* אחסון מלא/חסום - בלי מטמון, לא בלי תוצאות */ }
+}
 let pqToken = 0;
 
 function pqRowHtml(row) {
@@ -2044,6 +2069,17 @@ function pqRowHtml(row) {
 // ב5 - מריץ את חיפוש השאילתות הקודמות מעצמו אחרי שנוסחה שאילתה.
 // אותו מנגנון בדיוק כמו חיפוש ידני (כולל התצוגה ההדרגתית), רק
 // שהקלט מגיע מהנושא שנוסח ולא מהקלדה.
+// "נסה שוב" (ש2) - מריץ את אותו חיפוש שוב. מה שכבר נטען מגיע מהמטמון
+// היומי מיד; רק מה שנכשל חוזר לפיד.
+function bindPqRetry(q) {
+  const btn = document.getElementById("pq-retry");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    document.getElementById("past-queries-input").value = q;
+    searchPastQueries();
+  });
+}
+
 function autoSearchPastQueries(topic) {
   const input = document.getElementById("past-queries-input");
   if (!input || !topic) return;
@@ -2074,9 +2110,8 @@ async function searchPastQueries() {
     if (token !== pqToken || !statusEl.isConnected) return;
     // לפני שהפירוק חזר עוד לא ידוע כמה מקורות יהיו - ואומרים "מחפש…"
     // במקום להציג מכנה שעוד ישתנה.
-    statusEl.querySelector("span:last-child").textContent = planReady
-      ? `מחפש… ${done + failed} מתוך ${total} מקורות הושלמו`
-      : "מחפש…";
+    // בלי "מקורות" - מונח פנימי. ההתקדמות נראית בשורות שנכנסות.
+    statusEl.querySelector("span:last-child").textContent = "מחפש…";
   };
   const appendRow = (row) => {
     shown.add(row.query_id);
@@ -2129,19 +2164,25 @@ async function searchPastQueries() {
     }
   };
 
+  const failedUnits = [];
   const runUnit = async (unit) => {
     const qs = unit.words.map((w) => `w=${encodeURIComponent(w)}`).join("&")
       + pqKnessetParams();
     try {
-      const r = await fetch(`/api/queries/unit?${qs}`);
-      if (!r.ok) throw new Error("unit");
-      const data = await r.json();
+      let data = pqCacheGet(qs);
+      if (!data) {
+        const r = await fetch(`/api/queries/unit?${qs}`);
+        if (!r.ok) throw new Error("unit");
+        data = await r.json();
+        pqCachePut(qs, data);
+      }
       if (token !== pqToken) return;
       done += 1;
       absorb(unit, data);
     } catch {
       if (token !== pqToken) return;
-      failed += 1;   // **לא נבלע:** נספר ונאמר בשורת הסיום
+      failed += 1;   // **לא נבלע:** נספר, מנוסה שוב, ונאמר אם נשאר
+      failedUnits.push(unit);
     }
     setStatus();
   };
@@ -2167,7 +2208,22 @@ async function searchPastQueries() {
                       probe: true, rankOnly: i > 0 }))
     .slice(0, 4);
   total = probeUnits.length;
-  const probeRuns = probeUnits.map(runUnit);
+  // בדיקות הפתיחה יוצאות מיד - אבל דרך אותו תור של PQ_CONCURRENCY,
+  // לא כולן בבת אחת (ש2).
+  const queue = [...probeUnits];
+  let active = 0;
+  const pump = () => new Promise((resolve) => {
+    const tick = () => {
+      if (!queue.length && active === 0) return resolve();
+      while (active < PQ_CONCURRENCY && queue.length) {
+        active += 1;
+        runUnit(queue.shift()).finally(() => { active -= 1; tick(); });
+      }
+    };
+    pump.tick = tick;
+    tick();
+  });
+  const probeRuns = [pump()];
 
   // שלב ב - פירוק הנושא. כשל כאן אינו עוצר את החיפוש: נופלים חזרה
   // לחיפוש המילולי בדיוק כפי שהיה, ואומרים שההרחבה לא רצה.
@@ -2191,17 +2247,22 @@ async function searchPastQueries() {
     return;
   }
 
-  // שלב ג - יחידה אחת = קריאה אחת. רצות במקביל (3), ונקלטות לפי
-  // סדר ההגעה. היחידות ממוינות לפי סגוליות, ולכן הצרות יוצאות ראשונות.
-  let next = 0;
-  const worker = async () => {
-    while (next < units.length) await runUnit(units[next++]);
-  };
-  await Promise.all([
-    ...probeRuns,
-    ...Array.from({ length: Math.min(PQ_CONCURRENCY, units.length) }, worker),
-  ]);
+  // שלב ג - יחידה אחת = קריאה אחת, דרך אותו תור (2 בו-זמנית), ונקלטות
+  // לפי סדר ההגעה. היחידות ממוינות לפי סגוליות - הצרות יוצאות ראשונות.
+  queue.push(...units);
+  pump.tick();
+  await Promise.all(probeRuns);
   if (token !== pqToken) return;
+  // מקור שנכשל מנוסה שוב פעם אחת, לבד, אחרי שהעומס ירד.
+  if (failedUnits.length) {
+    const retry = failedUnits.splice(0);
+    failed -= retry.length;
+    for (const u of retry) {
+      await new Promise((r) => setTimeout(r, 400));
+      await runUnit(u);
+    }
+    if (token !== pqToken) return;
+  }
 
   // שלב ד' - ההצלבה. עכשיו ידוע לכמה צירופים כל שורה התאימה, ושורה
   // שהתאימה ליותר מאחד היא התוצאה המדויקת ביותר שיש. אם היא נדחתה
@@ -2224,14 +2285,14 @@ async function searchPastQueries() {
   statusEl.remove();
   const foundRows = shown.size;
   const parts = [];
-  if (failed) {
-    parts.push(`<b>${total - failed} מתוך ${total} מקורות נבדקו.</b>
-      ${failed} לא נבדקו בגלל תקלה בפיד — ייתכן שיש תוצאות נוספות.`);
-  } else {
-    parts.push(`<b>זה הכול.</b> ${total} מקורות נבדקו.`);
-  }
+  // ש2: בלי הקופסה הצהובה ובלי "מקורות"/"פיד". אם אחרי כל הניסיונות
+  // עדיין חסר משהו - שורה שקטה עם "נסה שוב". **לא מוסתר לגמרי:** זה
+  // בדיוק "לא נמצא" במקום "לא בדקתי" (CLAUDE.md).
+  const retryLink = failed
+    ? ` <span class="pq-partial">חלק מהתוצאות לא נטענו — <button type="button" class="dz-link" id="pq-retry">נסה שוב</button></span>`
+    : "";
   if (!plan.expanded) {
-    parts.push(`ההרחבה לניסוחים חלופיים לא רצה — החיפוש היה מילולי בלבד.`);
+    parts.push(`החיפוש נעשה על הניסוח המדויק בלבד.`);
   }
   if (foundRows === 0) {
     // **"לא נמצא" אינו "אין".** ראו CLAUDE.md.
@@ -2239,12 +2300,13 @@ async function searchPastQueries() {
         <b>החיפוש לא מצא כותרת שמכילה את הצירופים האלה.</b>
         החיפוש רץ על כותרות השאילתות בלבד — שאילתה שעוסקת באותו נושא
         בניסוח אחר לא תיתפס בו. <b>זו אינה תשובה שהנושא לא נשאל</b>.
-        ${parts.join(" ")}
+        ${parts.join(" ")}${retryLink}
       </div>`;
+    bindPqRetry(q);
     return;
   }
-  doneEl.innerHTML = `<div class="pq-done${failed ? " pq-done-partial" : ""}">
-      ${parts.join(" ")} ${foundRows} תוצאות.</div>`;
+  doneEl.innerHTML = `<div class="pq-done">${foundRows} תוצאות. ${parts.join(" ")}${retryLink}</div>`;
+  bindPqRetry(q);
 
   // שלב ה' - מי שאל וקישור לקובץ. רץ אחרי התצוגה וממלא שדות במקום:
   // לא מוסיף שורה, לא מזיז שורה, ולכן אינו יכול לגרום לקפיצה.

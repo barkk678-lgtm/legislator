@@ -102,6 +102,76 @@ def test_no_id_means_no_link_not_a_broken_one():
     assert kq.page_url(0) is None
 
 
+# ── ש2 (25.9.2026): ה-WAF חוסם 4 תנאי contains() ומעלה ─────────────
+def test_four_word_unit_sends_three_contains_and_filters_all_four():
+    """נמדד מול הפיד: 4 contains -> 473 תמיד, 3 -> תמיד עובר. יחידה של
+    4 מילים מהמודל נכשלה בכל חיפוש - "4 מתוך 11 מקורות נבדקו"."""
+    kq._unit_cache.clear()
+    seen = {}
+    def spy(entity, *, filter=None, **k):
+        seen["filter"] = filter
+        return [{"Id": 1, "Name": "מחסור בכוח אדם במשטרה"},
+                {"Id": 2, "Name": "מחסור בכוח אדם בבתי חולים"}]   # בלי "משטרה"
+    original = with_fetch(spy)
+    try:
+        out = kq.run_unit(["מחסור", "כוח", "אדם", "משטרה"])
+        assert seen["filter"].count("contains(") == 3, seen["filter"]
+        assert [r["query_id"] for r in out["rows"]] == [1], out["rows"]
+        assert out["count"] == 1
+    finally:
+        kq.fetch = original
+        kq._unit_cache.clear()
+
+
+def test_three_word_unit_is_sent_as_is():
+    kq._unit_cache.clear()
+    seen = {}
+    def spy(entity, *, filter=None, **k):
+        seen["filter"] = filter
+        return []
+    original = with_fetch(spy)
+    try:
+        kq.run_unit(["כוח", "אדם", "משטרה"])
+        assert seen["filter"].count("contains(") == 3
+    finally:
+        kq.fetch = original
+        kq._unit_cache.clear()
+
+
+def test_same_unit_twice_hits_the_feed_once():
+    kq._unit_cache.clear()
+    calls = []
+    def spy(entity, **k):
+        calls.append(1)
+        return []
+    original = with_fetch(spy)
+    try:
+        kq.run_unit(["מצוקת", "דיור"])
+        kq.run_unit(["מצוקת", "דיור"])
+        assert len(calls) == 1, calls
+    finally:
+        kq.fetch = original
+        kq._unit_cache.clear()
+
+
+def test_rate_limit_473_is_retried_until_it_passes():
+    kq._unit_cache.clear()
+    attempts = []
+    def flaky(entity, **k):
+        attempts.append(1)
+        if len(attempts) < 4:
+            raise kq.OdataError("Client error '473 '")
+        return [{"Id": 7, "Name": "מצוקת דיור"}]
+    original, sleep = with_fetch(flaky), kq.time.sleep
+    kq.time.sleep = lambda s: None
+    try:
+        out = kq.run_unit(["מצוקת", "דיור"])
+        assert out["count"] == 1 and len(attempts) == 4
+    finally:
+        kq.fetch, kq.time.sleep = original, sleep
+        kq._unit_cache.clear()
+
+
 for name, fn in sorted(list(globals().items())):
     if name.startswith("test_"):
         fn()
