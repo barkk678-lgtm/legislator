@@ -50,7 +50,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "knesset"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
-from odata import OdataError, escape, fetch, fetch_raw_array  # noqa: E402
+from odata import FeedBlockedError, OdataError, escape, fetch, fetch_raw_array  # noqa: E402
 from service import LLMConfigError, LLMRequestError, draft  # noqa: E402
 from dates import display_date  # noqa: E402
 
@@ -100,25 +100,97 @@ def unit_budget(count: int) -> int:
 
 _EXPAND_SYSTEM = (
     "אתה מפרק נושא של שאילתה פרלמנטרית לצירופי חיפוש. החזר JSON בלבד:\n"
-    '{"phrases": [["מילה", ...], ...], "alternatives": [["מילה", ...], ...]}\n\n'
+    '{"domain": [["...", ...], ...], "phrases": [["מילה", ...], ...], '
+    '"alternatives": [["מילה", ...], ...]}\n\n'
+    "כלל לכל המילים: **החלק המשותף לכל הנטיות**, כי החיפוש הוא תת-מחרוזת. "
+    "משטרה/משטרת/שוטרים -> 'משטר' ו'שוטר'; מורים/מורות -> 'מור'; "
+    "ניתוחים/ניתוח -> 'ניתוח'. בלי ה' הידיעה ובלי ב/ל/מ/ו/ש/כ בתחילת מילה. "
+    "**כתיב מלא, כמו בכותרות הכנסת**: אוויר (לא אויר), תוכנית, כסיפה.\n\n"
+    "domain: **מה שכל תוצאה חייבת לחלוק עם הנושא** - רשימה של עד שני היבטים. "
+    "כל היבט הוא רשימת כל הדרכים שבהן הוא נכתב בכותרת (נרדפים, יחידות, "
+    "תפקידים, צורות), ותוצאה חייבת להכיל מונח אחד לפחות **מכל** היבט.\n"
+    "- היבט 1, תמיד כשאפשר: **הגוף או התחום** - משטרה, חינוך, בריאות, דיור, "
+    "תחבורה. 'מחסור בכוח אדם במשטרת ישראל' -> "
+    '["משטר","שוטר","שיטור","מג\"ב","משמר הגבול"]. '
+    "'זמני המתנה לניתוחים' -> "
+    '["ניתוח","רפוא","רופא","בית חולים","בתי חולים","בריאות","אשפוז"].\n'
+    "- היבט 2, רק אם הנושא נוקב במקום: היישובים והאזורים שבו. "
+    "'במפרץ חיפה' -> "
+    '["מפרץ חיפה","חיפה","קרית חיים","קרית ביאליק","קרית מוצקין","קרית ים",'
+    '"קרית אתא","קריות","נשר","טירת כרמל","בזן","בז\"ן"]. '
+    "'בנגב' -> נגב, באר שבע, ועד 15 יישובי הנגב.\n"
+    "- הבעיה הכללית (מחסור, זמני המתנה, מצוקה, אלימות) **אינה** היבט - היא "
+    "משותפת לכל התחומים, ולכן היא לא מבחינה בין משטרה לבריאות.\n"
+    "- אם אין לנושא גוף, תחום או מקום מזוהים - [].\n\n"
     "phrases: פירוק הנושא ליחידות המשמעות שלו. כל יחידה היא רשימת המילים "
     "שחייבות להופיע *יחד* בכותרת. יחידות נפרדות נבדקות בנפרד.\n"
-    "- מילים בצורת בסיס: בלי ה' הידיעה ובלי אותיות ב/ל/מ/ו/ש/כ בתחילת מילה.\n"
     "- יחידה של מילה אחת מותרת רק אם המילה נושאית בפני עצמה (דיור, אלימות, "
     "פריפריה, נגב). מילה ריקה (מצוקה, בעיה, נושא, מצב, טיפול) לעולם לא לבדה - "
     "רק יחד עם המילה שהיא נסמכת אליה.\n"
-    "- 2 עד 4 יחידות.\n\n"
+    "- 2 עד 4 יחידות, עד 3 מילים ביחידה.\n\n"
     "alternatives: עד 4 ניסוחים חלופיים לאותו נושא, כפי שהוא עשוי להיות מנוסח "
-    "בכותרת שאילתה. כל ניסוח הוא רשימת מילים בצורת בסיס שחייבות להופיע יחד.\n"
+    "בכותרת שאילתה. כל ניסוח הוא רשימת מילים שחייבות להופיע יחד, עד 3.\n"
     "- ניסוח חלופי חייב לתאר את **אותו נושא בדיוק**, לא נושא סמוך. "
     "ל'אלימות במערכת החינוך' - 'אלימות בבתי ספר' הוא ניסוח חלופי; "
     "'בטיחות במוסדות חינוך' הוא נושא אחר ואסור להחזיר אותו.\n"
     "- מוטב להחזיר שניים מדויקים מארבעה שאחד מהם גולש.\n\n"
     'דוגמה - הקלט "מצוקת הדיור בפריפריה":\n'
-    '{"phrases": [["מצוקת","דיור"], ["דיור"], ["פריפריה"]], '
+    '{"domain": [["דיור","דירה","דירות","שיכון","משכנת","מחיר למשתכן"], '
+    '["פריפרי","נגב","גליל","עיירות פיתוח","עיירת פיתוח"]], '
+    '"phrases": [["מצוקת","דיור"], ["דיור"], ["פריפרי"]], '
     '"alternatives": [["יוקר","דיור"], ["משבר","דיור"], ["שיכון","ציבורי"], '
     '["מחירי","דירות"]]}'
 )
+
+_DOMAIN_MAX = 25
+_QUOTES = str.maketrans({"״": '"', "׳": "'", "”": '"', "“": '"', "’": "'", "-": " ", "־": " "})
+
+
+def _norm_title(text: str) -> str:
+    """השוואת תחום: גרשיים עבריים ואנגליים זהים, מקף = רווח
+    ("תל-אביב" = "תל אביב"), רווחים מכווצים."""
+    return " ".join((text or "").translate(_QUOTES).split())
+
+
+def domain_match(title: str, domain: list[list[str]]) -> bool:
+    """**כל תוצאה חייבת להכיל מונח מכל היבט של התחום** (ש4, 25.9.2026):
+    הגוף או התחום, ומקום אם נקבו בו. תחום ריק = אין סינון (המודל לא
+    זיהה גוף, או שההרחבה נכשלה).
+
+    נמדד לפני התיקון: "מחסור בכוח אדם במשטרת ישראל" -> שלוש תוצאות,
+    שלושתן על בריאות ("מחסור בכוח אדם רפואי במרכז הרפואי לגליל").
+    הצירוף "מחסור בכוח" נכון מילולית - מה שחסר הוא הגוף. חייב להיות
+    זהה ל-pqDomainMatch ב-static/app.js."""
+    if not domain:
+        return True
+    t = _norm_title(title)
+    return all(any(_norm_title(term) in t for term in facet) for facet in domain)
+
+
+def _clean_facet(raw) -> list[str]:
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for term in raw:
+        if isinstance(term, str):
+            term = _norm_title(term)
+            # מונח של אות אחת תופס כל כותרת - אינו תחום.
+            if len(term) >= 2 and term not in out:
+                out.append(term)
+    return out[:_DOMAIN_MAX]
+
+
+def _clean_domain(raw) -> list[list[str]]:
+    """עד שני היבטים. המודל מחזיר לפעמים רשימה שטוחה של מחרוזות -
+    זה היבט אחד, לא עשרים."""
+    if not isinstance(raw, list) or not raw:
+        return []
+    if all(isinstance(x, str) for x in raw):
+        raw = [raw]
+    facets = [f for f in (_clean_facet(x) for x in raw) if f]
+    return facets[:2]
 
 
 def _clean_unit(raw) -> tuple[str, ...] | None:
@@ -146,9 +218,9 @@ def expand_query(q: str) -> dict:
     המילולי בדיוק כפי שהיה, ומסמנים `expanded=False` כדי שהממשק
     יאמר שההרחבה לא רצה - ולא יציג צמצום תוצאות כאילו זו המציאות."""
     q = q.strip()
-    literal = {"units": [{"words": [q], "kind": "literal"}], "expanded": False}
+    literal = {"units": [{"words": [q], "kind": "literal"}], "expanded": False, "domain": []}
     try:
-        raw = draft(instructions=_EXPAND_SYSTEM, content=q, max_tokens=400).strip()
+        raw = draft(instructions=_EXPAND_SYSTEM, content=q, max_tokens=700).strip()
     except (LLMConfigError, LLMRequestError) as e:
         return {**literal, "expansion_error": str(e)}
     if raw.startswith("```"):
@@ -172,7 +244,7 @@ def expand_query(q: str) -> dict:
         return {**literal, "expansion_error": "המודל לא החזיר אף צירוף."}
     # סגוליות: יותר מילים = צירוף צר יותר. בשוויון - סדר המודל.
     units.sort(key=lambda u: -len(u["words"]))
-    return {"units": units, "expanded": True}
+    return {"units": units, "expanded": True, "domain": _clean_domain(parsed.get("domain"))}
 
 
 _current_knesset_cache: int | None = None
@@ -216,10 +288,41 @@ def default_knesset_nums() -> list[int]:
 # סיבה לשאול את הפיד את אותו צירוף פעמיים באותו יום, וכל בקשה שנחסכת
 # היא בקשה שלא נחסמת. בזיכרון התהליך: ב-Vercel מופע חם משרת בקשות
 # רבות. מטמון משותף בדאטהבייס - אחרי ניקוי המקום (task 130).
-_WAF_MAX_CONTAINS = 3
+_WAF_MAX_PARENS = 3   # ראו feed_filter: 4 סוגריים ומעלה -> 473 תמיד
 _UNIT_CACHE_TTL = 6 * 3600
 _UNIT_CACHE_MAX = 500
 _unit_cache: dict[tuple, tuple[float, dict]] = {}
+
+
+def feed_filter(words: list[str], knesset_nums: list[int] | None = None
+                ) -> tuple[str, list[str], set[int] | None]:
+    """המסנן שנשלח לפיד: (המסנן, המילים שנשלחו, כנסות לסינון מקומי או None).
+
+    **ה-WAF של הכנסת סופר סוגריים** (ש4, 25.9.2026). נמדד על מטריצה
+    של מספר מילים x צורת סינון הכנסת, כל תא בבקשה נפרדת בהפסקה:
+    מסנן עם **4 סוגריים פותחים ומעלה -> HTTP 473 תמיד**; 3 ומטה ->
+    עובר. זה מסביר את כל התצפיות: 4 contains() בלי כנסת נחסם (ש2);
+    contains() אחד עם `(KnessetNum in (25,24))` נחסם; ו**כל צירוף של
+    2-3 מילים עם סינון הכנסת של ברירת המחדל נחסם** - הסוגריים העוטפים
+    `(... ) and (KnessetNum eq 25 or KnessetNum eq 24)` הוסיפו שניים.
+    עד כאן זה מה שהמשתמש קיבל בכל חיפוש: רק צירופים של מילה אחת עברו
+    (הרחבים, הרועשים), ו"מחסור בשוטרים" החזיר אפס. מדידת ש2 רצה בלי
+    סינון כנסת ולכן לא ראתה את זה.
+
+    ולכן: **בלי סוגריים עוטפים**, וכנסות כטווח `ge`/`le` (בלי סוגריים
+    בכלל). כל contains() הוא סוגר אחד -> עד 3 מילים לפיד. בחירת כנסות
+    לא רציפה (למשל 25 ו-23) נשלפת כטווח ומסוננת מקומית."""
+    feed_words = sorted(words, key=len, reverse=True)[:_WAF_MAX_PARENS]
+    parts = [f"contains(Name,'{escape(w)}')" for w in feed_words]
+    keep: set[int] | None = None
+    nums = sorted({int(n) for n in knesset_nums or []})
+    if nums:
+        lo, hi = nums[0], nums[-1]
+        parts.append(f"KnessetNum eq {lo}" if lo == hi
+                     else f"KnessetNum ge {lo} and KnessetNum le {hi}")
+        if len(nums) != hi - lo + 1:
+            keep = set(nums)
+    return " and ".join(parts), feed_words, keep
 
 
 def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None = None) -> dict:
@@ -232,30 +335,16 @@ def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None
     words = [w.strip() for w in words if w and w.strip()]
     if not words:
         return {"words": [], "rows": [], "count": 0}
-    # **ה-WAF של הכנסת חוסם 4 תנאי contains() ומעלה** (ש2, 25.9.2026).
-    # נמדד: 4 מילים -> HTTP 473 **תמיד**, גם בבקשה בודדת עם הפסקות וגם
-    # עם מילים של אות אחת; 3 -> תמיד עובר. זו הייתה הסיבה ל"4 מתוך 11
-    # מקורות נבדקו", לא מגבלת קצב: הורדת המקביליות ל-2 והוספת ניסיונות
-    # חוזרים לא שינו דבר (86/94 מול 84/92). כל יחידה של 4 מילים מהמודל
-    # נכשלה, בכל חיפוש. עכשיו: לפיד נשלחות 3 המילים הארוכות (הספציפיות
-    # ביותר), ו**כל** המילים נבדקות מקומית על השמות שחזרו - אותה
-    # משמעות בדיוק, כי contains הוא תת-מחרוזת בשני המקומות.
-    feed_words = sorted(words, key=len, reverse=True)[:_WAF_MAX_CONTAINS]
-    clause = " and ".join(f"contains(Name,'{escape(w)}')" for w in feed_words)
-    if knesset_nums:
-        ors = " or ".join(f"KnessetNum eq {int(n)}" for n in knesset_nums)
-        clause = f"({clause}) and ({ors})"
+    clause, feed_words, keep_knessets = feed_filter(words, knesset_nums)
     cache_key = (tuple(words), tuple(sorted(knesset_nums or [])), top)
     cached = _unit_cache.get(cache_key)
     if cached and time.time() - cached[0] < _UNIT_CACHE_TTL:
         return cached[1]
-    # **הפיד מגביל קצב.** נמדד: מעל ~4 בקשות בו-זמנית הוא מחזיר
-    # HTTP 473, וכשל כזה מתבטא כ"מקור שלא נבדק" אצל המשתמש. ש2
-    # (25.9.2026): עד כאן שני ניסיונות חוזרים בהשהיה קבועה, ו-8 מתוך
-    # 95 מקורות לא נבדקו על עשרה חיפושים באתר החי. עכשיו ארבעה
-    # ניסיונות חוזרים בהשהיה כפולה עם פיזור אקראי - כדי שבקשות שנחסמו
-    # יחד לא יחזרו שוב יחד. מה שנשאר נספר ונאמר, ולא נבלע.
-    for attempt in range(5):
+    # ניסיון חוזר רק על 473, ועד שלוש פעמים. **473 נגרם מהתוכן** (ראו
+    # feed_filter) ואחרי התיקון לא אמור להופיע; הניסיון נשאר כרשת ביטחון.
+    # **474 אינו מנוסה שוב** - זו חסימת כתובת, וכל ניסיון חוזר רק מחמיר
+    # אותה (odata.FeedBlockedError, המפסק שם).
+    for attempt in range(3):
         try:
             rows = fetch(
                 "KNS_Query",
@@ -265,10 +354,14 @@ def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None
                 top=top,
             )
             break
+        except FeedBlockedError:
+            raise
         except OdataError as e:
-            if attempt == 4 or "473" not in str(e):
+            if attempt == 2 or "473" not in str(e):
                 raise
-            time.sleep(min(0.5 * 2 ** attempt, 4.0) + random.uniform(0, 0.4))
+            time.sleep(0.5 * 2 ** attempt + random.uniform(0, 0.4))
+    if keep_knessets is not None:
+        rows = [r for r in rows if r.get("KnessetNum") in keep_knessets]
     if len(feed_words) < len(words):
         rows = [r for r in rows if all(w in (r.get("Name") or "") for w in words)]
     result = {
@@ -374,6 +467,14 @@ def search_queries(q: str, *, limit: int = 12, expand_fn=None, run_fn=None) -> d
             failed += 1
     if not units:
         raise OdataError(f"כל {failed} קריאות החיפוש נכשלו.")
+    # התחום (ש4): שורה שאינה מכילה אף מונח מהתחום לא נספרת ולא מוצגת.
+    # המכסה נקבעת לפי מה שנשאר - "זיהום אוויר" (116) אחרי סינון לחיפה
+    # הוא צירוף צר ומדויק, לא רחב.
+    domain = plan.get("domain") or []
+    if domain:
+        units = [{**u, "rows": [r for r in u["rows"] if domain_match(r.get("title"), domain)]}
+                 for u in units]
+        units = [{**u, "count": len(u["rows"])} for u in units]
 
     rank: dict[int, int] = {}
     for u in units:
@@ -444,8 +545,9 @@ def search_queries(q: str, *, limit: int = 12, expand_fn=None, run_fn=None) -> d
         note = f"{failed} מקורות לא נבדקו בגלל תקלה בפיד. " + note
     return {"query": q, "results": chosen, "note": note,
             "sources_total": len(plan["units"]), "sources_failed": failed,
-            "expanded": plan["expanded"]}
+            "expanded": plan["expanded"], "domain": domain}
 
 
-__all__ = ["OdataError", "current_knesset", "default_knesset_nums", "enrich",
-           "expand_query", "page_url", "run_unit", "search_queries", "unit_budget"]
+__all__ = ["FeedBlockedError", "OdataError", "current_knesset", "default_knesset_nums",
+           "domain_match", "enrich", "expand_query", "feed_filter", "page_url", "run_unit",
+           "search_queries", "unit_budget"]

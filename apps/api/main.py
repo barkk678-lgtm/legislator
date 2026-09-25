@@ -53,6 +53,7 @@ from knesset_bills import similar_bills  # noqa: E402
 from knesset_citations import OdataError, citations_for_law  # noqa: E402
 from knesset_queries import (  # noqa: E402
     GENERIC_CAP as QUERY_GENERIC_CAP,
+    FeedBlockedError,
     current_knesset,
     default_knesset_nums,
     enrich,
@@ -915,6 +916,10 @@ def api_queries_unit(w: list[str] = Query(default=[]),
     כמה מקורות לא נבדקו ואומר זאת למשתמש."""
     try:
         return run_unit(w, knesset_nums=knesset or None)
+    except FeedBlockedError as e:
+        # 503 ולא 502: הפיד חוסם את השרת (474), והלקוח אומר "לא זמין
+        # כרגע" במקום לספור את זה כמקור בודד שנכשל (ש4).
+        raise HTTPException(503, str(e))
     except OdataError as e:
         raise HTTPException(502, str(e))
 

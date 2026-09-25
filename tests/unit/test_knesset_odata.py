@@ -19,6 +19,8 @@ from odata import OdataError, escape  # noqa: E402
 
 
 class _Resp:
+    status_code = 200
+
     def __init__(self, payload):
         self._payload = payload
 
@@ -80,8 +82,34 @@ def main():
         except OdataError:
             threw = True
         checks.append((threw, "חריגה מתקרת העמודים -> שגיאה, לא 300 שורות מתוך 10,000 בשקט"))
+        # --- 474 (חסימת IP): מפסק - אחרי 474 אחד אין עוד בקשות לרשת ---
+        class _Blocked(_FakeClient):
+            def get(self, url, params=None):
+                self.calls += 1
+                r = _Resp({})
+                r.status_code = 474
+                return r
+        odata._MAX_PAGES = saved_pages
+        blocked = _Blocked(total=0)
+        odata._client = lambda: blocked
+        errs = []
+        for _ in range(3):
+            try:
+                odata.fetch("KNS_Query", filter="KnessetNum eq 25")
+            except odata.FeedBlockedError as e:
+                errs.append(e)
+        checks.append((len(errs) == 3, "474 -> FeedBlockedError בכל קריאה"))
+        checks.append((isinstance(errs[0], OdataError), "FeedBlockedError הוא OdataError - קוראים קיימים תופסים אותו"))
+        checks.append((blocked.calls == 1, f"אחרי 474 אחד - אפס בקשות נוספות לפיד (היו {blocked.calls})"))
+        # כשהחסימה פגה - חוזרים לרשת
+        odata._blocked_until = 0.0
+        fake4 = _FakeClient(total=5)
+        odata._client = lambda: fake4
+        checks.append((len(odata.fetch("KNS_Query")) == 5 and fake4.calls == 1,
+                       "אחרי תום החסימה - הבקשה יוצאת שוב"))
     finally:
         odata._client, odata._MAX_PAGES = saved_client, saved_pages
+        odata._blocked_until = 0.0
 
     # --- escape מונע שבירת ה-filter על גרש (נפוץ בשמות חוקים) ---
     checks.append((escape("התשס'ו") == "התשס''ו", "גרש בודד מוכפל"))

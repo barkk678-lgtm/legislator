@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+import time
+
 import httpx
 
 BASE_URL = "https://knesset.gov.il/OdataV4/ParliamentInfo"
@@ -30,6 +32,43 @@ _MAX_PAGES = 400
 
 class OdataError(Exception):
     """כשל רשת/HTTP מול הפיד של הכנסת."""
+
+
+class FeedBlockedError(OdataError):
+    """ה-WAF של הכנסת חוסם את כתובת ה-IP שלנו (HTTP 474)."""
+
+
+# **מפסק לחסימת IP** (ש4, 25.9.2026). ל-WAF של הכנסת שני סוגי דחייה,
+# ונמדדו בנפרד:
+# - **473 - לפי התוכן, דטרמיניסטי:** מסנן עם 4 סוגריים פותחים ומעלה
+#   נחסם תמיד (ראו knesset_queries.feed_filter). ניסיון חוזר לא יעזור.
+# - **474 - לפי הכתובת:** אותה בקשה בדיוק עברה, עברה, נחסמה ועברה;
+#   אחר כך 16 מתוך 25 נחסמו (בהפסקה של שנייה ובלי הפסקה - אותו שיעור,
+#   כלומר זו אינה מגבלת קצב רגילה), ובסוף **הכול** נחסם, גם
+#   `KnessetNum eq 25` בלי שום מילה. גם האתר החי נחסם באותו זמן.
+# ניסיון חוזר על 474 רק מוסיף בקשות לכתובת שכבר מסומנת. ולכן: 474
+# אחד -> כל קריאה לפיד נכשלת מיד, בלי רשת, למשך BLOCK_COOLDOWN, והממשק
+# אומר "לא זמין כרגע" (ולא "לא נמצא").
+BLOCK_COOLDOWN = 60.0
+_blocked_until = 0.0
+
+
+def _get(client: httpx.Client, url: str, params: dict | None, what: str) -> httpx.Response:
+    global _blocked_until
+    if time.time() < _blocked_until:
+        raise FeedBlockedError(f"{what}: הפיד של הכנסת חוסם כרגע את השרת (474), לא נשלחה בקשה.")
+    try:
+        resp = client.get(url, params=params)
+    except httpx.HTTPError as e:
+        raise OdataError(f"{what}: {e}") from None
+    if resp.status_code == 474:
+        _blocked_until = time.time() + BLOCK_COOLDOWN
+        raise FeedBlockedError(f"{what}: הפיד של הכנסת חוסם את השרת (474).")
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPError as e:
+        raise OdataError(f"{what}: {e}") from None
+    return resp
 
 
 def _client() -> httpx.Client:
@@ -51,11 +90,8 @@ def fetch(entity: str, *, filter: str | None = None, select: str | None = None,
     url: str | None = f"{BASE_URL}/{entity}"
     with _client() as client:
         for _ in range(_MAX_PAGES):
-            try:
-                resp = client.get(url, params=params if params and url.endswith(entity) else None)
-                resp.raise_for_status()
-            except httpx.HTTPError as e:
-                raise OdataError(f"כשל בקריאה ל-{entity} מהפיד של הכנסת: {e}") from None
+            resp = _get(client, url, params if params and url.endswith(entity) else None,
+                        f"כשל בקריאה ל-{entity} מהפיד של הכנסת")
             payload = resp.json()
             rows.extend(payload.get("value", []))
             if top is not None and len(rows) >= top:
@@ -76,11 +112,7 @@ def count(entity: str, *, filter: str | None = None) -> int:
     if filter:
         params["$filter"] = filter
     with _client() as client:
-        try:
-            resp = client.get(f"{BASE_URL}/{entity}", params=params)
-            resp.raise_for_status()
-        except httpx.HTTPError as e:
-            raise OdataError(f"כשל בספירת {entity}: {e}") from None
+        resp = _get(client, f"{BASE_URL}/{entity}", params, f"כשל בספירת {entity}")
     return int(resp.json().get("@odata.count", 0))
 
 
@@ -102,11 +134,7 @@ def fetch_raw_array(entity: str, *, filter: str | None = None) -> list[dict]:
     לא לסריקה - ראו CLAUDE.md על ההנחה שכל תשובה מעומדת."""
     params = {"$filter": filter} if filter else None
     with _client() as client:
-        try:
-            resp = client.get(f"{BASE_URL}/{entity}", params=params)
-            resp.raise_for_status()
-        except httpx.HTTPError as e:
-            raise OdataError(f"כשל בקריאה ל-{entity}: {e}") from None
+        resp = _get(client, f"{BASE_URL}/{entity}", params, f"כשל בקריאה ל-{entity}")
     payload = resp.json()
     return payload if isinstance(payload, list) else payload.get("value", [])
 
@@ -131,11 +159,7 @@ def fetch_apply(entity: str, apply_expr: str, page_size: int = 100) -> list[dict
             params = {"$apply": apply_expr}
             if skip:
                 params["$skip"] = str(skip)
-            try:
-                resp = client.get(f"{BASE_URL}/{entity}", params=params)
-                resp.raise_for_status()
-            except httpx.HTTPError as e:
-                raise OdataError(f"כשל בצבירה על {entity}: {e}") from None
+            resp = _get(client, f"{BASE_URL}/{entity}", params, f"כשל בצבירה על {entity}")
             payload = resp.json()
             page = payload if isinstance(payload, list) else payload.get("value", [])
             rows.extend(page)

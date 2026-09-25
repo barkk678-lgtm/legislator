@@ -2044,6 +2044,21 @@ function pqCachePut(key, data) {
 }
 let pqToken = 0;
 
+// ש4 - **התחום**: כל שורה חייבת להכיל מונח מהגוף או התחום שבנושא
+// (משטרה, חינוך, מקום). נמדד לפני: "מחסור בכוח אדם במשטרת ישראל" ->
+// שלוש שורות, שלושתן על בריאות. חייב להיות זהה ל-
+// knesset_queries.domain_match. תחום ריק = אין סינון.
+function pqNorm(text) {
+  return String(text || "").replace(/[״”“]/g, '"').replace(/[׳’]/g, "'")
+    .replace(/[-־]/g, " ").split(/\s+/).filter(Boolean).join(" ");
+}
+// domain = היבטים (הגוף/התחום, ומקום אם נקבו בו): מונח אחד לפחות מכל היבט.
+function pqDomainMatch(title, domain) {
+  if (!domain || !domain.length) return true;
+  const t = pqNorm(title);
+  return domain.every((facet) => facet.some((term) => t.includes(pqNorm(term))));
+}
+
 function pqRowHtml(row) {
   // שורות ישנות במאגר חסרות תאריך או סוג. מרכיבים את שורת המידע
   // מהחלקים שקיימים בלבד - מפריד ריק בין שני שדות חסרים נראה כמו
@@ -2105,6 +2120,12 @@ async function searchPastQueries() {
   const shown = new Set();   // query_id שכבר על המסך
   const held = new Map();    // query_id -> שורה שנדחתה במכסה, מועמדת לשלב ההצלבה
   let strongRows = 0, done = 0, failed = 0, total = 0, planReady = false;
+  let domain = [], blocked = false;
+  // ש4: תשובות שהגיעו לפני הפירוק ממתינות לו. עד כאן בדיקת הפתיחה
+  // "מחסור בכוח" הציגה מיד "מחסור בכוח אדם רפואי" - לפני שהיה ידוע
+  // שהנושא הוא משטרה. השורה הראשונה מגיעה עכשיו עם הפירוק (~2.5
+  // שניות), וזה אותו זמן בערך, כי שתי הקריאות יוצאות יחד.
+  const early = [];
 
   const setStatus = () => {
     if (token !== pqToken || !statusEl.isConnected) return;
@@ -2133,9 +2154,13 @@ async function searchPastQueries() {
     // צירוף שנשלח כרצף אחד, לא מילה בודדת.
     const rankOnly = unit.rankOnly || data.too_broad ||
       (unit.words.length === 1 && !unit.words[0].trim().includes(" "));
-    const budget = pqUnitBudget(data.count);
+    // המכסה לפי מה שנשאר אחרי התחום: "זיהום אוויר" (116) אחרי סינון
+    // לחיפה הוא צירוף צר, לא רחב.
+    const rows = (data.rows || []).filter((r) => pqDomainMatch(r.title, domain));
+    const count = domain.length ? rows.length : data.count;
+    const budget = pqUnitBudget(count);
     let used = 0;
-    for (const row of data.rows || []) {
+    for (const row of rows) {
       const id = row.query_id;
       const n = (rank.get(id) || 0) + 1;
       rank.set(id, n);
@@ -2154,7 +2179,7 @@ async function searchPastQueries() {
       }
       if (rankOnly) continue;
       const candidate = { ...row, matched: n, matched_by: unit.words.join(" "),
-                          unit_count: data.count, broad: data.count > PQ_HOLD_ABOVE };
+                          unit_count: count, broad: count > PQ_HOLD_ABOVE };
       if (used < budget && strongRows < PQ_MAX_STRONG_ROWS) {
         used += 1; strongRows += 1;
         appendRow(candidate);
@@ -2171,14 +2196,17 @@ async function searchPastQueries() {
     try {
       let data = pqCacheGet(qs);
       if (!data) {
+        // הפיד חוסם את השרת - לא שולחים עוד בקשות שייכשלו (ש4).
+        if (blocked) throw new Error("blocked");
         const r = await fetch(`/api/queries/unit?${qs}`);
+        if (r.status === 503) blocked = true;
         if (!r.ok) throw new Error("unit");
         data = await r.json();
         pqCachePut(qs, data);
       }
       if (token !== pqToken) return;
       done += 1;
-      absorb(unit, data);
+      if (planReady) absorb(unit, data); else early.push([unit, data]);
     } catch {
       if (token !== pqToken) return;
       failed += 1;   // **לא נבלע:** נספר, מנוסה שוב, ונאמר אם נשאר
@@ -2236,10 +2264,12 @@ async function searchPastQueries() {
     plan = { units: [{ words: [q], kind: "literal" }], expanded: false };
   }
   if (token !== pqToken) return;
+  domain = plan.domain || [];
+  planReady = true;
+  for (const [u, d] of early.splice(0)) absorb(u, d);
   const probeKeys = new Set(probeUnits.map((u) => u.words.join(" ")));
   const units = (plan.units || []).filter((u) => !probeKeys.has(u.words.join(" ")));
   total += units.length;
-  planReady = true;
   setStatus();
   if (!total) {
     statusEl.remove();
@@ -2249,12 +2279,16 @@ async function searchPastQueries() {
 
   // שלב ג - יחידה אחת = קריאה אחת, דרך אותו תור (2 בו-זמנית), ונקלטות
   // לפי סדר ההגעה. היחידות ממוינות לפי סגוליות - הצרות יוצאות ראשונות.
+  // **ממתינים לתור מחדש, לא להבטחה של בדיקות הפתיחה.** זו נפתרה
+  // כשהתור התרוקן בפעם הראשונה - ואם בדיקות הפתיחה הסתיימו לפני
+  // שהפירוק חזר, החיפוש "הסתיים" בזמן שיחידות הפירוק עוד רצו: שורות
+  // נוספו אחרי שורת הסיום, בלי שם מגיש ובלי שלב ההצלבה (נמצא ב-ש4).
   queue.push(...units);
-  pump.tick();
   await Promise.all(probeRuns);
+  await pump();
   if (token !== pqToken) return;
   // מקור שנכשל מנוסה שוב פעם אחת, לבד, אחרי שהעומס ירד.
-  if (failedUnits.length) {
+  if (failedUnits.length && !blocked) {
     const retry = failedUnits.splice(0);
     failed -= retry.length;
     for (const u of retry) {
@@ -2293,6 +2327,16 @@ async function searchPastQueries() {
     : "";
   if (!plan.expanded) {
     parts.push(`החיפוש נעשה על הניסוח המדויק בלבד.`);
+  }
+  if (foundRows === 0 && done === 0 && failed) {
+    // **שום דבר לא נבדק** - אסור להגיד "לא נמצא" (CLAUDE.md).
+    doneEl.innerHTML = `<div class="notice notice-coverage">
+        <b>מאגר השאילתות של הכנסת לא זמין כרגע.</b>
+        לא נבדק דבר — זו אינה תשובה שהנושא לא נשאל.
+        <button type="button" class="dz-link" id="pq-retry">נסה שוב</button> בעוד כמה דקות.
+      </div>`;
+    bindPqRetry(q);
+    return;
   }
   if (foundRows === 0) {
     // **"לא נמצא" אינו "אין".** ראו CLAUDE.md.

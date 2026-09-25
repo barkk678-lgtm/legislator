@@ -67,6 +67,10 @@ def test_feed_failure_is_none_not_a_hardcoded_year():
 
 
 def test_knesset_filter_is_added_to_the_clause():
+    """ש4: טווח ge/le, **בלי סוגריים עוטפים**. הצורה הקודמת -
+    `(...) and (KnessetNum eq 25 or KnessetNum eq 24)` - הוסיפה שני
+    סוגריים, וכל צירוף של 2 מילים ומעלה נחסם ב-473."""
+    kq._unit_cache.clear()
     seen = {}
     def spy(entity, *, filter=None, **k):
         seen["filter"] = filter
@@ -74,10 +78,11 @@ def test_knesset_filter_is_added_to_the_clause():
     original = with_fetch(spy)
     try:
         kq.run_unit(["מצוקת", "דיור"], knesset_nums=[25, 24])
-        assert "KnessetNum eq 25 or KnessetNum eq 24" in seen["filter"], seen["filter"]
-        assert seen["filter"].startswith("("), "הצירוף חייב להיות בסוגריים משלו"
+        assert "KnessetNum ge 24 and KnessetNum le 25" in seen["filter"], seen["filter"]
+        assert seen["filter"].count("(") == 2, seen["filter"]
     finally:
         kq.fetch = original
+        kq._unit_cache.clear()
 
 
 def test_no_knesset_filter_means_no_clause():
@@ -159,17 +164,149 @@ def test_rate_limit_473_is_retried_until_it_passes():
     attempts = []
     def flaky(entity, **k):
         attempts.append(1)
-        if len(attempts) < 4:
+        if len(attempts) < 3:
             raise kq.OdataError("Client error '473 '")
         return [{"Id": 7, "Name": "מצוקת דיור"}]
     original, sleep = with_fetch(flaky), kq.time.sleep
     kq.time.sleep = lambda s: None
     try:
         out = kq.run_unit(["מצוקת", "דיור"])
-        assert out["count"] == 1 and len(attempts) == 4
+        assert out["count"] == 1 and len(attempts) == 3
     finally:
         kq.fetch, kq.time.sleep = original, sleep
         kq._unit_cache.clear()
+
+
+# ── ש4 (25.9.2026): ה-WAF סופר סוגריים; 474 היא חסימת כתובת ──────
+def test_no_filter_ever_has_four_parentheses():
+    """נמדד: 4 '(' ומעלה -> 473 תמיד. בודק כל צירוף של 1-5 מילים עם
+    כל צורת בחירת כנסות שהממשק מאפשר."""
+    words = ["זיהום", "אוויר", "מפרץ", "חיפה", "קריות"]
+    for n in range(1, 6):
+        for kn in (None, [25], [25, 24], [25, 24, 23], [25, 23], [25, 22, 20]):
+            clause, _, _ = kq.feed_filter(words[:n], kn)
+            assert clause.count("(") <= 3, (n, kn, clause)
+
+
+def test_non_contiguous_knessets_are_filtered_locally():
+    kq._unit_cache.clear()
+    seen = {}
+    def spy(entity, *, filter=None, **k):
+        seen["filter"] = filter
+        return [{"Id": 1, "Name": "מצוקת דיור", "KnessetNum": 25},
+                {"Id": 2, "Name": "מצוקת דיור", "KnessetNum": 24},
+                {"Id": 3, "Name": "מצוקת דיור", "KnessetNum": 23}]
+    original = with_fetch(spy)
+    try:
+        out = kq.run_unit(["מצוקת", "דיור"], knesset_nums=[25, 23])
+        assert "KnessetNum ge 23 and KnessetNum le 25" in seen["filter"], seen["filter"]
+        assert [r["query_id"] for r in out["rows"]] == [1, 3], out["rows"]
+    finally:
+        kq.fetch = original
+        kq._unit_cache.clear()
+
+
+def test_single_knesset_is_eq_not_range():
+    clause, _, keep = kq.feed_filter(["דיור"], [25])
+    assert clause.endswith("KnessetNum eq 25") and keep is None, clause
+
+
+def test_ip_block_474_is_not_retried():
+    """חסימת כתובת: ניסיון חוזר רק מחמיר אותה."""
+    kq._unit_cache.clear()
+    attempts = []
+    def blocked(entity, **k):
+        attempts.append(1)
+        raise kq.FeedBlockedError("474")
+    original = with_fetch(blocked)
+    try:
+        try:
+            kq.run_unit(["מצוקת", "דיור"])
+            raise AssertionError("היה אמור לזרוק")
+        except kq.FeedBlockedError:
+            pass
+        assert len(attempts) == 1, attempts
+    finally:
+        kq.fetch = original
+        kq._unit_cache.clear()
+
+
+# כותרות אמיתיות שהוצגו לברק על "מחסור בכוח אדם במשטרת ישראל" (תמונה 2),
+# ועוד כותרות אמיתיות מהפיד מאותו לילה.
+HEALTH = ["פערים בהתחסנות ילדים לשפעת בין המרכז לפריפריה כתוצאה ממחסור בכוח סיעודי",
+          "מחסור בכוח אדם בתוכנית תיאום טיפול",
+          "מחסור בכוח אדם רפואי במרכז הרפואי לגליל"]
+POLICE = ["ירידה עקבית באיכות השוטרים וחשש מהורדת תנאי הקבלה",
+          "המפכ\"ל הורה לגנוז את ממצאי הסקר הפנימי שנערך בקרב כ-30 אלף שוטרים"]
+POLICE_DOMAIN = [["משטר", "שוטר", "שיטור", 'מג"ב', "משמר הגבול"]]
+
+
+def test_domain_drops_the_health_rows_from_image_2():
+    assert not any(kq.domain_match(t, POLICE_DOMAIN) for t in HEALTH)
+    assert all(kq.domain_match(t, POLICE_DOMAIN) for t in POLICE)
+
+
+def test_domain_match_normalizes_quotes_and_hyphens():
+    assert kq.domain_match("פעילות מג״ב בירושלים", [['מג"ב']])
+    assert kq.domain_match("זיהום אוויר בתל-אביב", [["תל אביב"]])
+    assert kq.domain_match("כל כותרת", []), "תחום ריק = אין סינון"
+
+
+def test_search_queries_applies_the_domain_to_every_row():
+    plan = {"expanded": True, "domain": POLICE_DOMAIN,
+            "units": [{"words": ["מחסור", "כוח", "אדם"], "kind": "phrase"},
+                      {"words": ["מחסור", "שוטר"], "kind": "phrase"}]}
+    rows = {("מחסור", "כוח", "אדם"): HEALTH + ["מחסור בכוח אדם במשטרה"],
+            ("מחסור", "שוטר"): ["מחסור בשוטרים בדרום"]}
+    def run(words):
+        titles = rows[tuple(words)]
+        return {"words": words, "count": len(titles), "too_broad": False,
+                "rows": [{"query_id": hash(t) % 10**6, "title": t, "person_id": None}
+                         for t in titles]}
+    original = kq.enrich
+    kq.enrich = lambda ids, persons: {"docs": {}, "names": {}}
+    try:
+        out = kq.search_queries("מחסור בכוח אדם במשטרת ישראל",
+                                expand_fn=lambda q: plan, run_fn=run)
+    finally:
+        kq.enrich = original
+    titles = [r["title"] for r in out["results"]]
+    assert titles == ["מחסור בכוח אדם במשטרה", "מחסור בשוטרים בדרום"], titles
+
+
+def test_expand_query_returns_the_domain():
+    import json as _json
+    reply = _json.dumps({"domain": ["משטר", "שוטר", "ש"], "phrases": [["מחסור", "שוטר"]],
+                         "alternatives": []}, ensure_ascii=False)
+    original = kq.draft
+    kq.draft = lambda **k: reply
+    try:
+        plan = kq.expand_query("מחסור בשוטרים")
+    finally:
+        kq.draft = original
+    # רשימה שטוחה = היבט אחד; אות אחת אינה תחום
+    assert plan["domain"] == [["משטר", "שוטר"]], plan["domain"]
+
+
+def test_every_facet_must_match():
+    """"זמני המתנה לניתוחים בפריפריה": רופאים בפריפריה אינם ניתוחים."""
+    dom = [["ניתוח", "בית חולים"], ["פריפרי", "גליל", "נגב"]]
+    assert kq.domain_match("זמני המתנה לניתוחים בבית החולים בגליל", dom)
+    assert not kq.domain_match(
+        "התארכות זמני המתנה לרופאים, במיוחד בפריפריה, על רקע מלחמת \"שאגת הארי\"", dom)
+    assert not kq.domain_match("זמני המתנה לניתוחים במרכז", dom)
+
+
+def test_expansion_failure_has_empty_domain():
+    def boom(**k):
+        raise kq.LLMRequestError("down")
+    original = kq.draft
+    kq.draft = boom
+    try:
+        plan = kq.expand_query("מחסור בשוטרים")
+    finally:
+        kq.draft = original
+    assert plan["domain"] == [] and plan["expanded"] is False
 
 
 for name, fn in sorted(list(globals().items())):
