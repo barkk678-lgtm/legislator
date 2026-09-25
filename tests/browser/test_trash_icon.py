@@ -22,7 +22,7 @@ def lines(page):
 
 
 def trash(page, node_id):
-    page.locator(f'.node[data-node-id="{node_id}"] > .node-body-row > .node-del-btn').first.click()
+    page.locator(f'.node-del-btn[data-actor="{node_id}"]').first.click()   # ח12: הפח של היחידה
 
 
 def open_law(page, law_id, probe):

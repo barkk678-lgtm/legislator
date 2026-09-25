@@ -456,44 +456,19 @@ function renderNode(node, depth) {
       bodyRow.appendChild(spacer);
     }
 
-    // כפתור "+" בסוף שורת הטקסט של הצומת עצמו (לא ליד הכותרת) - ראו
-    // משוב המשתמש: המקום להוסיף סעיף/סעיף קטן חדש הוא איפה שנגמר
-    // התוכן של הצומת הנוכחי, בכל היררכיה.
-    if (
-      node.node_type === "section" || node.node_type === "subsection" ||
-      node.node_type === "paragraph" || node.node_type === "definition"
-    ) {
-      const addBtn = document.createElement("button");
-      addBtn.className = "node-add-btn subtle";
-      addBtn.textContent = "+";
-      addBtn.title = "הוספת סעיף, סעיף קטן או פסקה מתחת לכאן";
-      addBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        toggleInsertMenu(node, wrapper);
-      });
-      bodyRow.appendChild(addBtn);
-
-      // ח4: פח ליד הפלוס - מוחק את היחידה שהוא עומד עליה (סעיף, סעיף
-      // קטן, פסקה, הגדרה). **אותו מסלול כמו מחיקה ידנית של כל הטקסט**:
-      // השדות של היחידה ושל כל צאצאיה מתרוקנים ונרשמים כעריכות, והשרת
-      // מתרגם ל"סעיף 5 – בטל" / "סעיף קטן (ב) – בטל" / "פסקה (1) – תימחק"
-      // (apply_changes._apply_section_repeals / _apply_unit_removals).
-      if (node.status !== "repealed" && hasDeletableText(node)) {
-        const delBtn = document.createElement("button");
-        delBtn.className = "node-del-btn subtle";
-        delBtn.type = "button";
-        delBtn.innerHTML = TRASH_ICON;
-        delBtn.title = `מחיקת ה${UNIT_NAME[node.node_type] || "יחידה"}`;
-        delBtn.setAttribute("aria-label", delBtn.title);
-        delBtn.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          deleteUnit(node);
-        });
-        bodyRow.appendChild(delBtn);
-      }
+    // ח12+ח15 (26.9.2026): **זוג אחד של פלוס ופח לכל יחידה.** עד כאן
+    // יחידה בלי טקסט משלה (סעיף שכל תוכנו ברישה או בסעיפים קטנים) קיבלה
+    // שורה ריקה עם זוג, ואחריה הרישה - עוד זוג. עכשיו: הרישה נושאת את
+    // הזוג של היחידה (הפח עליה מבטל את היחידה כולה, עם כל מה שתחתיה -
+    // ח15), ויחידה בלי רישה - הזוג בכותרת שלה.
+    const actor = actionOwner(node);
+    const opensWithHead = Boolean(headChildOf(node));
+    const hasHeader = wrapper.contains(header);
+    const emptyOwnRow = !node.text && !inlineLabel;
+    if (actor && !opensWithHead) {
+      appendUnitActions(emptyOwnRow && hasHeader ? header : bodyRow, actor, wrapper);
     }
-
-    wrapper.appendChild(bodyRow);
+    if (!(emptyOwnRow && (opensWithHead || hasHeader))) wrapper.appendChild(bodyRow);
 
     const insertHost = document.createElement("div");
     insertHost.className = "insert-host";
@@ -505,6 +480,8 @@ function renderNode(node, depth) {
   }
   return wrapper;
 }
+
+let parentById = {};
 
 function rebuildTree(tree) {
   // ח2 (25.9.2026): **תפריט הוספה פתוח שורד את הבנייה מחדש.** עד כאן
@@ -520,6 +497,8 @@ function rebuildTree(tree) {
     ? [focused.selectionStart, focused.selectionEnd] : null;
 
   fieldElements = {};
+  parentById = {};
+  (function index(n) { for (const c of n.children || []) { parentById[c.id] = n; index(c); } })(tree);
   treeContainer.innerHTML = "";
   treeContainer.appendChild(renderNode(tree, 0));
 
@@ -547,6 +526,95 @@ function onFieldFocus(ev) {
 const TRASH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/>' +
   '<path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';
 const UNIT_NAME = { section: "סעיף", subsection: "סעיף הקטן", paragraph: "פסקה", definition: "הגדרה" };
+
+/* ח12+ח15: רישה = פסקה בלי מספר שפותחת יחידה בלי טקסט משלה ("לענין
+ * סעיף זה –" לפני (א), או כל תוכנו של סעיף בלי סעיפים קטנים). השורה שלה
+ * היא השורה של היחידה. */
+function headChildOf(node) {
+  if (!node || (node.text || "").trim()) return null;
+  if (!["section", "subsection", "paragraph"].includes(node.node_type)) return null;
+  const first = (node.children || [])[0];
+  return first && first.node_type === "paragraph" && !first.number ? first : null;
+}
+
+// על מי פועלים הפלוס והפח שבשורה של הצומת: הרישה - על היחידה שלה.
+function actionOwner(node) {
+  const parent = parentById[node.id];
+  if (parent && headChildOf(parent) === node) return parent;
+  const t = node.node_type;
+  return t === "section" || t === "subsection" || t === "paragraph" || t === "definition" ? node : null;
+}
+
+function appendUnitActions(row, actor, hostWrapper) {
+  const addBtn = document.createElement("button");
+  addBtn.className = "node-add-btn subtle";
+  addBtn.textContent = "+";
+  addBtn.title = "הוספת סעיף, סעיף קטן או פסקה מתחת לכאן";
+  addBtn.dataset.actor = actor.id;
+  addBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    toggleInsertMenu(actor, hostWrapper);
+  });
+  row.appendChild(addBtn);
+
+  // ח4: פח ליד הפלוס - מוחק את היחידה שהוא עומד עליה (סעיף, סעיף
+  // קטן, פסקה, הגדרה). **אותו מסלול כמו מחיקה ידנית של כל הטקסט**:
+  // השדות של היחידה ושל כל צאצאיה מתרוקנים ונרשמים כעריכות, והשרת
+  // מתרגם ל"סעיף 5 – בטל" / "סעיף קטן (ב) – בטל" / "פסקה (1) – תימחק"
+  // (apply_changes._apply_section_repeals / _apply_unit_removals).
+  if (actor.status !== "repealed" && hasDeletableText(actor)) {
+    const delBtn = document.createElement("button");
+    delBtn.className = "node-del-btn subtle";
+    delBtn.type = "button";
+    delBtn.innerHTML = TRASH_ICON;
+    delBtn.title = `מחיקת ה${UNIT_NAME[actor.node_type] || "יחידה"}`;
+    delBtn.setAttribute("aria-label", delBtn.title);
+    delBtn.dataset.actor = actor.id;
+    delBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      deleteUnit(actor);
+    });
+    row.appendChild(delBtn);
+  }
+}
+
+/* ח11 (26.9.2026): **התפריט מציע רק רמות שאפשר להוסיף במקום הזה.**
+ * אותה רמה - תמיד. רמה נמוכה יותר - רק כשאין ליחידה עדיין ילדים ברמה
+ * הזו (המנגנון הקיים: (א) הופך ל-(א)(1)); אחרת מוסיפים מהפלוס של הילד
+ * האחרון. רמה גבוהה יותר - רק מהתוכן האחרון של היחידה שבאותה רמה: בין
+ * 6(א) ל-6(ב) לא יכול לבוא 6א. כך השרת ממקם (insert_preview._resolve):
+ * סעיף - אחרי הסעיף כולו; סעיף קטן מתוך פסקה - אחרי הסעיף הקטן האחרון. */
+function insertLevelsAt(node) {
+  const base = levelsForNodeType(node.node_type);
+  if (node.node_type === "definition") return base;
+  let own = LEVEL_ORDER.indexOf(node.node_type);
+  if (own === -1) own = 2;
+  const children = node.children || [];
+  return base.filter((level) => {
+    const idx = LEVEL_ORDER.indexOf(level);
+    if (idx === own) return true;
+    if (idx > own) return !children.some((c) => c.node_type === level);
+    let anc = parentById[node.id];
+    while (anc && anc.node_type !== level) anc = parentById[anc.id];
+    if (!anc || !isLastWithin(node, anc)) return false;
+    if (level === "subsection") {
+      const subs = (parentById[anc.id]?.children || []).filter((c) => c.node_type === "subsection");
+      return subs[subs.length - 1] === anc;
+    }
+    return true;
+  });
+}
+
+function isLastWithin(node, ancestor) {
+  let cur = node;
+  while (cur && cur !== ancestor) {
+    const parent = parentById[cur.id];
+    const siblings = parent ? parent.children || [] : [];
+    if (siblings[siblings.length - 1] !== cur) return false;
+    cur = parent;
+  }
+  return cur === ancestor;
+}
 
 function hasDeletableText(node) {
   if ((node.text || "").trim()) return true;
@@ -1248,8 +1316,18 @@ function toggleInsertMenu(node, wrapper) {
   host.appendChild(menu);
 
   const levelsContainer = menu.querySelector(".insert-menu-levels");
-  const levels = levelsForNodeType(node.node_type);
+  const levels = insertLevelsAt(node);
   insertPreviewSeq += 1;
+  let pending = levels.length;
+  const noneLeft = () => {
+    if (menu.isConnected && !levelsContainer.querySelector(".insert-level-btn")) {
+      const none = document.createElement("div");
+      none.className = "insert-menu-none";
+      none.textContent = "במקום הזה אי אפשר להוסיף יחידה חדשה. נסו את הפלוס שבסוף היחידה.";
+      levelsContainer.appendChild(none);
+    }
+  };
+  if (!levels.length) noneLeft();
 
   for (const level of levels) {
     const btn = document.createElement("button");
@@ -1265,9 +1343,9 @@ function toggleInsertMenu(node, wrapper) {
         btn.disabled = false;
         btn.addEventListener("click", () => showInsertForm(menu, node, level, preview.label));
       } else {
-        btn.textContent = `הוסף ${LEVEL_LABELS[level]} - לא נתמך`;
-        btn.title = preview.reason || "";
+        btn.remove();   // ח11: אפשרות שאי אפשר להשתמש בה - לא מוצגת
       }
+      if (--pending === 0) noneLeft();
     });
   }
 }

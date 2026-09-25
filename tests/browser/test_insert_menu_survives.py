@@ -40,7 +40,7 @@ def main() -> int:
         el = page.locator(f'.node-text[data-node-id="{LAW}/s2/p0"]')
         el.click(); page.keyboard.press("End"); page.keyboard.type(" בדיקה")
         w = page.locator(f'#law-tree .node[data-node-id="{LAW}/s2"]').first
-        w.locator(":scope > .node-body-row > .node-add-btn").click()
+        page.locator(f'.node-add-btn[data-actor="{LAW}/s2"]').click()   # ח12: הזוג של היחידה, לא מבנה ה-DOM
         menu = page.locator(".insert-menu:not([hidden])").first
         ok1 = False
         try:
@@ -66,7 +66,7 @@ def main() -> int:
         page.evaluate(f"onLawChange('{LAW}')")
         page.wait_for_selector(f'.node-text[data-node-id="{LAW}/s2/p0"]', timeout=20000)
         w = page.locator(f'#law-tree .node[data-node-id="{LAW}/s2"]').first
-        w.locator(":scope > .node-body-row > .node-add-btn").click()
+        page.locator(f'.node-add-btn[data-actor="{LAW}/s2"]').click()   # ח12: הזוג של היחידה, לא מבנה ה-DOM
         menu = page.locator(".insert-menu:not([hidden])").first
         btn = menu.locator(".insert-level-btn:not([disabled])", has_text="הוסף סעיף ראשי").first
         btn.wait_for(timeout=10000)

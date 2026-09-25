@@ -101,7 +101,7 @@ def main() -> int:
                         page.evaluate(PLAIN, SEL)))
 
         # מחיקת סעיף שלם בפח - וביטול בכפתור
-        page.locator(f'.node[data-node-id="{LAW}/s5"] > .node-body-row > .node-del-btn').first.click()
+        page.locator(f'.node-del-btn[data-actor="{LAW}/s5"]').first.click()
         settle(page)
         results.append(("פח על סעיף 5 - 'סעיף 5 – בטל' בהצעה", any("סעיף 5 – בטל" in x for x in lines(page)),
                         str(lines(page))))
@@ -122,7 +122,7 @@ def main() -> int:
 
         # הוספת סעיף חדש - וביטולה
         w = page.locator(f'.node[data-node-id="{LAW}/s6"]')
-        w.locator(":scope > .node-body-row > .node-add-btn").click()
+        page.locator(f'.node-add-btn[data-actor="{LAW}/s6"]').click()
         menu = page.locator(".insert-menu:not([hidden])").first
         menu.locator(".insert-level-btn:not([disabled])", has_text="הוסף סעיף ראשי").first.click()
         menu.locator(".insert-margin-title-input").fill("סעיף בדיקה")
