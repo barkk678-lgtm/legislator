@@ -401,6 +401,8 @@ function renderNode(node, depth) {
       titleSpan.dataset.plainValue = node.margin_title || "";
       titleSpan.addEventListener("focus", onFieldFocus);
       titleSpan.addEventListener("input", onFieldInput);
+      titleSpan.addEventListener("beforeinput", onFieldBeforeInput);
+      titleSpan.addEventListener("compositionend", onFieldInput);
       titleSpan.addEventListener("blur", onFieldBlur);
       header.appendChild(titleSpan);
       fieldElements[`${node.id}:margin_title`] = titleSpan;
@@ -441,6 +443,8 @@ function renderNode(node, depth) {
       textEl.dataset.plainValue = node.text;
       textEl.addEventListener("focus", onFieldFocus);
       textEl.addEventListener("input", onFieldInput);
+      textEl.addEventListener("beforeinput", onFieldBeforeInput);
+      textEl.addEventListener("compositionend", onFieldInput);
       textEl.addEventListener("blur", onFieldBlur);
       bodyRow.appendChild(textEl);
       fieldElements[`${node.id}:text`] = textEl;
@@ -530,17 +534,10 @@ function rebuildTree(tree) {
 }
 
 function onFieldFocus(ev) {
-  const el = ev.target;
-  // מסירים דקורציה (del/ins) רק אם היא בפועל קיימת (יש אלמנטי ילד) -
-  // el.textContent = ... מחליף את צומת הטקסט הפנימי גם כשהתוכן זהה
-  // בייטים, מה שהורס את מיקום הסמן שהקליק כבר קבע (הבאג המקורי: כל
-  // פוקוס, כולל קליק רגיל בלי דקורציה בכלל, איפס את הסמן להתחלה).
-  // בלי דקורציה - לא נוגעים ב-DOM בכלל, נותנים לדפדפן למקם את הסמן
-  // איפה שהמשתמש לחץ.
-  if (el.childElementCount > 0) {
-    el.textContent = el.dataset.plainValue ?? "";
-  }
-  el.classList.remove("edit-unsupported");
+  // ח1 (25.9.2026): **הדקורציה נשארת גם בזמן העריכה** - "עקוב אחר
+  // שינויים" בכל עת. עד כאן הפוקוס החליף את השדה בטקסט החדש בלבד. לא
+  // נוגעים ב-DOM בפוקוס: הדפדפן כבר מיקם את הסמן איפה שהמשתמש לחץ.
+  ev.target.classList.remove("edit-unsupported");
 }
 
 /* רושם את מצב השדה ב-edits/insertions. מופרד מ-onFieldBlur כדי
@@ -569,7 +566,7 @@ function deleteUnit(node) {
 function recordField(el) {
   const nodeId = el.dataset.nodeId;
   const field = el.dataset.field;
-  const currentText = el.textContent;
+  const currentText = fieldPlainText(el);   // ח1: בלי הטקסט המחוק (<del>)
 
   // צומת שהוא עצמו הוספה ממתינה: אין "מקור" להשוות אליו - עריכת
   // התוכן החדש מעדכנת ישירות את ההוספה הממתינה, לא נכנסת למנגנון
@@ -619,7 +616,17 @@ function setPreviewPending(on) {
 }
 
 function onFieldInput(ev) {
-  recordField(ev.target);
+  const el = ev.target;
+  const native = ev instanceof Event &&
+    (ev.type === "compositionend" || (ev.type === "input" && !ev.isComposing));
+  if (native && tracksChanges(el)) {
+    // קלט שהדפדפן הקליד בעצמו (לא דרך onFieldBeforeInput): סוף הרכבה,
+    // או סוג קלט שלא נתפס. הטקסט הנוכחי נקרא מה-DOM ונצבע מחדש.
+    const sel = plainSelection(el);
+    renderTracked(el, fieldOriginal(el), fieldPlainText(el));
+    if (sel) setPlainSelection(el, sel[0], sel[1]);
+  }
+  recordField(el);
   setPreviewPending(true);
   clearTimeout(livePreviewTimer);
   livePreviewTimer = setTimeout(() => { refreshPreview(); }, LIVE_PREVIEW_DELAY_MS);
@@ -635,8 +642,7 @@ async function onFieldBlur(ev) {
 function applyDecoration(key, status) {
   const el = fieldElements[key];
   if (!el) return;
-  const [nodeId, field] = key.split(":");
-  const original = field === "margin_title" ? originalMarginTitleById[nodeId] : originalTextById[nodeId];
+  const original = fieldOriginal(el);
   if (!(key in edits)) {
     el.textContent = original;
     el.dataset.plainValue = original;
@@ -645,31 +651,207 @@ function applyDecoration(key, status) {
     return;
   }
   const editedText = edits[key].text;
+  // ח1: הסימון נבנה מהשוואת מילים בין המקור לטקסט הנוכחי, ולא מאזור
+  // השינוי שהשרת החזיר - לשרת יש סטטוס לכל אזור, והמפתח כאן שמר רק את
+  // האחרון: בשני שינויים באותו סעיף הראשון נעלם מהתצוגה. אותו סימון
+  // בדיוק כמו בזמן ההקלדה (renderTracked), ולכן יציאה מהשדה לא מזיזה דבר.
+  renderTracked(el, original, editedText);
   if (!status || !status.ok) {
-    el.textContent = editedText;
-    el.dataset.plainValue = editedText;
     el.classList.add("edit-unsupported");
     el.title = (status && status.reason) || "לא ניתן לבטא את השינוי הזה כהוראת תיקון";
     return;
   }
   el.classList.remove("edit-unsupported");
   el.removeAttribute("title");
-  el.dataset.plainValue = editedText;
-  if (status.old_phrase) {
-    const idx = original.indexOf(status.old_phrase);
-    const before = original.slice(0, idx);
-    const after = original.slice(idx + status.old_phrase.length);
-    el.innerHTML =
-      escapeHtml(before) +
-      "<del>" + escapeHtml(status.old_phrase) + "</del>" +
-      "<ins>" + escapeHtml(status.new_phrase) + "</ins>" +
-      escapeHtml(after);
-  } else if (status.anchor_substring) {
-    const cut = original.indexOf(status.anchor_substring) + status.anchor_substring.length;
-    const before = original.slice(0, cut);
-    const after = original.slice(cut);
-    el.innerHTML = escapeHtml(before) + "<ins>" + escapeHtml(status.inserted_text) + "</ins>" + escapeHtml(after);
+}
+
+/* ═══ ח1 - "עקוב אחר שינויים" גם בזמן העריכה ═══
+ * השדה הוא **תצוגה** של טקסט אחד (הטקסט הנוכחי): מה שנמחק מהמקור מוצג
+ * ב-<del contenteditable=false> - מחוק, ואי אפשר לערוך אותו; מה שנוסף -
+ * ב-<ins>. כל הקלדה נתפסת ב-beforeinput, מוחלת על הטקסט הנוכחי במונחי
+ * היסט בטקסט (בלי המחיקות), והתצוגה נבנית מחדש עם הסמן במקומו. כך
+ * הדפדפן לעולם לא עורך בתוך <del> ולא "מוחק" אותו כיחידה.
+ * הקלדה בהרכבה (IME, מקלדות טלפון) - הדפדפן מקליד בעצמו, והתצוגה
+ * נבנית מחדש מה-DOM בסוף ההרכבה (onFieldInput). */
+function fieldOriginal(el) {
+  const id = el.dataset.nodeId;
+  return (el.dataset.field === "margin_title" ? originalMarginTitleById[id] : originalTextById[id]) ?? "";
+}
+
+function inDel(node, root) {
+  for (let n = node.nodeType === 3 ? node.parentNode : node; n && n !== root; n = n.parentNode) {
+    if (n.nodeName === "DEL") return true;
   }
+  return false;
+}
+
+function liveTextNodes(el) {
+  const out = [];
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) if (!inDel(t, el)) out.push(t);
+  return out;
+}
+
+function fieldPlainText(el) {
+  if (!el.querySelector("del")) return el.textContent;
+  return liveTextNodes(el).map((t) => t.data).join("");
+}
+
+function plainOffsetAt(el, node, offset) {
+  const r = document.createRange();
+  r.setStart(el, 0);
+  try { r.setEnd(node, offset); } catch { return fieldPlainText(el).length; }
+  let n = 0;
+  for (const t of liveTextNodes(el)) {
+    if (t === node) { n += offset; break; }
+    if (r.intersectsNode(t)) n += t.data.length; else break;
+  }
+  return n;
+}
+
+function plainSelection(el) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || !el.contains(sel.anchorNode)) return null;
+  const r = sel.getRangeAt(0);
+  const a = plainOffsetAt(el, r.startContainer, r.startOffset);
+  const b = plainOffsetAt(el, r.endContainer, r.endOffset);
+  return [Math.min(a, b), Math.max(a, b)];
+}
+
+function domPointAt(el, offset) {
+  let acc = 0;
+  const nodes = liveTextNodes(el);
+  for (const t of nodes) {
+    if (offset <= acc + t.data.length) return [t, offset - acc];
+    acc += t.data.length;
+  }
+  if (nodes.length) { const t = nodes[nodes.length - 1]; return [t, t.data.length]; }
+  return [el, 0];
+}
+
+function setPlainSelection(el, start, end = start) {
+  const [sn, so] = domPointAt(el, start);
+  const [en, eo] = domPointAt(el, end);
+  const r = document.createRange();
+  r.setStart(sn, so);
+  r.setEnd(en, eo);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+// השוואת מילים (LCS) אחרי קיצוץ הרישא והסיפא המשותפות - עריכה היא כמעט
+// תמיד מקומית. אמצע ענק (הדבקה של סעיף שלם) - מחיקה והוספה בלי LCS.
+// **רווח שווה לרווח** בכל אורך: מחיקת מילה משאירה שני רווחים, והם אינם
+// שינוי שצריך לסמן. הקטעים השווים נלקחים תמיד מהטקסט הנוכחי (b) -
+// כך הטקסט בלי המחוק הוא בדיוק b.
+function wordDiff(a, b) {
+  const A = a.split(/(\s+)/).filter((x) => x !== "");
+  const B = b.split(/(\s+)/).filter((x) => x !== "");
+  const key = (tok) => (/^\s+$/.test(tok) ? " " : tok);
+  const KA = A.map(key), KB = B.map(key);
+  let pre = 0;
+  while (pre < A.length && pre < B.length && KA[pre] === KB[pre]) pre += 1;
+  let suf = 0;
+  while (suf < A.length - pre && suf < B.length - pre &&
+         KA[A.length - 1 - suf] === KB[B.length - 1 - suf]) suf += 1;
+  const mA = A.slice(pre, A.length - suf), mB = B.slice(pre, B.length - suf);
+  const kA = KA.slice(pre, A.length - suf), kB = KB.slice(pre, B.length - suf);
+  const ops = [];
+  const push = (op, text) => {
+    const last = ops[ops.length - 1];
+    if (last && last[0] === op) last[1] += text; else ops.push([op, text]);
+  };
+  if (pre) push("=", B.slice(0, pre).join(""));
+  if (mA.length * mB.length > 250000) {
+    if (mA.length) push("-", mA.join(""));
+    if (mB.length) push("+", mB.join(""));
+  } else {
+    const n = mA.length, m = mB.length;
+    const L = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+    for (let i = n - 1; i >= 0; i -= 1)
+      for (let j = m - 1; j >= 0; j -= 1)
+        L[i][j] = kA[i] === kB[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    let i = 0, j = 0;
+    const dels = [], adds = [];
+    const flush = () => {
+      if (dels.length) push("-", dels.join(""));
+      if (adds.length) push("+", adds.join(""));
+      dels.length = 0; adds.length = 0;
+    };
+    while (i < n || j < m) {
+      if (i < n && j < m && kA[i] === kB[j]) { flush(); push("=", mB[j]); i += 1; j += 1; }
+      else if (j < m && (i >= n || L[i][j + 1] >= L[i + 1][j])) { adds.push(mB[j]); j += 1; }
+      else { dels.push(mA[i]); i += 1; }
+    }
+    flush();
+  }
+  if (suf) push("=", B.slice(B.length - suf).join(""));
+  return ops;
+}
+
+function renderTracked(el, original, current) {
+  el.dataset.plainValue = current;
+  if (original === current) { el.textContent = current; return; }
+  el.innerHTML = wordDiff(original, current).map(([op, text]) =>
+    op === "=" ? escapeHtml(text)
+      : op === "-" ? `<del contenteditable="false">${escapeHtml(text)}</del>`
+        : `<ins>${escapeHtml(text)}</ins>`).join("");
+}
+
+function tracksChanges(el) {
+  return !insertions.some((i) => i.clientId === el.dataset.nodeId);
+}
+
+function prevBoundary(text, i) {           // תחילת המילה שלפני i
+  while (i > 0 && /\s/.test(text[i - 1])) i -= 1;
+  while (i > 0 && !/\s/.test(text[i - 1])) i -= 1;
+  return i;
+}
+function nextBoundary(text, i) {
+  while (i < text.length && /\s/.test(text[i])) i += 1;
+  while (i < text.length && !/\s/.test(text[i])) i += 1;
+  return i;
+}
+
+function onFieldBeforeInput(ev) {
+  const el = ev.currentTarget;
+  if (!tracksChanges(el) || ev.isComposing || ev.inputType === "insertCompositionText") return;
+  const sel = plainSelection(el);
+  if (!sel) return;
+  const text = fieldPlainText(el);
+  let [s, e] = sel;
+  let data = "";
+  const t = ev.inputType;
+  if (t === "insertText" || t === "insertReplacementText" || t === "insertFromPaste" ||
+      t === "insertFromDrop" || t === "insertFromYank") {
+    data = ev.data ?? (ev.dataTransfer ? ev.dataTransfer.getData("text/plain") : "") ?? "";
+    data = data.replace(/\s*[\r\n]+\s*/g, " ");
+  } else if (t === "deleteContentBackward") {
+    if (s === e) s = Math.max(0, s - 1);
+  } else if (t === "deleteContentForward") {
+    if (s === e) e = Math.min(text.length, e + 1);
+  } else if (t === "deleteWordBackward") {
+    if (s === e) s = prevBoundary(text, s);
+  } else if (t === "deleteWordForward") {
+    if (s === e) e = nextBoundary(text, e);
+  } else if (t === "deleteSoftLineBackward" || t === "deleteHardLineBackward") {
+    if (s === e) s = 0;
+  } else if (t === "deleteSoftLineForward" || t === "deleteHardLineForward") {
+    if (s === e) e = text.length;
+  } else if (t.startsWith("delete")) {
+    // deleteByCut / deleteByDrag / deleteContent - הבחירה עצמה
+  } else {
+    // שבירת שורה, עיצוב (Ctrl+B) וכו' - לא חלק מנוסח חוק
+    ev.preventDefault();
+    return;
+  }
+  ev.preventDefault();
+  if (s === e && !data) return;
+  const next = text.slice(0, s) + data + text.slice(e);
+  renderTracked(el, fieldOriginal(el), next);
+  setPlainSelection(el, s + data.length);
+  onFieldInput({ target: el });
 }
 
 function findNodeWrapperById(nodeId) {
