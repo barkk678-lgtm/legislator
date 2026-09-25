@@ -648,18 +648,67 @@ textarea.composer-input {
 .pq-chip.on { background: var(--flag); border-color: var(--flag); color: #fff; }
 
 
-/* --- שיחות שאילתא קודמות (ב4) --- */
-.qconv-new { font-size: 12.5px; padding: 5px 11px; }
-.qconv-item {
-  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-  width: 100%; text-align: start; background: none; cursor: pointer;
-  border: 0; border-bottom: 1px solid var(--rule); padding: 8px 2px; font: inherit;
+/* --- שיחות שאילתא קודמות (ב4) - כפתור "היסטוריה" ורשימה צפה (ש5) --- */
+.card > header.qconv-head { align-items: center; }
+.qconv-current {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.qconv-item:last-child { border-bottom: 0; }
+.qconv-current:not(:empty)::before { content: "· "; }
+.qconv-actions {
+  position: relative; display: flex; align-items: center; gap: 8px;
+  margin-inline-start: auto; flex: 0 0 auto;
+}
+.qconv-new { font-size: 12.5px; padding: 5px 11px; }
+button.qconv-history-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 600; padding: 5px 11px;
+  border: 1px solid var(--flag); color: var(--flag); background: var(--page);
+}
+button.qconv-history-btn:hover, button.qconv-history-btn[aria-expanded="true"] { background: var(--tint-2); }
+button.qconv-history-btn.warn { border-color: #B45309; color: #B45309; }
+.qconv-clock {
+  width: 11px; height: 11px; border: 1.6px solid currentColor; border-radius: 50%;
+  position: relative; box-sizing: border-box;
+}
+.qconv-clock::after {
+  content: ""; position: absolute; inset-inline-start: 3.4px; top: 1.2px;
+  width: 3px; height: 3.4px; border-inline-start: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+}
+.card > header .qconv-count {
+  font-size: 11px; font-weight: 600; color: var(--soft); background: var(--tint);
+  border-radius: 9px; padding: 0 6px; min-width: 18px; text-align: center;
+}
+.qconv-menu {
+  position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 30;
+  width: 340px; max-width: calc(100vw - 32px); max-height: min(460px, 70vh);
+  display: flex; flex-direction: column;
+  background: var(--page); border: 1px solid var(--rule); border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(11, 42, 91, .16);
+}
+.qconv-menu[hidden] { display: none; }
+.qconv-menu > .inp { margin: 12px 12px 6px; width: auto; font-size: 13px; }
+.qconv-list { overflow: auto; flex: 1 1 auto; padding-bottom: 4px; }
+.qconv-list .notice { margin: 6px 12px; }
+.qconv-group { font-size: 11.5px; font-weight: 700; color: var(--soft); padding: 8px 16px 4px; }
+.qconv-empty { padding: 10px 16px 14px; }
+.qconv-item {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  width: 100%; text-align: start; background: none; cursor: pointer;
+  border: 0; border-radius: 0; padding: 9px 16px; font: inherit;
+}
 .qconv-item:hover { background: var(--tint-2); }
 .qconv-item.on { background: var(--tint); }
-.qconv-title { color: var(--ink); font-size: 13.5px; }
+.qconv-item.on .qconv-title { font-weight: 700; }
+.qconv-title { color: var(--ink); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qconv-date { color: var(--soft); font-size: 12px; white-space: nowrap; }
+button.qconv-all {
+  border: 0; border-top: 1px solid var(--rule); border-radius: 0 0 10px 10px;
+  background: none; color: var(--flag); font-weight: 600; font-size: 13px;
+  padding: 10px 16px; text-align: start;
+}
+button.qconv-all:hover { background: var(--tint-2); }
+button.qconv-all[hidden] { display: none; }
 
 /* ח10: כשל בקליטת עריכה/הוספה - שורה לכל כשל, בולטת */
 #download-hint .failure-line { color: var(--del); font-weight: 600; margin-top: 4px; }

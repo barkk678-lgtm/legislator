@@ -1719,34 +1719,123 @@ function saveCurrentConv() {
   renderConvs(ok);
 }
 
-function renderConvs(saveOk = true) {
+/* ש5 (25.9.2026): השיחות אינן עוד כרטיס מתחת לחלוניות - כפתור "היסטוריה"
+ * בכותרת חלונית הניסוח פותח רשימה צפה (כמו במוקאפ): חיפוש, קיבוץ לפי זמן,
+ * חמש האחרונות ו"כל N השיחות ←". שם השיחה הפתוחה - ליד "ניסוח השאילתה". */
+const QCONV_SHOWN = 5;
+let qconvShowAll = false;
+let qconvSaveFailed = false;
+
+function qconvDate(at) {
+  const d = new Date(at), now = new Date();
+  const dm = `${d.getDate()}.${d.getMonth() + 1}`;
+  return d.getFullYear() === now.getFullYear() ? dm : `${dm}.${d.getFullYear()}`;
+}
+
+function qconvGroup(at) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const t = today.getTime(), day = 86400000;
+  if (at >= t) return "היום";
+  if (at >= t - 6 * day) return "השבוע";
+  if (at >= t - 29 * day) return "החודש";
+  return "קודם";
+}
+
+function qconvMatches(conv, q) {
+  const words = pqNorm(q).split(" ").filter(Boolean);
+  if (!words.length) return true;
+  const hay = pqNorm([conv.title, ...(conv.turns || []).map((t) => t.content)].join(" "));
+  return words.every((w) => hay.includes(w));
+}
+
+function renderConvCurrent() {
+  const el = document.getElementById("qconv-current");
+  if (!el) return;
+  const conv = currentConvId && readConvs().find((c) => c.id === currentConvId);
+  el.textContent = conv ? conv.title : "";
+  el.title = conv ? conv.title : "";
+}
+
+function renderConvs(saveOk = null) {
+  // saveOk: תוצאת השמירה האחרונה (saveCurrentConv), או null - רק רינדור.
+  if (saveOk !== null) qconvSaveFailed = !saveOk;
   const el = document.getElementById("qconv-list");
+  const count = document.getElementById("qconv-count");
+  const all = document.getElementById("qconv-all");
   if (!el) return;
   const list = readConvs();
+  renderConvCurrent();
+  count.textContent = qconvUnreadable ? "!" : String(list.length);
+  const btn = document.getElementById("qconv-history-btn");
+  btn.classList.toggle("warn", qconvUnreadable || qconvSaveFailed);
+  btn.title = qconvSaveFailed ? "שמירת השיחה נכשלה" : qconvUnreadable ? "לא הצלחתי לקרוא את השיחות השמורות" : "";
+  all.hidden = true;
+  const warn = qconvSaveFailed
+    ? `<div class="notice notice-coverage">⚠ שמירת השיחה נכשלה — השיחה אינה שמורה.</div>` : "";
   if (qconvUnreadable) {
     el.innerHTML = `<div class="notice notice-coverage"><b>לא הצלחתי לקרוא את
       השיחות השמורות.</b> <b>זו אינה תשובה שאין כאלה</b> — ייתכן שהן קיימות
       ולא נקראו.</div>`;
     return;
   }
-  if (saveOk === false) {
-    el.innerHTML = `<div class="notice notice-coverage">⚠ שמירת השיחה נכשלה —
-      השיחה אינה שמורה.</div>` + el.innerHTML;
-    return;
-  }
   if (!list.length) {
-    el.innerHTML = `<div class="hint">אין עדיין שיחות שמורות.</div>`;
+    el.innerHTML = warn + `<div class="hint qconv-empty">אין עדיין שיחות שמורות.</div>`;
     return;
   }
-  el.innerHTML = list.map((c) => `
+  const q = document.getElementById("qconv-search").value.trim();
+  const found = list.filter((c) => qconvMatches(c, q));
+  if (!found.length) {
+    el.innerHTML = warn + `<div class="hint qconv-empty">לא נמצאו שיחות שמתאימות לחיפוש.</div>`;
+    return;
+  }
+  const shown = q || qconvShowAll ? found : found.slice(0, QCONV_SHOWN);
+  let html = warn, group = null;
+  for (const c of shown) {
+    const g = qconvGroup(c.at);
+    if (g !== group) { html += `<div class="qconv-group">${g}</div>`; group = g; }
+    html += `
     <button type="button" class="qconv-item${c.id === currentConvId ? " on" : ""}"
             data-id="${escapeHtml(c.id)}">
       <span class="qconv-title">${escapeHtml(c.title)}</span>
-      <span class="qconv-date">${new Date(c.at).toLocaleDateString("he-IL")}</span>
-    </button>`).join("");
+      <span class="qconv-date">${qconvDate(c.at)}</span>
+    </button>`;
+  }
+  el.innerHTML = html;
+  if (shown.length < found.length) {
+    all.textContent = `כל ${found.length} השיחות ←`;
+    all.hidden = false;
+  }
   el.querySelectorAll(".qconv-item").forEach((b) =>
-    b.addEventListener("click", () => openConv(b.dataset.id)));
+    b.addEventListener("click", () => { closeConvMenu(); openConv(b.dataset.id); }));
 }
+
+function openConvMenu() {
+  const menu = document.getElementById("qconv-menu");
+  qconvShowAll = false;
+  document.getElementById("qconv-search").value = "";
+  renderConvs();
+  menu.hidden = false;
+  document.getElementById("qconv-history-btn").setAttribute("aria-expanded", "true");
+  document.getElementById("qconv-search").focus();
+}
+
+function closeConvMenu() {
+  const menu = document.getElementById("qconv-menu");
+  if (menu.hidden) return;
+  menu.hidden = true;
+  document.getElementById("qconv-history-btn").setAttribute("aria-expanded", "false");
+}
+
+document.getElementById("qconv-history-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (document.getElementById("qconv-menu").hidden) openConvMenu(); else closeConvMenu();
+});
+document.getElementById("qconv-search").addEventListener("input", () => renderConvs());
+document.getElementById("qconv-all").addEventListener("click", () => { qconvShowAll = true; renderConvs(); });
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#qconv-menu, #qconv-history-btn")) closeConvMenu();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeConvMenu(); });
 
 function openConv(id) {
   const conv = readConvs().find((c) => c.id === id);

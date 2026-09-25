@@ -141,9 +141,21 @@
       <div class="tab" id="query">
         <div class="cols" style="grid-template-columns:1.4fr 1fr">
           <section class="card">
-            <header>
-              <h2>ניסוח השאילתה</h2>
-              <button id="qconv-new" class="primary qconv-new">+ צור שאילתה חדשה</button>
+            <header class="qconv-head">
+              <h2>ניסוח השאילתה</h2><span id="qconv-current" class="qconv-current"></span>
+              <div class="qconv-actions">
+                <button id="qconv-history-btn" type="button" class="qconv-history-btn"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="qconv-menu">
+                  <span class="qconv-clock" aria-hidden="true"></span>היסטוריה
+                  <span id="qconv-count" class="qconv-count">0</span></button>
+                <button id="qconv-new" class="primary qconv-new">+ צור שאילתה חדשה</button>
+                <div id="qconv-menu" class="qconv-menu" hidden>
+                  <input id="qconv-search" class="inp" type="search" placeholder="חיפוש בשיחות קודמות…"
+                         autocomplete="off" />
+                  <div id="qconv-list" class="qconv-list"></div>
+                  <button id="qconv-all" type="button" class="qconv-all" hidden></button>
+                </div>
+              </div>
             </header>
             <div class="chat-form">
               <div class="fld"><label>אל השר/ה</label>
@@ -171,10 +183,6 @@
             </div>
             <div class="pq-knesset" id="pq-knesset"></div>
             <div class="body" id="past-queries-results"></div>
-          </section>
-          <section class="card">
-            <header><h2>שיחות קודמות</h2><span>נשמרות בדפדפן שלכם</span></header>
-            <div class="body" id="qconv-list"></div>
           </section>
         </div>
       </div>

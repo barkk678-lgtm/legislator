@@ -54,6 +54,11 @@ def main() -> int:
         results.append(("ש6: 'נושא', 'גוף', 'רצוני לשאול' בבולד",
                         bold == ["נושא:", "גוף:", "רצוני לשאול:"], str(bold)))
 
+        results.append(("ש5: אחרי הניסוח - שם השיחה ליד הכותרת, והמונה 1",
+                        page.inner_text("#qconv-current").strip() == DRAFT["subject"]
+                        and page.inner_text("#qconv-count") == "1",
+                        page.inner_text("#qconv-current") + " / " + page.inner_text("#qconv-count")))
+
         geo = page.evaluate("""() => {
             const m = document.querySelector('#query-chat .msg.a.has-action');
             const i = m.querySelector('.msg-action').getBoundingClientRect(), r = m.getBoundingClientRect();
@@ -64,6 +69,7 @@ def main() -> int:
 
         # שיחה חדשה ואז פתיחה מחדש של הקודמת מההיסטוריה
         page.click("#qconv-new")
+        page.click("#qconv-history-btn")   # ש5: השיחות ברשימה הנפתחת
         page.locator("#qconv-list .qconv-item").first.click()
         page.wait_for_timeout(300)
         results.append(("שיחה שנפתחה מחדש - האייקון עדיין שם", icons(page) == 1, str(icons(page))))
@@ -78,6 +84,7 @@ def main() -> int:
                       OLD_CONV)
         page.reload()
         page.click('nav button[data-t="query"]')
+        page.click("#qconv-history-btn")   # ש5: השיחות ברשימה הנפתחת
         page.locator("#qconv-list .qconv-item").first.click()
         page.wait_for_timeout(300)
         results.append(("שיחה ישנה - אייקון על הטיוטה בלבד, לא על 'בשמחה!'", icons(page) == 1,
