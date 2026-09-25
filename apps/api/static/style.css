@@ -768,3 +768,26 @@ a.rules-cite:hover, a.rules-cite:focus { text-decoration: underline; text-underl
 .rules-interp { margin-top: 6px; padding: 6px 10px; border-inline-start: 3px solid var(--flag);
   background: var(--page); font-size: 0.95em; }
 .rules-interp .lbl { display: block; font-size: 12px; font-weight: 700; color: var(--flag); margin-bottom: 2px; }
+
+/* ═══ הסתייגויות (בנייה מחדש, 26.9) ═══ */
+.res-levels { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.res-levels button { border: 0; border-radius: 0; padding: 7px 18px; background: #fff; }
+.res-levels button + button { border-inline-start: 1px solid var(--rule); }
+.res-levels button.on { background: var(--flag); color: #fff; font-weight: 600; }
+.res-families { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.res-fam { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+.res-fam-note { color: var(--soft); font-size: 12.5px; }
+.res-max { margin-top: 6px; font-size: 14px; }
+.res-max-item { display: inline-block; margin-inline-start: 12px; color: var(--soft); }
+.res-max-item.on { color: var(--ink); }
+.res-quote { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px; background: var(--tint-2); }
+.res-quote-row + .res-quote-row { margin-top: 6px; }
+.res-demo { font-size: 12.5px; color: var(--warn); background: var(--warn-bg); border: 1px solid var(--touched-accent); border-radius: 999px; padding: 3px 10px; }
+a.btn { display: inline-block; padding: 7px 14px; border-radius: 7px; text-decoration: none; border: 1px solid var(--rule); }
+a.btn.primary { background: var(--flag); border-color: var(--flag); color: #fff; font-weight: 600; }
+.res-preview { margin-top: 14px; font-family: "David", "Frank Ruhl Libre", serif; font-size: 15.5px; line-height: 1.7; text-align: justify; }
+.res-heading { margin: 14px 0 4px; font-weight: 700; text-decoration: underline; }
+.res-item { margin: 2px 0; }
+.res-num { font-weight: 700; }
+.res-quoted { padding-inline-start: 26px; }
+.res-budget { font-family: Assistant, sans-serif; font-size: 11.5px; color: var(--warn); background: var(--warn-bg); border-radius: 4px; padding: 1px 6px; }

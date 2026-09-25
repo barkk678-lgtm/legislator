@@ -623,224 +623,121 @@ async def api_merge_build(file: UploadFile = File(...)) -> dict:
     }
 
 
-@app.post("/api/reservations/analyze")
-async def api_reservations_analyze(file: UploadFile = File(...)) -> dict:
-    """מדידת הצעה שהועלתה: כמה הסתייגויות אפשר לייצר וכמה עוגנים
-    מובחנים יש. **מדידה בלבד, בלי LLM ובלי רשת.**"""
-    sections, bill = await _reservation_sections(file)
+# ── כלי ההסתייגויות (בנייה מחדש, 26.9) ─────────────────────────────────
+# **המודל לא כותב אף מילה שמגיעה לפלט**: כל הסתייגות בנויה מנוסח ההצעה,
+# מתבנית קבועה (packages/reservations/forms.py - נגזרו מטבריה), או מבנק
+# שברק אישר (data/reservations_bank.json). מצב "איכות" ירד. ראו
+# packages/reservations/families.py.
+
+def _reservations_pkg():
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "reservations"))
-    from generate import measure  # noqa: PLC0415
-
-    from quality import anchor_points  # noqa: PLC0415
-
-    result = measure(sections)
-    # **עלות מצב האיכות, דטרמיניסטית ולפני כל קריאה למודל:** קריאה
-    # אחת לכל סעיף, וגודל ההנחיה ידוע מראש. מוצג כדי שההחלטה להריץ
-    # תילקח מתוך מספר ולא מתוך תחושה.
-    quality_calls = sum(1 for _, text in sections if anchor_points(text))
-    return {
-        "title": bill.title,
-        "sections_found": len(sections),
-        # **אין "total".** measure() הפסיקה להחזיר אותו במכוון (ברק,
-        # 2026-09-18): מספר ההסתייגויות האפשריות אינו מדידה של ההצעה
-        # אלא תוצר של תקרה שאנחנו קובעים. ה-endpoint המשיך לקרוא לו
-        # עד 2026-09-19 והחזיר 500 על כל מדידה.
-        "distinct": result["distinct"],
-        "per_section": result["per_section"],
-        "quality_calls": quality_calls,
-        "quality_points": sum(len(anchor_points(text)) for _, text in sections),
-        "quality_prompt_chars": sum(len(text) for _, text in sections if anchor_points(text)),
-        "warnings": bill.warnings,
-    }
 
 
-@app.post("/api/reservations/quality")
-async def api_reservations_quality(
-    file: UploadFile = File(...),
-    proposers: str = Form(""),
-    sections_limit: int = Form(0),
-    download: bool = Form(False),
-):
-    """מצב האיכות: הסתייגות מהותית אחת לכל נקודת עיגון.
+async def _read_uploaded_bill(file: UploadFile):
+    _reservations_pkg()
+    from bill_input import BillInputError, read_bill  # noqa: PLC0415
 
-    **כאן המודל כן כותב טקסט, ולכן כאן - ורק כאן - שומר 86(ד)(2)
-    חל.** מה שנחסם נזרק ואינו מוחזר למשתמש (חוק ברזל 7); מוחזרת
-    רק הספירה, לדיווח.
-
-    `sections_limit` קיים בשביל העלות: קריאה אחת למודל לכל סעיף.
-    הטוקנים בפועל מוחזרים ב-`usage`, ולא בהערכה - `draft_fn` כאן
-    עוטף את `complete` ישירות וסופר את מה שה-API דיווח."""
-    sections, bill = await _reservation_sections(file)
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "reservations"))
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
-    from client import DEFAULT_MODEL, LLMConfigError, LLMRequestError, complete  # noqa: PLC0415
-    from quality import quality_reservations  # noqa: PLC0415
-    from render_docx import build_document  # noqa: PLC0415
-
-    usage = {"drafting_calls": 0, "screening_calls": 0,
-             "input_tokens": 0, "output_tokens": 0, "model": DEFAULT_MODEL}
-
-    def _counted(kind):
-        def call(*, instructions: str, content: str, max_tokens: int = 1600) -> str:
-            completion = complete(system=instructions, user_message=content,
-                                  max_tokens=max_tokens)
-            usage[kind] += 1
-            usage["input_tokens"] += completion.input_tokens
-            usage["output_tokens"] += completion.output_tokens
-            return completion.text
-        return call
-
-    # **שתי קריאות, לא אחת.** הניסוח וסינון 86(ד)(2) הן שתי קריאות
-    # נפרדות בתשלום, ודיווח שסופר רק את הראשונה מציג כמחצית מהעלות.
-    drafted = _counted("drafting_calls")
-    screened = _counted("screening_calls")
-
-    chosen = sections[:sections_limit] if sections_limit > 0 else sections
-    items, blocked = [], []
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(413, "הקובץ גדול מדי (עד 20MB).")
     try:
-        for number, text in chosen:
-            passed, reasons = quality_reservations(
-                text, section_number=number, draft_fn=drafted,
-                screen_draft_fn=screened)
-            items.extend(passed)
-            blocked.extend(reasons)
-    except LLMConfigError as e:
-        raise HTTPException(503, str(e))
-    except LLMRequestError as e:
-        raise HTTPException(502, f"שכבת ה-LLM נכשלה: {e}")
+        return read_bill(file.filename or "", data)
+    except BillInputError as exc:
+        raise HTTPException(422, str(exc)) from None
 
-    if download:
-        names = [n.strip() for n in proposers.split(",") if n.strip()]
-        doc = build_document(bill_title=bill.title or "הצעת חוק",
-                             reservations=items, proposers=names, budget_flags={})
-        buffer = io.BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        return StreamingResponse(
-            buffer,
-            media_type=("application/vnd.openxmlformats-officedocument"
-                        ".wordprocessingml.document"),
-            headers={"Content-Disposition": 'attachment; filename="reservations-quality.docx"',
-                     "X-Reservations-Count": str(len(items))},
-        )
 
+def _families_param(raw: str) -> list[str]:
+    from families import FAMILIES  # noqa: PLC0415
+
+    chosen = [f for f in (raw or "").split(",") if f in FAMILIES]
+    return chosen or list(FAMILIES)
+
+
+@app.post("/api/reservations/analyze")
+async def api_reservations_analyze(file: UploadFile = File(...), families: str = Form("")) -> dict:
+    """ההצעה שהועלתה: המבנה שנקרא, וכמה הסתייגויות אפשר לייצר ממנה לכל היותר
+    בכל רמת יצירתיות. **בלי מודל ובלי רשת.**"""
+    bill = await _read_uploaded_bill(file)
+    from bank import LEVELS  # noqa: PLC0415
+    from bill_input import user_notices  # noqa: PLC0415
+    from families import FAMILIES, availability  # noqa: PLC0415
+    from pricing import config  # noqa: PLC0415
+
+    avail = availability(bill, _families_param(families))
     return {
         "title": bill.title,
-        "sections_used": len(chosen),
-        "sections_found": len(sections),
-        "passed": [{"section_number": it.section_number, "text": it.text,
-                    "rationale": it.rationale} for it in items],
-        "blocked_count": len(blocked),
-        "usage": usage,
-        # אזהרות החילוץ חוזרות גם כאן, לא רק ב-/analyze: המשתמש
-        # יכול להגיע ישירות לניסוח בלי למדוד קודם.
+        "committee": bill.committee,
+        "sections": [{"number": s.number, "margin_title": s.margin_title,
+                      "units": [u.label for u in s.units], "certain": s.certain} for s in bill.sections],
         "warnings": bill.warnings,
+        "notices": user_notices(bill),
+        "levels": {k: {"label": v, **avail[k]} for k, v in LEVELS.items()},
+        "families": FAMILIES,
+        "pricing": config(),
     }
 
 
 @app.post("/api/reservations/generate")
 async def api_reservations_generate(
     file: UploadFile = File(...),
-    proposers: str = Form(""),
-    limit_per_section: int = Form(50),
-) -> StreamingResponse:
-    """מצב הכמות -> קובץ Word בפורמט שבו הסתייגויות מוגשות לוועדה.
+    level: str = Form("serious"),
+    families: str = Form(""),
+    count: int = Form(50),
+    payment: str = Form(""),
+) -> dict:
+    """הייצור: תצוגה מקדימה + קובץ Word (base64). **תשלום מדומה:** מעבר לכלול -
+    רק payment="demo" במצב הדגמה. אין כאן - ואין בשום מקום - פרטי תשלום."""
+    import base64  # noqa: PLC0415
 
-    **בלי LLM בכלל בנתיב הזה** - מצב הכמות דטרמיניסטי לחלוטין, וזו
-    בדיוק ההגנה המבנית (CLAUDE.md חוק ברזל 8)."""
-    sections, bill = await _reservation_sections(file)
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "reservations"))
-    from generate import budgetary_flags, quantity_reservations  # noqa: PLC0415
-    from render_docx import build_document  # noqa: PLC0415
+    bill = await _read_uploaded_bill(file)
+    from bank import LEVELS  # noqa: PLC0415
+    from families import FAMILIES, plan  # noqa: PLC0415
+    from bill_input import user_notices  # noqa: PLC0415
+    from pricing import config, price_usd  # noqa: PLC0415
+    from render_docx import docx_bytes  # noqa: PLC0415
 
-    items, flags = [], {}
-    for number, text in sections:
-        produced = quantity_reservations(text, section_number=number)[:limit_per_section]
-        for index, reason in budgetary_flags(produced, section_text=text).items():
-            flags[len(items) + index] = reason
-        items.extend(produced)
+    if level not in LEVELS:
+        raise HTTPException(422, "רמת יצירתיות לא מוכרת.")
+    if count < 1 or count > 5000:
+        raise HTTPException(422, "הכמות חייבת להיות בין 1 ל-5,000.")
+    cfg = config()
+    result = plan(bill, level, _families_param(families), count)
+    # המחיר - על מה שמיוצר בפועל: ביקשו יותר ממה שההצעה מאפשרת - אומרים את זה
+    # (short), לא משלימים בחזרות, ולא גובים על מה שלא נוצר.
+    price = price_usd(len(result.items), cfg)
+    if price > 0:
+        if cfg["payment_mode"] != "demo":
+            raise HTTPException(402, "הסליקה עדיין לא מחוברת - אפשר לייצר עד "
+                                     f"{cfg['included']} הסתייגויות.")
+        if payment != "demo":
+            raise HTTPException(402, "נדרש אישור תשלום (מצב הדגמה).")
+    title = bill.title if bill.title.startswith("הצעת") else f"הצעת {bill.title}".strip()
+    data = docx_bytes(bill_title=title, items=result.items)
+    return {
+        "title": title,
+        "level": level,
+        "requested": count,
+        "available": result.available,
+        "produced": len(result.items),
+        "short": result.short,
+        "at_least_separate": result.at_least_separate,
+        "families_waiting": [FAMILIES[f] for f in result.families_waiting],
+        "price_usd": price,
+        "payment_mode": cfg["payment_mode"],
+        "items": [{"number": i, "heading": it.heading, "lines": it.lines, "family": FAMILIES[it.family],
+                   "budget": it.budget} for i, it in enumerate(result.items, 1)],
+        "docx_base64": base64.b64encode(data).decode(),
+        "warnings": bill.warnings,
+        "notices": user_notices(bill),
+    }
 
-    names = [n.strip() for n in proposers.split(",") if n.strip()]
-    doc = build_document(bill_title=bill.title or "הצעת חוק",
-                         reservations=items, proposers=names, budget_flags=flags)
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return StreamingResponse(
-        buffer,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": 'attachment; filename="reservations.docx"',
-                 "X-Reservations-Count": str(len(items)),
-                 # בהורדת קובץ אין גוף JSON להציג בו אזהרות.
-                 "X-Extraction-Warnings": str(len(bill.warnings))},
-    )
 
+@app.get("/api/reservations/pricing")
+def api_reservations_pricing() -> dict:
+    _reservations_pkg()
+    from pricing import config  # noqa: PLC0415
 
-async def _reservation_sections(file: UploadFile):
-    """חילוץ (מספר סעיף, נוסח) מהצעה שהועלתה. Word בלבד - ראו
-    drafting-rules.md §9.3: מתוך 2,680 נוסחי קריאה 2-3 ב-OData רק
-    4 הם Word, ולכן אין משיכה אוטומטית והמשתמש מעלה בעצמו."""
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "documents"))
-    from extract_docx import DocumentExtractError, extract_bill  # noqa: PLC0415
-
-    if not (file.filename or "").lower().endswith(".docx"):
-        raise HTTPException(
-            415,
-            "נתמכים קובצי Word מסוג .docx בלבד. **פתחו את הקובץ ב-Word "
-            "ושמרו אותו מחדש: קובץ ← שמירה בשם ← מסמך Word (.docx).** "
-            "ב-.doc הישן מספרי הסעיפים אינם ניתנים להפרדה מהנוסח "
-            "המצוטט שבתוכם, והסתייגות שתעוגן למספר שגוי גרועה "
-            "מהודעת שגיאה.",
-        )
-    try:
-        bill = extract_bill(io.BytesIO(await file.read()))
-    except DocumentExtractError as e:
-        raise HTTPException(422, str(e))
-
-    # **טקסט שלפני הסעיף הממוספר הראשון אינו נזרק** (ברק,
-    # 2026-09-19). הגרסה הקודמת פתחה סעיף רק כשהיה `line.number`,
-    # וכל מה שקדם לו נעלם בשקט. זה לא מקרה קצה: בשתי הצעות אמיתיות
-    # (`13948363`, `13948394`) **סעיף 1 הוא היחיד שממוספר אוטומטית
-    # ב-Word**, ולכן `number` שלו ריק - וזה בדיוק הסעיף שמגדיר
-    # "(להלן - החוק העיקרי)" שכל שאר הסעיפים מפנים אליו.
-    # ב-13948363 נתפס סעיף אחד מתוך שניים: חצי מההצעה, בלי אזהרה.
-    lead: list[str] = []
-    sections, current, buffer = [], "", []
-    for line in bill.lines:
-        if line.number:
-            if current:
-                sections.append((current.rstrip("."), " ".join(buffer).strip()))
-            current, buffer = line.number, [line.text]
-        elif current:
-            buffer.append(line.text)
-        elif line.text.strip():
-            lead.append(line.text)
-    if current:
-        sections.append((current.rstrip("."), " ".join(buffer).strip()))
-
-    if lead:
-        text = " ".join(lead).strip()
-        first = sections[0][0] if sections else ""
-        # מספר שלפני הראשון שכן זוהה. אם הראשון הוא "2" - זה "1".
-        inferred = ""
-        if first.isdigit() and int(first) > 1:
-            inferred = str(int(first) - 1)
-        if inferred:
-            sections.insert(0, (inferred, text))
-            bill.warnings.append(
-                f"סעיף {inferred} לא נשא מספר במסמך (כנראה מספור אוטומטי "
-                f"של Word, שאינו טקסט) - שוחזר מהמיקום ומהסעיף שאחריו. "
-                f"ודאו שהמספור נכון.")
-        else:
-            # לא ניתן להסיק - **אזהרה רועשת**, לא השמטה שקטה.
-            bill.warnings.append(
-                f"נמצא טקסט לפני הסעיף הממוספר הראשון ולא ניתן להסיק "
-                f"את מספרו (הסעיף הראשון שזוהה: {first or 'אין'}). "
-                f"{len(lead)} שורות אינן משויכות לאף סעיף: "
-                f"{text[:120]!r}")
-    if not sections:
-        raise HTTPException(422, "לא זוהו סעיפים ממוספרים במסמך.")
-    return sections, bill
+    return config()
 
 
 @app.post("/api/research/ask")

@@ -1,20 +1,12 @@
-"""ארבעת השומרים של תקנון הכנסת §86. **כולם חוסמים, אף אחד אינו
-אזהרה** (CLAUDE.md חוק ברזל 7).
+"""השומרים של תקנון הכנסת §86 ושל §3ג לחוק-יסוד: משק המדינה.
 
+**כולם חוסמים, אף אחד אינו אזהרה** (CLAUDE.md חוק ברזל 7) - מלבד §3ג, שמסמן.
 הנוסחים כאן נשלפו מהקורפוס ולא ממסמך ביניים (חוק ברזל 9).
 
-**חלוקת התפקידים בין השומרים לשני מצבי הכלי:**
-
-| שומר | כמות | איכות |
-|---|---|---|
-| 86(ד)(2) תוכן פוגעני | **לא חל - מבנית** | חל, חוסם |
-| 86(ד)(1) שלילת ההצעה | חל | חל |
-| 86(ד)(3) שם ההצעה | חל | חל |
-| §3ג עלות תקציבית | חל (סימון + כיוון מקל) | חל (סימון) |
-
-"לא חל - מבנית" אינו ויתור: `model.Reservation` אינה מחזיקה טקסט
-חופשי כלל, ו-`screen_content` מקבלת `DraftedReservation` בלבד.
-הטיפוס הוא האכיפה.
+**אחרי הבנייה מחדש (26.9):** המודל לא כותב אף מילה שמגיעה לפלט (מצב "איכות"
+ירד). לכן 86(ד)(2) רץ על **רשומות הבנק**, מראש (tools/reservations_bank_review.py),
+ולא על הסתייגות שנוצרה - ראו bank.py. 86(ד)(1) ו-86(ד)(3) נאכפים גם במבנה
+המשפחות עצמו (families.py): מחיקת יחידה רק כשיש שתיים, ולא עיגון בציטוט שם חוק.
 """
 
 from __future__ import annotations
@@ -23,7 +15,6 @@ import re
 from dataclasses import dataclass
 
 from anchors import find_anchors
-from model import DraftedReservation, Reservation
 
 # ── §86(ד)(2), נוסח מלא מהקורפוס (law-tkanon-haknesset) ─────────────
 RULE_86_D_2 = (
@@ -43,7 +34,7 @@ class Verdict:
 ALLOWED = Verdict(True)
 
 
-# ── שומר 1: 86(ד)(2) - מצב האיכות בלבד ─────────────────────────────
+# ── שומר 1: 86(ד)(2) - על רשומות הבנק (tools/reservations_bank_review.py) ──
 # שכבה א': ביטויים שנחסמים בלי שיקול דעת. רשימה מכוונת-חסר: היא לא
 # מתיימרת לכסות, היא תופסת את המובהק בלי קריאת רשת.
 _HARD_BLOCK = (
@@ -86,22 +77,11 @@ _CLASSIFIER_INSTRUCTIONS = f"""אתה בודק נוסח של הסתייגות ל
 ההצעה. ענה "כן" רק על מה שבאמת מופיע ברשימה."""
 
 
-def screen_content(
-    reservation: DraftedReservation, *, draft_fn=None
-) -> Verdict:
-    """שומר 86(ד)(2). **מקבל `DraftedReservation` בלבד** - הסתייגות
-    ממצב הכמות אינה יכולה להגיע לכאן, כי היא אינה מחזיקה טקסט חופשי.
-
-    כל מסלול שאינו "תקין" מפורש מחזיר חסימה: רשימה, תשובת מודל
-    שאינה חד-משמעית, חריגה, או היעדר שירות. **ברירת המחדל היא
-    חסימה** - פסילה בטעות עולה אחת מתוך אלפיים, פלט פוגעני עולה
+def screen_text(text: str, *, draft_fn=None) -> Verdict:
+    """שומר 86(ד)(2) על נוסח - רשומת בנק. כל מסלול שאינו "תקין" מפורש
+    מחזיר חסימה: רשימה, תשובת מודל שאינה חד-משמעית, חריגה, או היעדר שירות.
+    **ברירת המחדל היא חסימה** - פסילה בטעות עולה רשומה אחת, פלט פוגעני עולה
     את החברה."""
-    if not isinstance(reservation, DraftedReservation):
-        raise TypeError(
-            "screen_content מקבלת DraftedReservation בלבד. הסתייגות ממצב "
-            "הכמות מוגנת מבנית ואינה עוברת כאן - ראו model.py."
-        )
-    text = reservation.text
     for phrase in _HARD_BLOCK:
         if phrase in text:
             return Verdict(False, "86(ד)(2)", f"ביטוי חסום: {phrase!r}")
@@ -196,20 +176,15 @@ class BudgetFlag:
     lenient_direction: str = ""  # "decrease" = מקל
 
 
-def screen_budgetary(reservation: Reservation, *, section_text: str) -> BudgetFlag:
-    """שומר 4. **אינו חוסם** - הוא מסמן, ומטה לכיוון מקל.
-
-    הסתייגות תקציבית אינה אסורה; היא דורשת 50 ח"כים. לכן הפעולה
-    הנכונה היא סימון גלוי (כדי שהמסתייג ידע מה הוא מגיש) והעדפת
-    כיוון שמקטין עלות."""
+def screen_budgetary(anchor: str, value: str, *, section_text: str) -> BudgetFlag:
+    """שומר 4. **אינו חוסם** - מסמן: הסתייגות תקציבית אינה אסורה, היא דורשת
+    50 ח"כים. anchor/value - הסכום שבהצעה והסכום החדש (ספרות)."""
     if not _MONEY_CONTEXT_RE.search(section_text):
         return BudgetFlag(False)
-    if not _SUM_RE.match(reservation.value) and not _SUM_RE.search(reservation.anchor):
+    if not _SUM_RE.search(value) and not _SUM_RE.search(anchor):
         return BudgetFlag(False)
     try:
-        increases = int(reservation.value.replace(",", "")) > int(
-            reservation.anchor.replace(",", "")
-        )
+        increases = int(re.sub(r"\D", "", value)) > int(re.sub(r"\D", "", anchor))
     except ValueError:
         return BudgetFlag(True, "שינוי סכום בהקשר כספי - כיוון לא ידוע")
     return BudgetFlag(

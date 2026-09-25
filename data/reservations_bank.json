@@ -1,0 +1,1040 @@
+{
+ "_doc": "בנק התוכן של כלי ההסתייגויות (ברק, 26.9). רק רשומה ב-status 'approved' מגיעה לפלט; כל הרשומות מתחילות 'pending'. {committee} - הוועדה מעמוד השער של ההצעה. בחובה/רשות הערך הוא 'מ=>אל'. בסעיף אחרי הסעיף האחרון התבנית היא 'כותרת שוליים|נוסח'. levels: serious=רציני, clever=מתחכם, absurd=הזוי.",
+ "records": [
+  {
+   "id": "actor_swap-001",
+   "level": "serious",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "שר האוצר",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-002",
+   "level": "serious",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "שר המשפטים",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-003",
+   "level": "serious",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "ראש הממשלה",
+   "status": "pending",
+   "source": "טבריה 43, 67 (החלפת 'שר הפנים')"
+  },
+  {
+   "id": "actor_swap-004",
+   "level": "serious",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "הממשלה",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-005",
+   "level": "serious",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "היועץ המשפטי לממשלה",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-006",
+   "level": "serious",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "מבקר המדינה",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-007",
+   "level": "clever",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "סגן השר",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-008",
+   "level": "clever",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "המנהל הכללי של המשרד",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-009",
+   "level": "clever",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "ועדה ציבורית שימנה השר",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-010",
+   "level": "clever",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "שר המדע והטכנולוגיה",
+   "status": "pending",
+   "source": "טבריה 67/ב"
+  },
+  {
+   "id": "actor_swap-011",
+   "level": "absurd",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "דמבלדור",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-012",
+   "level": "absurd",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "מועצת הזקנים של השבט הסנאי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-013",
+   "level": "absurd",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "הוועד המנהל של הוגוורטס",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "actor_swap-014",
+   "level": "absurd",
+   "family": "actor_swap",
+   "template": "{value}",
+   "value": "הקוסם הראשי של הממלכה",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-001",
+   "level": "serious",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "{committee} של הכנסת",
+   "status": "pending",
+   "source": "טבריה 44 ('באישור ועדת הפנים והגנת הסביבה של הכנסת'), הוועדה מעמוד השער"
+  },
+  {
+   "id": "approval-002",
+   "level": "serious",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "היועץ המשפטי לממשלה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-003",
+   "level": "serious",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "מבקר המדינה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-004",
+   "level": "serious",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "שר האוצר",
+   "status": "pending",
+   "source": "טבריה 44/א"
+  },
+  {
+   "id": "approval-005",
+   "level": "clever",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "80% מבעלי המסעדות בישראל",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-006",
+   "level": "clever",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "כלל מדריכי היוגה בישראל",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-007",
+   "level": "clever",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "רוב מוחלט של ועד ההורים הארצי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-008",
+   "level": "clever",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "60% ממורי ומורות ישראל",
+   "status": "pending",
+   "source": "טבריה 44/טו"
+  },
+  {
+   "id": "approval-009",
+   "level": "absurd",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "דמבלדור והוועד המנהל של הוגוורטס",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-010",
+   "level": "absurd",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "מועצת הזקנים של השבט הסנאי בפארק הירקון",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-011",
+   "level": "absurd",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "ועד הדולפינים של הים התיכון",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-012",
+   "level": "absurd",
+   "family": "approval",
+   "template": "באישור {value}",
+   "value": "איגוד שומרי הגמדים הלאומי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-013",
+   "level": "serious",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "{committee} של הכנסת",
+   "status": "pending",
+   "source": "טבריה 44 ('באישור ועדת הפנים והגנת הסביבה של הכנסת'), הוועדה מעמוד השער"
+  },
+  {
+   "id": "approval-014",
+   "level": "serious",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "היועץ המשפטי לממשלה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-015",
+   "level": "serious",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "מבקר המדינה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-016",
+   "level": "serious",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "שר האוצר",
+   "status": "pending",
+   "source": "טבריה 44/א"
+  },
+  {
+   "id": "approval-017",
+   "level": "clever",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "80% מבעלי המסעדות בישראל",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-018",
+   "level": "clever",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "כלל מדריכי היוגה בישראל",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-019",
+   "level": "clever",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "רוב מוחלט של ועד ההורים הארצי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-020",
+   "level": "clever",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "60% ממורי ומורות ישראל",
+   "status": "pending",
+   "source": "טבריה 44/טו"
+  },
+  {
+   "id": "approval-021",
+   "level": "absurd",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "דמבלדור והוועד המנהל של הוגוורטס",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-022",
+   "level": "absurd",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "מועצת הזקנים של השבט הסנאי בפארק הירקון",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-023",
+   "level": "absurd",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "ועד הדולפינים של הים התיכון",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-024",
+   "level": "absurd",
+   "family": "approval",
+   "template": "בכפוף לאישור {value}",
+   "value": "איגוד שומרי הגמדים הלאומי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-025",
+   "level": "serious",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "{committee} של הכנסת",
+   "status": "pending",
+   "source": "טבריה 44 ('באישור ועדת הפנים והגנת הסביבה של הכנסת'), הוועדה מעמוד השער"
+  },
+  {
+   "id": "approval-026",
+   "level": "serious",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "היועץ המשפטי לממשלה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-027",
+   "level": "serious",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "מבקר המדינה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-028",
+   "level": "serious",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "שר האוצר",
+   "status": "pending",
+   "source": "טבריה 44/א"
+  },
+  {
+   "id": "approval-029",
+   "level": "clever",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "80% מבעלי המסעדות בישראל",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-030",
+   "level": "clever",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "כלל מדריכי היוגה בישראל",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-031",
+   "level": "clever",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "רוב מוחלט של ועד ההורים הארצי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-032",
+   "level": "clever",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "60% ממורי ומורות ישראל",
+   "status": "pending",
+   "source": "טבריה 44/טו"
+  },
+  {
+   "id": "approval-033",
+   "level": "absurd",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "דמבלדור והוועד המנהל של הוגוורטס",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-034",
+   "level": "absurd",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "מועצת הזקנים של השבט הסנאי בפארק הירקון",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-035",
+   "level": "absurd",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "ועד הדולפינים של הים התיכון",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-036",
+   "level": "absurd",
+   "family": "approval",
+   "template": "בהתייעצות עם {value}",
+   "value": "איגוד שומרי הגמדים הלאומי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-037",
+   "level": "serious",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "{committee} של הכנסת",
+   "status": "pending",
+   "source": "טבריה 44 ('באישור ועדת הפנים והגנת הסביבה של הכנסת'), הוועדה מעמוד השער"
+  },
+  {
+   "id": "approval-038",
+   "level": "serious",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "היועץ המשפטי לממשלה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-039",
+   "level": "serious",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "מבקר המדינה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-040",
+   "level": "serious",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "שר האוצר",
+   "status": "pending",
+   "source": "טבריה 44/א"
+  },
+  {
+   "id": "approval-041",
+   "level": "clever",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "80% מבעלי המסעדות בישראל",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-042",
+   "level": "clever",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "כלל מדריכי היוגה בישראל",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-043",
+   "level": "clever",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "רוב מוחלט של ועד ההורים הארצי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-044",
+   "level": "clever",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "60% ממורי ומורות ישראל",
+   "status": "pending",
+   "source": "טבריה 44/טו"
+  },
+  {
+   "id": "approval-045",
+   "level": "absurd",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "דמבלדור והוועד המנהל של הוגוורטס",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-046",
+   "level": "absurd",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "מועצת הזקנים של השבט הסנאי בפארק הירקון",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "approval-047",
+   "level": "absurd",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "ועד הדולפינים של הים התיכון",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "approval-048",
+   "level": "absurd",
+   "family": "approval",
+   "template": "לאחר התייעצות עם {value}",
+   "value": "איגוד שומרי הגמדים הלאומי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-001",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יתקן=>רשאי לתקן",
+   "status": "pending",
+   "source": "טבריה 49 ('במקום \"יתקן\" יבוא \"רשאי לתקן\"')"
+  },
+  {
+   "id": "duty-002",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי לתקן=>יתקן",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-003",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יקבע=>רשאי לקבוע",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-004",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי לקבוע=>יקבע",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-005",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "ימנה=>רשאי למנות",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-006",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי למנות=>ימנה",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-007",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יפרסם=>רשאי לפרסם",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-008",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי לפרסם=>יפרסם",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-009",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יגיש=>רשאי להגיש",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-010",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי להגיש=>יגיש",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-011",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יודיע=>רשאי להודיע",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-012",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי להודיע=>יודיע",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-013",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יאשר=>רשאי לאשר",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-014",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי לאשר=>יאשר",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-015",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יעביר=>רשאי להעביר",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-016",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי להעביר=>יעביר",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-017",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יתקין=>רשאי להתקין",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-018",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי להתקין=>יתקין",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-019",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "ייתן=>רשאי לתת",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-020",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי לתת=>ייתן",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-021",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יחליט=>רשאי להחליט",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-022",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי להחליט=>יחליט",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-023",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "יביא=>רשאי להביא",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "duty-024",
+   "level": "serious",
+   "family": "duty",
+   "template": "{value}",
+   "value": "רשאי להביא=>יביא",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "conditions-001",
+   "level": "serious",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "השר ידווח ל{committee} של הכנסת בתוך שישה חודשים",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "conditions-002",
+   "level": "serious",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "השר יפרסם את החלטתו ברשומות",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "conditions-003",
+   "level": "serious",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "התקבלה חוות דעת של היועץ המשפטי לממשלה",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "conditions-004",
+   "level": "serious",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "יובא לאישור {committee} של הכנסת",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "conditions-005",
+   "level": "clever",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "תוקם ועדה ציבורית לבחינת החוק",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "conditions-006",
+   "level": "clever",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "התקבלה הסכמה של 80 חברי כנסת",
+   "status": "pending",
+   "source": "טבריה 16/כד"
+  },
+  {
+   "id": "conditions-007",
+   "level": "clever",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "יתקיים דיון ציבורי פתוח בכל מחוז",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "conditions-008",
+   "level": "clever",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "הושלם סקר דעת קהל ארצי בנושא",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "conditions-009",
+   "level": "absurd",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "ישראל תזכה באליפות העולם בשחמט",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "conditions-010",
+   "level": "absurd",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "הסתיימה נדידת העופות מישראל",
+   "status": "pending",
+   "source": "טבריה 16/ד"
+  },
+  {
+   "id": "conditions-011",
+   "level": "absurd",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "ירד שלג בחודש אוגוסט",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "conditions-012",
+   "level": "absurd",
+   "family": "conditions",
+   "template": "ובלבד ש{value}",
+   "value": "חתול הרחוב הממוצע יסיים תואר ראשון",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "conditions-013",
+   "level": "serious",
+   "family": "conditions",
+   "template": "החל מיום {value}",
+   "value": "1 בינואר של השנה הבאה",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "conditions-014",
+   "level": "clever",
+   "family": "conditions",
+   "template": "החל מיום {value}",
+   "value": "תום שלוש שנים מפרסום החוק",
+   "status": "pending",
+   "source": "ברק (הטבלה)"
+  },
+  {
+   "id": "conditions-015",
+   "level": "absurd",
+   "family": "conditions",
+   "template": "החל מיום {value}",
+   "value": "1 בינואר 3000",
+   "status": "pending",
+   "source": "ברק (הטבלה); טבריה 73/א ('מיום ה-1.1.3000')"
+  },
+  {
+   "id": "after_last-001",
+   "level": "serious",
+   "family": "after_last",
+   "template": "תחילה|תחילתו של חוק זה {value}.",
+   "value": "ביום 1 בינואר של השנה הבאה",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "after_last-002",
+   "level": "serious",
+   "family": "after_last",
+   "template": "תחילה|תחילתו של חוק זה {value}.",
+   "value": "שנה מיום פרסומו",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "after_last-003",
+   "level": "clever",
+   "family": "after_last",
+   "template": "תחילה|תחילתו של חוק זה {value}.",
+   "value": "שלוש שנים מיום פרסומו",
+   "status": "pending",
+   "source": "טבריה 74 ('תחילתו של חוק זה שלוש שנים מיום פרסומו')"
+  },
+  {
+   "id": "after_last-004",
+   "level": "absurd",
+   "family": "after_last",
+   "template": "תחילה|תחילתו של חוק זה {value}.",
+   "value": "ביום 1 בינואר 3000",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "after_last-005",
+   "level": "serious",
+   "family": "after_last",
+   "template": "תחולה|חוק זה לא יחול על {value}.",
+   "value": "עניין שהחל לפני יום תחילתו",
+   "status": "pending",
+   "source": "טבריה 81, 84 (צורת 'חוק זה לא יחול על')"
+  },
+  {
+   "id": "after_last-006",
+   "level": "clever",
+   "family": "after_last",
+   "template": "תחולה|חוק זה לא יחול על {value}.",
+   "value": "מי שמלאו לו 120 שנים",
+   "status": "pending",
+   "source": "טבריה 81, 84 (צורת 'חוק זה לא יחול על')"
+  },
+  {
+   "id": "after_last-007",
+   "level": "absurd",
+   "family": "after_last",
+   "template": "תחולה|חוק זה לא יחול על {value}.",
+   "value": "תושבי כוכב הלכת מאדים",
+   "status": "pending",
+   "source": "טבריה 81, 84 (צורת 'חוק זה לא יחול על')"
+  },
+  {
+   "id": "after_last-008",
+   "level": "serious",
+   "family": "after_last",
+   "template": "הוראת שעה|חוק זה יעמוד בתוקפו {value} מיום תחילתו.",
+   "value": "שנתיים",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "after_last-009",
+   "level": "serious",
+   "family": "after_last",
+   "template": "הוראת שעה|חוק זה יעמוד בתוקפו {value} מיום תחילתו.",
+   "value": "שנה",
+   "status": "pending",
+   "source": "טבריה 75 ('חוק זה יעמוד בתוקפו שנה מיום תחילתו')"
+  },
+  {
+   "id": "after_last-010",
+   "level": "clever",
+   "family": "after_last",
+   "template": "הוראת שעה|חוק זה יעמוד בתוקפו {value} מיום תחילתו.",
+   "value": "שנה ויום אחד",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "after_last-011",
+   "level": "absurd",
+   "family": "after_last",
+   "template": "הוראת שעה|חוק זה יעמוד בתוקפו {value} מיום תחילתו.",
+   "value": "חמש דקות",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "after_last-012",
+   "level": "serious",
+   "family": "after_last",
+   "template": "הוראת מעבר|הוראות חוק זה לא יחולו על {value}.",
+   "value": "הליך שהחל לפני יום תחילתו של חוק זה",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "after_last-013",
+   "level": "clever",
+   "family": "after_last",
+   "template": "הוראת מעבר|הוראות חוק זה לא יחולו על {value}.",
+   "value": "מי שהגיש בקשה ביום שישי",
+   "status": "pending",
+   "source": "מוצע"
+  },
+  {
+   "id": "after_last-014",
+   "level": "absurd",
+   "family": "after_last",
+   "template": "הוראת מעבר|הוראות חוק זה לא יחולו על {value}.",
+   "value": "מי שנולד בשנה מעוברת",
+   "status": "pending",
+   "source": "מוצע"
+  }
+ ]
+}

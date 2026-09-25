@@ -286,36 +286,37 @@
           <section class="card" style="max-width:900px;margin:0 auto;width:100%">
             <header><h2>הסתייגויות</h2><span>נוסח לקריאה שנייה ושלישית</span></header>
             <div class="body">
-              <div class="notice" style="margin-bottom:14px">
-                <b>נתמך: קובץ Word (.docx) של נוסח שהוועדה הכינה.</b>
-                מתוך 2,680 נוסחים לקריאה שנייה ושלישית במאגר הכנסת, 4 בלבד
-                הם Word — ולכן אין משיכה אוטומטית, ויש להעלות את הקובץ
-                שקיבלתם מהוועדה.
-                <br><b>מצב הכמות דטרמיניסטי לחלוטין:</b> הוא מייצר וריאציות
-                על ערכים שכבר קיימים בהצעה ואינו כותב טקסט חדש בשום דפוס.
+              <div class="dropzone" id="res-drop">
+                <input type="file" id="res-file" accept=".pdf,.docx" hidden />
+                <svg class="dz-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                <div class="dz-main">גררו לכאן את הצעת החוק, או <button type="button" class="dz-link" id="res-pick">בחרו קובץ</button></div>
+                <div class="dz-sub" id="res-name">PDF או Word (.docx)</div>
               </div>
-              <input type="file" id="res-file" accept=".docx" class="inp" />
-              <div class="fld" style="margin-top:10px">
-                <label>מציעים (מופרדים בפסיקים)</label>
-                <input id="res-proposers" class="inp" type="text"
-                       placeholder="לדוגמה: ישראל ישראלי, פלוני אלמוני" />
+              <div id="res-analysis" style="margin-top:14px"></div>
+              <div id="res-controls" hidden>
+                <div class="fld" style="margin-top:14px">
+                  <label>רמת יצירתיות</label>
+                  <div class="res-levels" id="res-level" role="radiogroup">
+                    <button type="button" data-level="serious" class="on" role="radio" aria-checked="true">רציני</button>
+                    <button type="button" data-level="clever" role="radio" aria-checked="false">מתחכם</button>
+                    <button type="button" data-level="absurd" role="radio" aria-checked="false">הזוי</button>
+                  </div>
+                </div>
+                <div class="fld" style="margin-top:12px">
+                  <label>משפחות</label>
+                  <div class="res-families" id="res-families"></div>
+                </div>
+                <div class="fld" style="margin-top:12px">
+                  <label for="res-count">כמה הסתייגויות</label>
+                  <input id="res-count" class="inp" type="number" min="1" value="50" style="width:120px" />
+                </div>
+                <div id="res-quote" class="res-quote"></div>
+                <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+                  <button id="res-pay-btn" class="primary">לתשלום</button>
+                  <span class="res-demo" id="res-demo">מצב הדגמה — לא מתבצע חיוב</span>
+                </div>
               </div>
-              <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
-                <button id="res-measure-btn" class="primary">מדידה</button>
-                <button id="res-generate-btn">הפקת מסמך Word</button>
-                <span style="flex:1"></span>
-                <label class="hint" for="res-quality-limit">מצב איכות, סעיפים ראשונים:</label>
-                <input id="res-quality-limit" class="inp" type="number" min="0" value="3"
-                       style="width:72px" />
-                <button id="res-quality-btn">ניסוח מהותי</button>
-              </div>
-              <div class="notice" style="margin-top:10px">
-                <b>מצב האיכות אינו דטרמיניסטי.</b> נקודות העיגון נבחרות מהנוסח
-                בלי מודל, אבל הניסוח עצמו נכתב על ידי מודל — ולכן כאן, ורק כאן,
-                חל סף 86(ד)(2), וכל ניסוח עובר את השומרים. מה שנחסם נזרק ואינו
-                מוצג. קריאה אחת למודל לכל סעיף; 0 = כל הסעיפים.
-              </div>
-              <div id="res-result" style="margin-top:16px"></div>
+              <div id="res-result" style="margin-top:18px"></div>
             </div>
           </section>
         </div>
