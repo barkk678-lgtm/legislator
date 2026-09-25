@@ -274,12 +274,35 @@ def test_search_queries_applies_the_domain_to_every_row():
     assert titles == ["מחסור בכוח אדם במשטרה", "מחסור בשוטרים בדרום"], titles
 
 
+def test_plan_is_cached_per_topic_but_failures_are_not():
+    import json as _json
+    calls = []
+    def fake(**k):
+        calls.append(1)
+        return _json.dumps({"domain": [["תחבור"]], "phrases": [["תחבורה", "ציבורית"]],
+                            "alternatives": []}, ensure_ascii=False)
+    original = kq.draft
+    kq.draft, kq._plan_cache = fake, {}
+    try:
+        a = kq.expand_query("תחבורה ציבורית בנגב")
+        b = kq.expand_query("תחבורה  ציבורית בנגב ")
+        assert a is b and len(calls) == 1, calls
+        def boom(**k):
+            raise kq.LLMRequestError("down")
+        kq.draft = boom
+        assert kq.expand_query("נושא אחר")["expanded"] is False
+        kq.draft = fake
+        assert kq.expand_query("נושא אחר")["expanded"] is True, "כשל לא נשמר במטמון"
+    finally:
+        kq.draft, kq._plan_cache = original, {}
+
+
 def test_expand_query_returns_the_domain():
     import json as _json
     reply = _json.dumps({"domain": ["משטר", "שוטר", "ש"], "phrases": [["מחסור", "שוטר"]],
                          "alternatives": []}, ensure_ascii=False)
     original = kq.draft
-    kq.draft = lambda **k: reply
+    kq.draft, kq._plan_cache = (lambda **k: reply), {}
     try:
         plan = kq.expand_query("מחסור בשוטרים")
     finally:
@@ -301,7 +324,7 @@ def test_expansion_failure_has_empty_domain():
     def boom(**k):
         raise kq.LLMRequestError("down")
     original = kq.draft
-    kq.draft = boom
+    kq.draft, kq._plan_cache = boom, {}
     try:
         plan = kq.expand_query("מחסור בשוטרים")
     finally:
@@ -413,7 +436,7 @@ def test_expand_adds_units_from_the_body_facet():
     reply = _json.dumps({"domain": [["מחסור", "חוסר"], ["משטר", "שוטר", "מג\"ב"]],
                          "phrases": [["מחסור", "שוטר"]], "alternatives": []}, ensure_ascii=False)
     original = kq.draft
-    kq.draft = lambda **k: reply
+    kq.draft, kq._plan_cache = (lambda **k: reply), {}
     try:
         plan = kq.expand_query("מחסור בשוטרים")
     finally:
