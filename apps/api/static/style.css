@@ -438,24 +438,19 @@ select { font-weight: 600; max-width: 420px; }
 
 /* חיווי "מעדכן" בצד הצעת החוק - ראו setPreviewPending ב-app.js.
    יש כשתי שניות בין הקלדה לתשובה (השהיה + בקשת render), וזו
-   התחושה שדווחה כ"תקוע". */
+   התחושה שדווחה כ"תקוע". ח5 (25.9.2026): 12px באפור בהיר לא נראה -
+   עכשיו פס מודגש עם ספינר, דביק לראש החלונית (נשאר גלוי גם כשגוללים
+   בהצעה), והתוכן עצמו מעומעם - כדי שיהיה ברור שהוא עוד לא מעודכן. */
 .preview-pending {
-  font-size: 12px;
-  color: var(--faint);
-  margin-bottom: 6px;
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  font-family: "Assistant", sans-serif; font-size: 14px; font-weight: 700;
+  color: var(--flag); background: var(--tint);
+  border: 1px solid var(--flag); border-radius: 8px;
+  padding: 8px 12px; margin-bottom: 10px;
 }
-.preview-pending::after {
-  content: "";
-  display: inline-block;
-  width: 1.1em;
-  text-align: right;
-  animation: preview-dots 1.2s steps(4, end) infinite;
-}
-@keyframes preview-dots {
-  0%   { content: ""; }
-  25%  { content: "·"; }
-  50%  { content: "··"; }
-  75%  { content: "···"; }
+.preview-pending[hidden] { display: none; }
+#docx-approx.is-pending #docx-lines { opacity: .45; transition: opacity .15s; }
 }
 
 /* לשונית "הצעות חוק" מוצגת במלואה עוד לפני בחירת חוק (ברק,

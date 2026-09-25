@@ -574,6 +574,8 @@ function setPreviewPending(on) {
   // שדווחה כ"תקוע".
   const el = document.getElementById("preview-pending");
   if (el) el.hidden = !on;
+  const box = document.getElementById("docx-approx");
+  if (box) box.classList.toggle("is-pending", !!on);
 }
 
 function onFieldInput(ev) {
