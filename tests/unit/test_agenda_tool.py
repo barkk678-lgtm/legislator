@@ -13,6 +13,8 @@ from agenda_tool import AgendaDraftError, draft_agenda  # noqa: E402
 def main():
     ok = True
     original_draft = agenda_tool.draft
+    # ס5: השומר נגד פרט חדש מנסה ניסוח מחדש דרך draft_conversation - כאן בלי רשת.
+    agenda_tool.draft_conversation = lambda **kw: (_ for _ in ()).throw(AssertionError("קריאה לא צפויה למודל"))
 
     def _set(reply):
         agenda_tool.draft = lambda **kw: reply
@@ -20,14 +22,14 @@ def main():
     # --- פרסור תקין: נושא: / דברי הסבר: (ס3 - המבנה של הטופס של הכנסת) ---
     _set(
         "נושא: מצוקת דיור לזוגות צעירים\n"
-        "דברי הסבר: מחירי הדיור עלו משמעותית בשנים האחרונות.\n"
+        "דברי הסבר: מחירי הדיור גבוהים מדי עבור זוגות צעירים.\n"
         "רבים מהזוגות הצעירים מתקשים לרכוש דירה ראשונה."
     )
     try:
         a = draft_agenda(topic_description="מחירי הדיור גבוהים מדי לזוגות צעירים", mk_name="דנה לוי")
         passed = (
             a["subject"] == "מצוקת דיור לזוגות צעירים"
-            and a["explanation"] == ["מחירי הדיור עלו משמעותית בשנים האחרונות.",
+            and a["explanation"] == ["מחירי הדיור גבוהים מדי עבור זוגות צעירים.",
                                      "רבים מהזוגות הצעירים מתקשים לרכוש דירה ראשונה."]
             and a["mk_name"] == "דנה לוי" and a["kind"] == "דחופה"
         )

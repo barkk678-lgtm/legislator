@@ -23,7 +23,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
-from service import LLMConfigError, LLMRequestError, draft  # noqa: E402
+from service import LLMConfigError, LLMRequestError, draft, draft_conversation  # noqa: E402
+from query_tool import _normalize_for_support, unsupported_source_claims  # noqa: E402
 
 # ס3 (26.9.2026): **המבנה של הטופס שהכנסת עצמה משתמשת בו** (reference/הצעה
 # לסדר יום (8).docx, (10).docx): "לכבוד / יו"ר הכנסת, ח"כ ... / אדוני היושב
@@ -59,6 +60,73 @@ class AgendaDraftError(Exception):
     """שכבת אפליקציה - LLM לא זמין/נכשל, או המודל דיווח שאי אפשר לנסח."""
 
 
+# ── ס5 (ברק, 26.9): השומר נגד פרט חדש - אותו שומר כמו בשאילתות ──────
+# נמצא באתר החי (26.9): על "מחסור חמור בשוטרים בנגב, תחנות נסגרות בלילה"
+# המודל כתב "מתרבים הדיווחים על מחסור..." ו"...לצד **עלייה במקרי פשיעה**
+# ואירועים פליליים באזור" - שתי טענות עובדתיות שהמשתמש לא אמר, בהצעה
+# שמוגשת בשם חבר/ת כנסת.
+#
+# **הכלל: פרט חדש נתפס, ניסוח מחדש מותר.** "תחנות נסגרות בלילה" ->
+# "סגירת תחנות בשעות הלילה" הוא ניסוח. מה שנתפס:
+# - מקור, גוף או מספר שלא נמסרו - בדיוק השומר של השאילתות
+#   (query_tool.unsupported_source_claims);
+# - ובהצעה לסדר, שבה המודל כותב גם "למה עכשיו": **טענה על מגמה או על
+#   דיווחים** - עלייה, ירידה, זינוק, "מתרבים", נתונים, דיווחים, פרסומים.
+#   מילה כזו נחשבת נתמכת אם אותו שורש מופיע בדברי המשתמש.
+_CLAIM_ROOTS = (
+    ("עלייה", ("עלייה", "עליה", "עלו", "עולה", "עלה", "גובר", "גוברת")),
+    ("עליה", ("עלייה", "עליה", "עלו", "עולה", "עלה", "גובר", "גוברת")),
+    ("ירידה", ("ירידה", "ירד", "יורד")),
+    ("גידול", ("גידול", "גדל", "גדלה", "גדלו")),
+    ("זינוק", ("זינוק", "זינק", "זינקו")),
+    ("הכפל", ("הכפל", "כפול")),
+    ("שיא", ("שיא",)),
+    ("מתרב", ("מתרב", "רבים", "הרבה", "ריבוי")),
+    ("נתונ", ("נתונ",)),
+    ("סטטיסט", ("סטטיסט",)),
+    ("אחוז", ("אחוז", "%")),
+    ("דיווח", ("דיווח", "דווח", "כתב", "פורסם", "פרסום", "שודר", "תחקיר")),
+    ("דווח", ("דיווח", "דווח", "כתב", "פורסם", "פרסום", "שודר", "תחקיר")),
+    ("פורסם", ("דיווח", "דווח", "כתב", "פורסם", "פרסום", "שודר", "תחקיר")),
+    ("פרסומ", ("דיווח", "דווח", "כתב", "פורסם", "פרסום", "שודר", "תחקיר")),
+    ("תלונ", ("תלונ", "התלונ")),
+    # נמצא בהרצה מקומית (26.9): "סגירת סניפי דואר ביישובים קטנים בגליל" ->
+    # "בחודשים האחרונים מסתמנת מגמה של סגירת סניפים" - מתי ו"מגמה" לא נמסרו.
+    ("מגמ", ("מגמ",)),
+    ("מסתמנ", ("מסתמנ", "מגמ")),
+    ("האחרונ", ("האחרונ", "לאחרונה")),
+    ("לאחרונה", ("האחרונ", "לאחרונה")),
+)
+
+_REWRITE_WITHOUT = (
+    "בדברי ההסבר הופיעו פרטים שלא אמרתי: {items}. נסח מחדש את ההצעה בלי "
+    "אף אחד מהם - בלי מגמה, נתון, דיווח או מקור שלא מסרתי. אל תחליף אותם "
+    "בפרט אחר; תאר רק את מה שאמרתי ולמה הוא מצדיק דיון. החזר שוב בפורמט "
+    "המלא (נושא:/דברי הסבר:)."
+)
+
+
+def unsupported_agenda_claims(text: str, user_text: str) -> list[str]:
+    """פרטים בנושא ובדברי ההסבר שאין להם זכר בדברי המשתמש. פונקציה טהורה."""
+    # "דיון" הוא מקור בשאילתה ("בדיון שהתקיים"), אבל בהצעה לסדר הוא מהות
+    # הבקשה ("יש לקיים דיון"). דיון בוועדה עדיין נתפס - על "ועד".
+    found = set(unsupported_source_claims(text, user_text)) - {"דיון"}
+    haystack = _normalize_for_support(user_text)
+    for marker, supports in _CLAIM_ROOTS:
+        if marker in (text or "") and not any(s in haystack for s in supports):
+            found.add(marker)
+    return sorted(found)
+
+
+def _parse(raw: str) -> tuple[str, list[str]]:
+    subject_match = re.search(rf"{re.escape(_SUBJECT_MARK)}\s*(.+)", raw)
+    explanation_match = re.search(rf"{re.escape(_EXPLANATION_MARK)}\s*(.+)", raw, re.DOTALL)
+    if not subject_match or not explanation_match:
+        raise AgendaDraftError(f"תשובת ה-LLM לא בפורמט הצפוי (נושא:/דברי הסבר:): {raw!r}")
+    explanation = [ln.strip() for ln in explanation_match.group(1).split("\n") if ln.strip()]
+    return subject_match.group(1).strip(), explanation
+
+
 def draft_agenda(*, topic_description: str, mk_name: str, kind: str = "דחופה") -> dict:
     try:
         raw = draft(instructions=_INSTRUCTIONS, content=topic_description, max_tokens=700)
@@ -67,16 +135,31 @@ def draft_agenda(*, topic_description: str, mk_name: str, kind: str = "דחופ�
 
     if raw.startswith("לא ניתן לנסח הצעה לסדר"):
         raise AgendaDraftError(raw)
+    subject, explanation = _parse(raw)
 
-    subject_match = re.search(rf"{re.escape(_SUBJECT_MARK)}\s*(.+)", raw)
-    explanation_match = re.search(rf"{re.escape(_EXPLANATION_MARK)}\s*(.+)", raw, re.DOTALL)
-    if not subject_match or not explanation_match:
-        raise AgendaDraftError(f"תשובת ה-LLM לא בפורמט הצפוי (נושא:/דברי הסבר:): {raw!r}")
+    invented = unsupported_agenda_claims("\n".join([subject, *explanation]), topic_description)
+    if invented:
+        # כמו בשאילתות: קודם ניסוח מחדש בלי הפרט, ורק אז עצירה גלויה.
+        turns = [{"role": "user", "content": topic_description},
+                 {"role": "assistant", "content": raw},
+                 {"role": "user", "content": _REWRITE_WITHOUT.format(items=", ".join(invented))}]
+        try:
+            retry = draft_conversation(instructions=_INSTRUCTIONS, turns=turns, max_tokens=700)
+            subject, explanation = _parse(retry)
+            invented = unsupported_agenda_claims("\n".join([subject, *explanation]), topic_description)
+        except (LLMConfigError, LLMRequestError, AgendaDraftError, ValueError):
+            pass
+        if invented:
+            raise AgendaDraftError(
+                "לא ניתן לנסח הצעה לסדר: הניסוח כלל פרט שלא הופיע בדבריכם - "
+                f"{', '.join(invented)}. ניסיתי לנסח מחדש בלעדיו וזה חזר. ההצעה "
+                "מוגשת בשם חבר/ת הכנסת, ולכן כל עובדה בדברי ההסבר חייבת להגיע ממה "
+                "שמסרתם. אפשר לציין את הפרט במפורש, או לבקש ניסוח בלעדיו."
+            )
 
-    explanation = [ln.strip() for ln in explanation_match.group(1).split("\n") if ln.strip()]
     return {
         "kind": kind if kind in AGENDA_KINDS else "דחופה",
         "mk_name": mk_name,
-        "subject": subject_match.group(1).strip(),
+        "subject": subject,
         "explanation": explanation,
     }

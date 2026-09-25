@@ -554,6 +554,22 @@ def journey_rules_interpretation(base, res):
               str(done.get("cited_ids")))
 
 
+def journey_agenda_invented(base, res):
+    """ס5 (26.9): על "מחסור חמור בשוטרים בנגב, תחנות נסגרות בלילה" המודל כתב
+    "מתרבים הדיווחים" ו"לצד עלייה במקרי פשיעה" - עובדות שלא נמסרו. עכשיו
+    השומר מנסח מחדש בלעדיהן, או עוצר בגלוי."""
+    print("\n[6ד] הצעה לסדר - בלי עובדה שלא נמסרה")
+    status, body = _post(base, "/api/agenda/draft", {
+        "topic_description": "מחסור חמור בשוטרים בנגב, תחנות נסגרות בלילה",
+        "mk_name": "בדיקה חיה", "kind": "דחופה"})
+    data = json.loads(body) if body else {}
+    text = " ".join([data.get("subject", ""), *data.get("explanation", [])])
+    stopped = status == 422 and "פרט שלא הופיע" in (data.get("detail") or "")
+    bad = [w for w in ("עלייה", "עליה", "מתרב", "דיווח", "מגמ", "האחרונ") if w in text]
+    res.check("בלי מגמה/דיווח/זמן שלא נמסרו (או עצירה גלויה)", stopped or (status == 200 and not bad),
+              f"{status} {bad} {text[:120]}")
+
+
 def journey_chat_smalltalk(base, res):
     """ת4 + ת5 (25.9): מחמאה קיבלה תשובה חמה - ואז שומר הציטוט החליף
     אותה ב"לא מצאתי תשובה". עכשיו הסיווג קודם לתשובה."""
@@ -688,6 +704,7 @@ def main():
         run("כלי הצ'אט", journey_chat, base, res)
         run("מומחה התקנון - מקורות", journey_rules_citations, base, res)
         run("מומחה התקנון - פרשנות", journey_rules_interpretation, base, res)
+        run("הצעה לסדר - עובדה שלא נמסרה", journey_agenda_invented, base, res)
         if edited:
             run("דברי ההסבר ברקע", journey_explanatory, base, res, *edited)
         run("צ'אטבוטים - חולין וקללה", journey_chat_smalltalk, base, res)
