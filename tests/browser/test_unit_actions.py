@@ -90,6 +90,15 @@ def main() -> int:
         all_labels = page.evaluate("() => document.body.innerText.includes('לא נתמך')")
         results.append(("ח11: אין 'לא נתמך' בתפריט", not all_labels, str(all_labels)))
 
+        # בקשת בדיקה שנכשלה ברשת - הודעה, לא "בודק..." לנצח
+        page.route("**/insert-preview", lambda r: r.abort())
+        page.locator('.node-add-btn[data-actor="law-2000037/s6"]').click()
+        page.wait_for_selector("#law-tree .insert-menu .insert-menu-none", timeout=15000)
+        none = page.inner_text("#law-tree .insert-menu")
+        results.append(("ח11: בקשה שנכשלה - הודעה במקום 'בודק...' לנצח", "החיבור לשרת נקטע" in none and "בודק" not in none, none))
+        page.locator('.node-add-btn[data-actor="law-2000037/s6"]').click()
+        page.unroute("**/insert-preview")
+
         # ח15
         page.locator('.node-del-btn[data-actor="law-2000037/s7"]').click()
         page.wait_for_selector("#preview-pending", state="hidden", timeout=30000)

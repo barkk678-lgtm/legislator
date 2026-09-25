@@ -1319,11 +1319,14 @@ function toggleInsertMenu(node, wrapper) {
   const levels = insertLevelsAt(node);
   insertPreviewSeq += 1;
   let pending = levels.length;
+  let failed = false;
   const noneLeft = () => {
     if (menu.isConnected && !levelsContainer.querySelector(".insert-level-btn")) {
       const none = document.createElement("div");
       none.className = "insert-menu-none";
-      none.textContent = "במקום הזה אי אפשר להוסיף יחידה חדשה. נסו את הפלוס שבסוף היחידה.";
+      none.textContent = failed
+        ? "לא הצלחתי לבדוק מה אפשר להוסיף כאן - החיבור לשרת נקטע. סגרו ופתחו את התפריט שוב."
+        : "במקום הזה אי אפשר להוסיף יחידה חדשה. נסו את הפלוס שבסוף היחידה.";
       levelsContainer.appendChild(none);
     }
   };
@@ -1345,6 +1348,11 @@ function toggleInsertMenu(node, wrapper) {
       } else {
         btn.remove();   // ח11: אפשרות שאי אפשר להשתמש בה - לא מוצגת
       }
+      if (--pending === 0) noneLeft();
+    }).catch(() => {
+      // בקשה שנכשלה (רשת) - לא משאירים "בודק..." לנצח
+      failed = true;
+      btn.remove();
       if (--pending === 0) noneLeft();
     });
   }
