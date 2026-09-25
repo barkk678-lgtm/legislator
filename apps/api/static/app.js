@@ -2192,6 +2192,19 @@ function attachQueryExport(bubble, draft) {
 // --- הצעות לסדר ---
 let agendaTopicHistory = [];
 let currentAgendaDraft = null;
+let agendaTurns = [];   // ס2: לשיחות השמורות - כמו queryTurns
+
+function renderAgendaDraft(chat, data) {
+  document.getElementById("agenda-copy-btn").disabled = false;
+  return appendMsg(
+    chat,
+    "a",
+    `הנה נוסח מוצע.` +
+      `<div class="draft"><div class="to">הצעה לסדר היום</div>` +
+      `<b>הנושא:</b> ${escapeHtml(data.subject)}<br><br>` +
+      `${escapeHtml(data.reasoning)}<br><br>${escapeHtml(data.request_text)}</div>`
+  );
+}
 
 async function sendAgendaMessage() {
   const input = document.getElementById("agenda-composer-input");
@@ -2207,6 +2220,7 @@ async function sendAgendaMessage() {
 
   appendMsg(chat, "u", escapeHtml(text));
   agendaTopicHistory.push(text);
+  agendaTurns.push({ role: "user", content: text });
   input.value = "";
   input.disabled = true;
 
@@ -2228,24 +2242,55 @@ async function sendAgendaMessage() {
     if (data.chat_reply) {
       agendaTopicHistory.pop();
       appendMsg(chat, "a", escapeHtml(data.chat_reply));
+      agendaTurns.push({ role: "assistant", content: data.chat_reply, chat: true });
+      agendaHistory.save();
       return;
     }
     currentAgendaDraft = data;
-    document.getElementById("agenda-copy-btn").disabled = false;
-    appendMsg(
-      chat,
-      "a",
-      `הנה נוסח מוצע.` +
-        `<div class="draft"><div class="to">הצעה לסדר היום</div>` +
-        `<b>הנושא:</b> ${escapeHtml(currentAgendaDraft.subject)}<br><br>` +
-        `${escapeHtml(currentAgendaDraft.reasoning)}<br><br>${escapeHtml(currentAgendaDraft.request_text)}</div>`
-    );
+    renderAgendaDraft(chat, data);
+    agendaTurns.push({ role: "assistant", content: `נושא: ${data.subject}`, draft: { ...data } });
+    agendaHistory.save();
   } finally {
     thinking.remove();
     input.disabled = false;
     input.focus();
   }
 }
+
+// ס2 (26.9.2026): אותו רכיב היסטוריה כמו בשאילתות.
+const agendaHistory = mountConvHistory({
+  prefix: "aconv",
+  storageKey: "legislator.agendaConversations.v1",
+  getTurns: () => agendaTurns,
+  getTitle: (turns) => {
+    const firstUser = turns.find((t) => t.role === "user");
+    return (currentAgendaDraft && currentAgendaDraft.subject) || (firstUser ? firstUser.content.slice(0, 60) : "");
+  },
+  getExtra: () => ({ mk: document.getElementById("agenda-mk-input").value.trim() }),
+  restore: (conv) => {
+    agendaTurns = conv.turns || [];
+    currentAgendaDraft = null;
+    document.getElementById("agenda-mk-input").value = conv.mk || "";
+    const chat = document.getElementById("agenda-chat");
+    chat.innerHTML = "";
+    // מה שנשלח למודל בהמשך: הודעות המשתמש, בלי אלה שנענו כחולין (ת4)
+    agendaTopicHistory = agendaTurns.filter((t, i) => t.role === "user"
+      && !(agendaTurns[i + 1] && agendaTurns[i + 1].chat)).map((t) => t.content);
+    for (const t of agendaTurns) {
+      if (t.role === "user") appendMsg(chat, "u", escapeHtml(t.content));
+      else if (t.draft) { currentAgendaDraft = t.draft; renderAgendaDraft(chat, t.draft); }
+      else appendMsg(chat, "a", escapeHtml(t.content));
+    }
+  },
+  reset: () => {
+    agendaTurns = [];
+    agendaTopicHistory = [];
+    currentAgendaDraft = null;
+    document.getElementById("agenda-copy-btn").disabled = true;
+    document.getElementById("agenda-chat").innerHTML = "";
+    document.getElementById("agenda-composer-input").focus();
+  },
+});
 
 document.getElementById("agenda-send-btn").addEventListener("click", sendAgendaMessage);
 bindComposer(document.getElementById("agenda-composer-input"), sendAgendaMessage);
@@ -2266,72 +2311,25 @@ document.getElementById("agenda-copy-btn").addEventListener("click", async () =>
   }
 });
 
-/* ═══ ב4 - שיחות שאילתא קודמות ═══
- * אותו דפוס בדיוק כמו "ההצעות שלי" (DRAFTS_KEY): localStorage,
- * מכסה, וכישלון קריאה **שאינו מוצג כ"אין שיחות"** - ראו readDrafts
- * והלקח שנלמד שם. שיחה נשמרת אחרי כל תור, כך שסגירת לשונית
- * באמצע אינה מאבדת אותה. */
-const QCONV_KEY = "legislator.queryConversations.v1";
-const QCONV_LIMIT = 30;
-let currentConvId = null;
-let qconvUnreadable = false;
+/* ═══ ת7 + ס2 (26.9.2026): היסטוריית שיחות - רכיב אחד לשלושת הצ'אטים ═══
+ * מה שנבנה לשאילתות (ב4, ש5) - כפתור "היסטוריה" עם רשימה צפה, חיפוש,
+ * קיבוץ לפי זמן, חמש אחרונות ו"כל N השיחות ←", ו"שיחה חדשה" שמאפס - עכשיו
+ * רכיב אחד (mountConvHistory) שכל צ'אט מחבר אליו: שאילתות, מומחה התקנון
+ * והצעה לסדר. **לא שלוש העתקות.** כל צ'אט אומר רק מה נשמר בתור ואיך
+ * משחזרים אותו. המזהים בדף: <prefix>-history-btn, <prefix>-menu וכו'.
+ *
+ * מהשאילתות נשמר גם הלקח: localStorage עם מכסה, שמירה אחרי כל תור (סגירת
+ * לשונית באמצע אינה מאבדת), וכישלון קריאה **שאינו מוצג כ"אין שיחות"**. */
+const CONV_LIMIT = 30;
+const CONV_SHOWN = 5;
 
-function readConvs() {
-  try {
-    const raw = localStorage.getItem(QCONV_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    qconvUnreadable = false;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    // **אחסון פגום אינו "אין שיחות".** המשתמש יראה הודעה שאומרת
-    // שלא הצלחנו לקרוא, ולא מסך ריק שנראה כמו מי שלא שמר מעולם.
-    qconvUnreadable = true;
-    return [];
-  }
-}
-
-function writeConvs(list) {
-  try {
-    localStorage.setItem(QCONV_KEY, JSON.stringify(list.slice(0, QCONV_LIMIT)));
-    return true;
-  } catch {
-    return false;   // הקורא חייב לבדוק - ראו writeDrafts
-  }
-}
-
-function saveCurrentConv() {
-  if (!queryTurns.length) return;
-  const list = readConvs().filter((c) => c.id !== currentConvId);
-  currentConvId = currentConvId || `c${Date.now()}`;
-  const firstUser = queryTurns.find((t) => t.role === "user");
-  list.unshift({
-    id: currentConvId,
-    title: (currentQueryDraft && currentQueryDraft.subject)
-      || (firstUser ? firstUser.content.slice(0, 60) : "שיחה"),
-    at: Date.now(),
-    turns: queryTurns,
-    minister: document.getElementById("query-minister-input").value.trim(),
-    mk: document.getElementById("query-mk-input").value.trim(),
-    kind: document.getElementById("query-kind-input").value,
-  });
-  const ok = writeConvs(list);
-  renderConvs(ok);
-}
-
-/* ש5 (25.9.2026): השיחות אינן עוד כרטיס מתחת לחלוניות - כפתור "היסטוריה"
- * בכותרת חלונית הניסוח פותח רשימה צפה (כמו במוקאפ): חיפוש, קיבוץ לפי זמן,
- * חמש האחרונות ו"כל N השיחות ←". שם השיחה הפתוחה - ליד "ניסוח השאילתה". */
-const QCONV_SHOWN = 5;
-let qconvShowAll = false;
-let qconvSaveFailed = false;
-
-function qconvDate(at) {
+function convDate(at) {
   const d = new Date(at), now = new Date();
   const dm = `${d.getDate()}.${d.getMonth() + 1}`;
   return d.getFullYear() === now.getFullYear() ? dm : `${dm}.${d.getFullYear()}`;
 }
 
-function qconvGroup(at) {
+function convGroup(at) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const t = today.getTime(), day = 86400000;
   if (at >= t) return "היום";
@@ -2340,136 +2338,205 @@ function qconvGroup(at) {
   return "קודם";
 }
 
-function qconvMatches(conv, q) {
+function convMatches(conv, q) {
   const words = pqNorm(q).split(" ").filter(Boolean);
   if (!words.length) return true;
   const hay = pqNorm([conv.title, ...(conv.turns || []).map((t) => t.content)].join(" "));
   return words.every((w) => hay.includes(w));
 }
 
-function renderConvCurrent() {
-  const el = document.getElementById("qconv-current");
-  if (!el) return;
-  const conv = currentConvId && readConvs().find((c) => c.id === currentConvId);
-  el.textContent = conv ? conv.title : "";
-  el.title = conv ? conv.title : "";
+// opts: prefix, storageKey, getTurns() -> [], getTitle(turns), getExtra() -> {},
+//       restore(conv) - מצייר את השיחה מחדש, reset() - מנקה לשיחה חדשה.
+function mountConvHistory(opts) {
+  const host = document.querySelector(`[data-conv="${opts.prefix}"]`);
+  const P = opts.prefix;
+  host.innerHTML = `
+    <button id="${P}-history-btn" type="button" class="qconv-history-btn"
+            aria-haspopup="true" aria-expanded="false" aria-controls="${P}-menu">
+      <span class="qconv-clock" aria-hidden="true"></span>היסטוריה
+      <span id="${P}-count" class="qconv-count">0</span></button>
+    <button id="${P}-new" class="primary qconv-new">${escapeHtml(host.dataset.newLabel || "+ שיחה חדשה")}</button>
+    <div id="${P}-menu" class="qconv-menu" hidden>
+      <input id="${P}-search" class="inp" type="search" placeholder="חיפוש בשיחות קודמות…" autocomplete="off" />
+      <div id="${P}-list" class="qconv-list"></div>
+      <button id="${P}-all" type="button" class="qconv-all" hidden></button>
+    </div>`;
+  const $ = (id) => document.getElementById(`${P}-${id}`);
+  const st = { currentId: null, unreadable: false, saveFailed: false, showAll: false };
+
+  function read() {
+    try {
+      const raw = localStorage.getItem(opts.storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      st.unreadable = false;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      // **אחסון פגום אינו "אין שיחות"** - ההודעה אומרת שלא הצלחנו לקרוא.
+      st.unreadable = true;
+      return [];
+    }
+  }
+
+  function write(list) {
+    try {
+      localStorage.setItem(opts.storageKey, JSON.stringify(list.slice(0, CONV_LIMIT)));
+      return true;
+    } catch {
+      return false;   // הקורא בודק - ראו writeDrafts
+    }
+  }
+
+  function save() {
+    const turns = opts.getTurns();
+    if (!turns.length) return;
+    const list = read().filter((c) => c.id !== st.currentId);
+    st.currentId = st.currentId || `c${Date.now()}`;
+    list.unshift({ id: st.currentId, title: opts.getTitle(turns) || "שיחה", at: Date.now(),
+                   turns, ...opts.getExtra() });
+    render(write(list));
+  }
+
+  function renderCurrent() {
+    const el = document.getElementById(`${P}-current`);
+    if (!el) return;
+    const conv = st.currentId && read().find((c) => c.id === st.currentId);
+    el.textContent = conv ? conv.title : "";
+    el.title = conv ? conv.title : "";
+  }
+
+  function render(saveOk = null) {
+    if (saveOk !== null) st.saveFailed = !saveOk;
+    const el = $("list"), all = $("all");
+    const list = read();
+    renderCurrent();
+    $("count").textContent = st.unreadable ? "!" : String(list.length);
+    const btn = $("history-btn");
+    btn.classList.toggle("warn", st.unreadable || st.saveFailed);
+    btn.title = st.saveFailed ? "שמירת השיחה נכשלה" : st.unreadable ? "לא הצלחתי לקרוא את השיחות השמורות" : "";
+    all.hidden = true;
+    const warn = st.saveFailed
+      ? `<div class="notice notice-coverage">⚠ שמירת השיחה נכשלה — השיחה אינה שמורה.</div>` : "";
+    if (st.unreadable) {
+      el.innerHTML = `<div class="notice notice-coverage"><b>לא הצלחתי לקרוא את
+        השיחות השמורות.</b> <b>זו אינה תשובה שאין כאלה</b> — ייתכן שהן קיימות
+        ולא נקראו.</div>`;
+      return;
+    }
+    if (!list.length) {
+      el.innerHTML = warn + `<div class="hint qconv-empty">אין עדיין שיחות שמורות.</div>`;
+      return;
+    }
+    const q = $("search").value.trim();
+    const found = list.filter((c) => convMatches(c, q));
+    if (!found.length) {
+      el.innerHTML = warn + `<div class="hint qconv-empty">לא נמצאו שיחות שמתאימות לחיפוש.</div>`;
+      return;
+    }
+    const shown = q || st.showAll ? found : found.slice(0, CONV_SHOWN);
+    let html = warn, group = null;
+    for (const c of shown) {
+      const g = convGroup(c.at);
+      if (g !== group) { html += `<div class="qconv-group">${g}</div>`; group = g; }
+      html += `
+      <button type="button" class="qconv-item${c.id === st.currentId ? " on" : ""}"
+              data-id="${escapeHtml(c.id)}">
+        <span class="qconv-title">${escapeHtml(c.title)}</span>
+        <span class="qconv-date">${convDate(c.at)}</span>
+      </button>`;
+    }
+    el.innerHTML = html;
+    if (shown.length < found.length) {
+      all.textContent = `כל ${found.length} השיחות ←`;
+      all.hidden = false;
+    }
+    el.querySelectorAll(".qconv-item").forEach((b) =>
+      b.addEventListener("click", () => { closeMenu(); open(b.dataset.id); }));
+  }
+
+  function openMenu() {
+    st.showAll = false;
+    $("search").value = "";
+    render();
+    $("menu").hidden = false;
+    $("history-btn").setAttribute("aria-expanded", "true");
+    $("search").focus();
+  }
+
+  function closeMenu() {
+    if ($("menu").hidden) return;
+    $("menu").hidden = true;
+    $("history-btn").setAttribute("aria-expanded", "false");
+  }
+
+  function open(id) {
+    const conv = read().find((c) => c.id === id);
+    if (!conv) return;
+    st.currentId = id;
+    opts.restore(conv);
+    render();
+  }
+
+  function newConv() {
+    save();
+    st.currentId = null;
+    opts.reset();
+    render();
+  }
+
+  $("history-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if ($("menu").hidden) openMenu(); else closeMenu();
+  });
+  $("search").addEventListener("input", () => render());
+  $("all").addEventListener("click", () => { st.showAll = true; render(); });
+  $("new").addEventListener("click", newConv);
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(`#${P}-menu, #${P}-history-btn`)) closeMenu();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+  render();
+  return { save, render, open, newConv, get currentId() { return st.currentId; } };
 }
 
-function renderConvs(saveOk = null) {
-  // saveOk: תוצאת השמירה האחרונה (saveCurrentConv), או null - רק רינדור.
-  if (saveOk !== null) qconvSaveFailed = !saveOk;
-  const el = document.getElementById("qconv-list");
-  const count = document.getElementById("qconv-count");
-  const all = document.getElementById("qconv-all");
-  if (!el) return;
-  const list = readConvs();
-  renderConvCurrent();
-  count.textContent = qconvUnreadable ? "!" : String(list.length);
-  const btn = document.getElementById("qconv-history-btn");
-  btn.classList.toggle("warn", qconvUnreadable || qconvSaveFailed);
-  btn.title = qconvSaveFailed ? "שמירת השיחה נכשלה" : qconvUnreadable ? "לא הצלחתי לקרוא את השיחות השמורות" : "";
-  all.hidden = true;
-  const warn = qconvSaveFailed
-    ? `<div class="notice notice-coverage">⚠ שמירת השיחה נכשלה — השיחה אינה שמורה.</div>` : "";
-  if (qconvUnreadable) {
-    el.innerHTML = `<div class="notice notice-coverage"><b>לא הצלחתי לקרוא את
-      השיחות השמורות.</b> <b>זו אינה תשובה שאין כאלה</b> — ייתכן שהן קיימות
-      ולא נקראו.</div>`;
-    return;
-  }
-  if (!list.length) {
-    el.innerHTML = warn + `<div class="hint qconv-empty">אין עדיין שיחות שמורות.</div>`;
-    return;
-  }
-  const q = document.getElementById("qconv-search").value.trim();
-  const found = list.filter((c) => qconvMatches(c, q));
-  if (!found.length) {
-    el.innerHTML = warn + `<div class="hint qconv-empty">לא נמצאו שיחות שמתאימות לחיפוש.</div>`;
-    return;
-  }
-  const shown = q || qconvShowAll ? found : found.slice(0, QCONV_SHOWN);
-  let html = warn, group = null;
-  for (const c of shown) {
-    const g = qconvGroup(c.at);
-    if (g !== group) { html += `<div class="qconv-group">${g}</div>`; group = g; }
-    html += `
-    <button type="button" class="qconv-item${c.id === currentConvId ? " on" : ""}"
-            data-id="${escapeHtml(c.id)}">
-      <span class="qconv-title">${escapeHtml(c.title)}</span>
-      <span class="qconv-date">${qconvDate(c.at)}</span>
-    </button>`;
-  }
-  el.innerHTML = html;
-  if (shown.length < found.length) {
-    all.textContent = `כל ${found.length} השיחות ←`;
-    all.hidden = false;
-  }
-  el.querySelectorAll(".qconv-item").forEach((b) =>
-    b.addEventListener("click", () => { closeConvMenu(); openConv(b.dataset.id); }));
-}
-
-function openConvMenu() {
-  const menu = document.getElementById("qconv-menu");
-  qconvShowAll = false;
-  document.getElementById("qconv-search").value = "";
-  renderConvs();
-  menu.hidden = false;
-  document.getElementById("qconv-history-btn").setAttribute("aria-expanded", "true");
-  document.getElementById("qconv-search").focus();
-}
-
-function closeConvMenu() {
-  const menu = document.getElementById("qconv-menu");
-  if (menu.hidden) return;
-  menu.hidden = true;
-  document.getElementById("qconv-history-btn").setAttribute("aria-expanded", "false");
-}
-
-document.getElementById("qconv-history-btn").addEventListener("click", (e) => {
-  e.stopPropagation();
-  if (document.getElementById("qconv-menu").hidden) openConvMenu(); else closeConvMenu();
+// --- שאילתות ---
+const queryHistory = mountConvHistory({
+  prefix: "qconv",
+  storageKey: "legislator.queryConversations.v1",
+  getTurns: () => queryTurns,
+  getTitle: (turns) => {
+    const firstUser = turns.find((t) => t.role === "user");
+    return (currentQueryDraft && currentQueryDraft.subject) || (firstUser ? firstUser.content.slice(0, 60) : "");
+  },
+  getExtra: () => ({
+    minister: document.getElementById("query-minister-input").value.trim(),
+    mk: document.getElementById("query-mk-input").value.trim(),
+    kind: document.getElementById("query-kind-input").value,
+  }),
+  restore: (conv) => {
+    queryTurns = conv.turns || [];
+    currentQueryDraft = null;
+    document.getElementById("query-minister-input").value = conv.minister || "";
+    document.getElementById("query-mk-input").value = conv.mk || "";
+    mkGenderLookup(conv.mk);   // צ5 - לפני ההורדה, לא בזמנה
+    if (conv.kind) document.getElementById("query-kind-input").value = conv.kind;
+    const chat = document.getElementById("query-chat");
+    chat.innerHTML = "";
+    for (const t of queryTurns) {
+      if (t.role === "user") { appendMsg(chat, "u", escapeHtml(t.content)); continue; }
+      const draft = draftFromTurn(t, conv);
+      if (draft) { currentQueryDraft = draft; renderQueryDraft(chat, draft); }
+      else appendMsg(chat, "a", escapeHtml(t.content).replace(/\n/g, "<br>"));
+    }
+  },
+  reset: () => {
+    queryTurns = [];
+    currentQueryDraft = null;
+    document.getElementById("query-chat").innerHTML = "";
+    document.getElementById("past-queries-results").innerHTML = "";
+    document.getElementById("query-composer-input").focus();
+  },
 });
-document.getElementById("qconv-search").addEventListener("input", () => renderConvs());
-document.getElementById("qconv-all").addEventListener("click", () => { qconvShowAll = true; renderConvs(); });
-document.addEventListener("click", (e) => {
-  if (!e.target.closest("#qconv-menu, #qconv-history-btn")) closeConvMenu();
-});
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeConvMenu(); });
-
-function openConv(id) {
-  const conv = readConvs().find((c) => c.id === id);
-  if (!conv) return;
-  currentConvId = id;
-  queryTurns = conv.turns || [];
-  currentQueryDraft = null;
-  document.getElementById("query-minister-input").value = conv.minister || "";
-  document.getElementById("query-mk-input").value = conv.mk || "";
-  mkGenderLookup(conv.mk);   // צ5 - לפני ההורדה, לא בזמנה
-  if (conv.kind) document.getElementById("query-kind-input").value = conv.kind;
-  const chat = document.getElementById("query-chat");
-  chat.innerHTML = "";
-  for (const t of queryTurns) {
-    if (t.role === "user") { appendMsg(chat, "u", escapeHtml(t.content)); continue; }
-    const draft = draftFromTurn(t, conv);
-    if (draft) { currentQueryDraft = draft; renderQueryDraft(chat, draft); }
-    else appendMsg(chat, "a", escapeHtml(t.content).replace(/\n/g, "<br>"));
-  }
-  renderConvs();
-}
-
-function newConv() {
-  saveCurrentConv();
-  currentConvId = null;
-  queryTurns = [];
-  currentQueryDraft = null;
-  document.getElementById("query-chat").innerHTML = "";
-  document.getElementById("past-queries-results").innerHTML = "";
-  document.getElementById("query-composer-input").focus();
-  renderConvs();
-}
-
-document.getElementById("qconv-new").addEventListener("click", newConv);
-renderConvs();
+function saveCurrentConv() { queryHistory.save(); }
 
 // --- מומחה התקנון: עזרי ניסוח ---
 // השאלה לדוגמה היא ה-placeholder של תיבת הקלט, ולכן היא **חוזרת
@@ -2697,9 +2764,11 @@ async function sendRulesMessage() {
   const chat = document.getElementById("rules-chat");
 
   appendMsg(chat, "u", escapeHtml(text));
+  rulesTurns.push({ role: "user", content: text });
   input.value = "";
   input.disabled = true;
   hideRulesExamples();
+  let answered = false;
 
   const thinking = appendThinking(chat, "קורא את התקנון…");
   let bubble = null, body = null, acc = "", follower = null;
@@ -2767,7 +2836,11 @@ async function sendRulesMessage() {
     }
     if (done.refused) {
       if (bubble) bubble.remove();
-      appendMsg(chat, "a", escapeHtml(rulesRefusalText(text, done.refusal_reason)));
+      const refusal = rulesRefusalText(text, done.refusal_reason);
+      appendMsg(chat, "a", escapeHtml(refusal));
+      rulesTurns.push({ role: "assistant", content: refusal, refused: true });
+      answered = true;
+      rulesHistory.save();
       return;
     }
     ensureBubble();
@@ -2776,16 +2849,59 @@ async function sendRulesMessage() {
     // הסעיפים שאוזכרו - תגיות מעל התקנון וקישורים בתוך התשובה (ת3). השורה
     // "מקורות: ..." שהייתה כאן חזרה על שניהם, והורדה (ברק, 26.9).
     addRulesCited([...(done.cited_ids || []), ...linkifyRulesCitations(body)]);
+    rulesTurns.push({ role: "assistant", content: done.text || acc, cited: done.cited_ids || [] });
+    answered = true;
+    rulesHistory.save();
   } catch {
     if (bubble) bubble.remove();
     appendMsg(chat, "err", "החיבור נקטע לפני שהתשובה הושלמה. נסו שוב.");
   } finally {
+    // תקלה (רשת, קטיעה) אינה חלק מהשיחה - השאלה יוצאת מהתורים השמורים
+    if (!answered) rulesTurns.pop();
     if (follower) follower.stop();
     thinking.remove();
     input.disabled = false;
     input.focus();
   }
 }
+
+// ת7 (26.9.2026): היסטוריית שיחות במומחה התקנון - אותו רכיב.
+let rulesTurns = [];
+const RULES_PLACEHOLDER = document.getElementById("rules-composer-input").placeholder;
+const rulesHistory = mountConvHistory({
+  prefix: "rconv",
+  storageKey: "legislator.rulesConversations.v1",
+  getTurns: () => rulesTurns,
+  getTitle: (turns) => { const u = turns.find((t) => t.role === "user"); return u ? u.content.slice(0, 60) : ""; },
+  getExtra: () => ({}),
+  restore: (conv) => {
+    rulesTurns = conv.turns || [];
+    const chat = document.getElementById("rules-chat");
+    chat.innerHTML = "";
+    rulesCitedIds.length = 0;
+    for (const t of rulesTurns) {
+      if (t.role === "user") { appendMsg(chat, "u", escapeHtml(t.content)); continue; }
+      if (t.refused) { appendMsg(chat, "a", escapeHtml(t.content)); continue; }
+      const bubble = appendMsg(chat, "a", "");
+      const body = document.createElement("span");
+      body.className = "rules-answer";
+      body.innerHTML = rulesAnswerHtml(t.content);
+      bubble.appendChild(body);
+      addRulesCited([...(t.cited || []), ...linkifyRulesCitations(body)]);
+    }
+    renderRulesCited();
+    if (rulesTurns.length) hideRulesExamples();
+  },
+  reset: () => {
+    rulesTurns = [];
+    rulesCitedIds.length = 0;
+    renderRulesCited();
+    document.getElementById("rules-chat").innerHTML = "";
+    const input = document.getElementById("rules-composer-input");
+    input.placeholder = RULES_PLACEHOLDER;
+    input.focus();
+  },
+});
 
 document.getElementById("rules-send-btn").addEventListener("click", sendRulesMessage);
 bindComposer(document.getElementById("rules-composer-input"), sendRulesMessage);
