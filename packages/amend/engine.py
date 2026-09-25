@@ -136,6 +136,18 @@ class _Mutation:
 
 
 @dataclass
+class _Removal:
+    """ביטול יחידה בתוך סעיף - סעיף קטן, פסקה, פסקת משנה או הגדרה (ח4).
+    ראו transform.RemoveUnit ו-_render_removal."""
+
+    before_node: LegislativeNode
+
+    @property
+    def node_id(self) -> str:
+        return self.before_node.id
+
+
+@dataclass
 class _MarginTitleMutation:
     """שינוי בכותרת השוליים של סעיף (לא בגוף הטקסט שלו) - ha-hoveret-
     ha-sgula.pdf §7.8. before_node הוא הסעיף עצמו (לא ילד) - הכותרת
@@ -283,6 +295,11 @@ def _scan_level(
     for child in after_children:
         prior = before_by_id.get(child.id)
         if prior is None:
+            continue
+        # ח4: יחידה שבוטלה - הוראה אחת, "– בטל"/"– תימחק". לא יורדים לתוכה
+        # ולא משווים טקסט: מה שבתוכה בוטל איתה.
+        if child.status == "repealed" and prior.status != "repealed":
+            mutations.append(_Removal(before_node=prior))
             continue
         if prior.children or child.children:
             _scan_level(prior, child, insertions, mutations)
@@ -727,6 +744,50 @@ def _render_mutation(
     return Line(text=text, depth=0)
 
 
+_REMOVAL_WORDS = {
+    # יחידה שלמה - "בטל"; חלק מיחידה - "יימחק" (מדריך §7.10.3, §7.10.7).
+    "subsection": ("סעיף קטן", "בטל"),
+    "paragraph": ("פסקה", "תימחק"),
+    "subparagraph": ("פסקת משנה", "תימחק"),
+}
+
+
+def _render_removal(
+    locator: str,
+    removal: _Removal,
+    *,
+    prefix: str = "",
+    full_title: str | None = None,
+    law_footnote_key: str | None = None,
+) -> Line:
+    """ח4 (25.9.2026) - מדריך §7.10.7, עמ' 30:
+    `בסעיף 15 לחוק העיקרי, סעיף קטן (א) – בטל.`
+    `בסעיף 107(ג) לחוק העיקרי, פסקה (1) – תימחק.` (המכולה בסוגריים, כמו
+    בשאר ההוראות - drafting-rules.md §8.7; המדריך כותב "בסעיף קטן (ג),
+    פסקה (1)", ושתי הצורות קיימות בהצעות האמיתיות).
+    הגדרה: `בסעיף 1 לחוק העיקרי, ההגדרה "X" – תימחק.` (§7.9)."""
+    node = removal.before_node
+    if node.node_type == "definition":
+        body = f'ההגדרה "{_quoted_term(node.text)}" – תימחק.'
+    elif node.node_type in _REMOVAL_WORDS and node.number:
+        what, verb = _REMOVAL_WORDS[node.node_type]
+        body = f"{what} {node.number} – {verb}."
+    else:
+        raise NotImplementedError(
+            f"ביטול יחידה מסוג {node.node_type!r} בלי תווית ({node.id!r}) - אין "
+            "דרך לנקוב בה בהוראת התיקון. לא ניחוש."
+        )
+    body = prefix + body
+    if full_title is not None:
+        return Line(
+            text=f"ב{full_title}",
+            text_after=f" (להלן – החוק העיקרי), בסעיף {locator}, {body}",
+            footnotes=[law_footnote_key] if law_footnote_key else [],
+            depth=0,
+        )
+    return Line(text=f"בסעיף {locator} לחוק העיקרי, {body}", depth=0)
+
+
 def _render_margin_title_mutation(
     section_number: str,
     mutation: _MarginTitleMutation,
@@ -1024,6 +1085,25 @@ def amend(
             lines.append(title_line)
             continue
 
+        if len(instructions) == 1 and isinstance(instructions[0], _Removal):
+            # ח4: ביטול יחידה אחת בסעיף - שורה אחת, כמו מוטציה בודדת.
+            # inclusive=False: היחידה היא היעד ("סעיף קטן (ב) – בטל"),
+            # והמכולה היא רק אבותיה שמתחת לסעיף.
+            node = instructions[0].before_node
+            locator = number + _container_suffix(before_sec, node, inclusive=False)
+            definition = _definition_clause(before_sec, node, inclusive=False)
+            if touched_count == 1:
+                removal_line = _render_removal(
+                    locator, instructions[0], prefix=definition,
+                    full_title=before.full_title or "", law_footnote_key=law_footnote_key)
+            else:
+                removal_line = _render_removal(locator, instructions[0], prefix=definition)
+            removal_line.side_heading = f"תיקון סעיף {number}"
+            removal_line.number = f"{touched_count}."
+            _stamp_provenance(removal_line, node, before)
+            lines.append(removal_line)
+            continue
+
         if len(instructions) == 1 and isinstance(instructions[0], _Mutation):
             # מוסק מדוגמה אחת: מוטציה בודדת מתלכדת לשורה אחת (סעיף 2),
             # לעומת הוספות שמקבלות שורת פתיח נפרדת (סעיף 1). לא ברור
@@ -1197,6 +1277,13 @@ def amend(
                     number, instruction, found[0] if found else None)
                 _stamp_provenance(title_line, instruction.before_node, before)
                 lines.append(title_line)
+            elif isinstance(instruction, _Removal):
+                node = instruction.before_node
+                removal_line = _render_removal(
+                    number + _container_suffix(before_sec, node, inclusive=False), instruction,
+                    prefix=_definition_clause(before_sec, node, inclusive=False))
+                _stamp_provenance(removal_line, node, before)
+                lines.append(removal_line)
             else:
                 replacement = replacements_by_id.get(instruction.node_id) or []
                 mutation_line = _render_mutation(number, instruction, replacement)

@@ -466,6 +466,25 @@ function renderNode(node, depth) {
         toggleInsertMenu(node, wrapper);
       });
       bodyRow.appendChild(addBtn);
+
+      // ח4: פח ליד הפלוס - מוחק את היחידה שהוא עומד עליה (סעיף, סעיף
+      // קטן, פסקה, הגדרה). **אותו מסלול כמו מחיקה ידנית של כל הטקסט**:
+      // השדות של היחידה ושל כל צאצאיה מתרוקנים ונרשמים כעריכות, והשרת
+      // מתרגם ל"סעיף 5 – בטל" / "סעיף קטן (ב) – בטל" / "פסקה (1) – תימחק"
+      // (apply_changes._apply_section_repeals / _apply_unit_removals).
+      if (node.status !== "repealed" && hasDeletableText(node)) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "node-del-btn subtle";
+        delBtn.type = "button";
+        delBtn.innerHTML = TRASH_ICON;
+        delBtn.title = `מחיקת ה${UNIT_NAME[node.node_type] || "יחידה"}`;
+        delBtn.setAttribute("aria-label", delBtn.title);
+        delBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          deleteUnit(node);
+        });
+        bodyRow.appendChild(delBtn);
+      }
     }
 
     wrapper.appendChild(bodyRow);
@@ -526,6 +545,27 @@ function onFieldFocus(ev) {
 
 /* רושם את מצב השדה ב-edits/insertions. מופרד מ-onFieldBlur כדי
  * שגם הקלדה חיה תוכל לקרוא לו, לא רק יציאה מהשדה. */
+const TRASH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/>' +
+  '<path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';
+const UNIT_NAME = { section: "סעיף", subsection: "סעיף הקטן", paragraph: "פסקה", definition: "הגדרה" };
+
+function hasDeletableText(node) {
+  if ((node.text || "").trim()) return true;
+  return (node.children || []).some(hasDeletableText);
+}
+
+// ח4: מרוקן את כל שדות הטקסט של היחידה ושל צאצאיה, ורושם אותם כעריכות.
+function deleteUnit(node) {
+  const walk = (n) => {
+    const el = fieldElements[`${n.id}:text`];
+    if (el) { el.textContent = ""; recordField(el); }
+    (n.children || []).forEach(walk);
+  };
+  walk(node);
+  setPreviewPending(true);
+  refreshPreview();
+}
+
 function recordField(el) {
   const nodeId = el.dataset.nodeId;
   const field = el.dataset.field;

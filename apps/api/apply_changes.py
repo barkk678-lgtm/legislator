@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "amend
 from node import LegislativeNode, find_parent  # noqa: E402
 from transform import (  # noqa: E402
     Annotation,
+    RemoveUnit,
     RepealSection,
     InsertWordsAfter,
     ReplaceMarginTitleWords,
@@ -92,6 +93,7 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
     annotations: list[Annotation] = []
     edit_statuses: list[EditStatus] = []
     current, edits, edit_statuses = _apply_section_repeals(before, list(edits), edit_statuses)
+    current, edits, edit_statuses = _apply_unit_removals(before, current, edits, edit_statuses)
 
     for edit in edits:
         field = getattr(edit, "field", "text")
@@ -203,6 +205,66 @@ def _apply_section_repeals(before: LegislativeNode, edits: list, statuses: list)
         remaining.append(edit)
     after, _ = apply(before, [RepealSection(section_number=s.number) for s in repealed.values()])
     return after, remaining, statuses
+
+
+_REMOVABLE = {"subsection", "paragraph", "subparagraph", "definition"}
+
+
+def _unit_text_ids(unit: LegislativeNode) -> set[str]:
+    ids = {n.id for n in _text_nodes(unit)}
+    if unit.text.strip():
+        ids.add(unit.id)
+    return ids
+
+
+def _apply_unit_removals(before: LegislativeNode, current: LegislativeNode, edits: list,
+                         statuses: list):
+    """ח4 (25.9.2026): **כל הנוסח של יחידה התרוקן = ביטול היחידה** - סעיף
+    קטן, פסקה, פסקת משנה או הגדרה. אותו כלל כמו _apply_section_repeals
+    (ח3) ברמה אחת מתחת, ולכן אייקון הפח ומחיקה ידנית של כל הטקסט נותנים
+    אותה הוראה: "סעיף קטן (ב) – בטל", "פסקה (1) – תימחק" (מדריך §7.10.7).
+    עד כאן שדה שהתרוקן נשלח ל-translate_text_edits והחזיר Unsupported.
+
+    רק היחידה העליונה מבוטלת: סעיף קטן שהתרוקן יחד עם כל פסקאותיו הוא
+    הוראה אחת, לא שלוש. יחידה בלי תווית (ואינה הגדרה) - לא נוגעים: אין
+    דרך לנקוב בה בהוראה, והיא ממשיכה במסלול הרגיל."""
+    emptied = {e.node_id for e in edits
+               if getattr(e, "field", "text") == "text" and not (e.text or "").strip()}
+    if not emptied:
+        return current, edits, statuses
+    candidates: dict[str, LegislativeNode] = {}
+    for nid in emptied:
+        node = _find_by_id(before, nid)
+        if node is None or node.node_type not in _REMOVABLE or node.status != "active":
+            continue
+        if not node.number and node.node_type != "definition":
+            continue
+        ids = _unit_text_ids(node)
+        if ids and ids <= emptied:
+            candidates[node.id] = node
+
+    def has_candidate_ancestor(node_id: str) -> bool:
+        parent = find_parent(before, node_id)
+        while parent is not None:
+            if parent.id in candidates:
+                return True
+            parent = find_parent(before, parent.id)
+        return False
+
+    top = [n for n in candidates.values() if not has_candidate_ancestor(n.id)]
+    if not top:
+        return current, edits, statuses
+    covered = set().union(*(_unit_text_ids(n) for n in top))
+    remaining = []
+    for edit in edits:
+        if getattr(edit, "field", "text") == "text" and edit.node_id in covered:
+            node = _find_by_id(before, edit.node_id)
+            statuses.append(EditStatus(node_id=edit.node_id, ok=True, field="text",
+                                       old_phrase=node.text or None, new_phrase=""))
+            continue
+        remaining.append(edit)
+    current, _ = apply(current, [RemoveUnit(node_id=n.id) for n in top])
+    return current, remaining, statuses
 
 
 def _apply_one_operation(current, result, edit, field, is_title, original_node,

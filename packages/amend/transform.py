@@ -189,6 +189,19 @@ class RepealSection:
 
 
 @dataclass
+class RemoveUnit:
+    """ביטול סעיף קטן / מחיקת פסקה, פסקת משנה או הגדרה (ח4, 25.9.2026) -
+    מדריך §7.10.7: "בסעיף 15 לחוק העיקרי, סעיף קטן (א) – בטל."; "בסעיף
+    107(ג) לחוק העיקרי, פסקה (1) – תימחק.". יחידה שלמה "בטל", חלק מיחידה
+    "יימחק" (§7.10.3).
+
+    כמו RepealSection: הצומת מסומן status="repealed" **ונשאר בעץ** -
+    הממשק מציג את מה שבוטל (מחוק), ו-amend() קורא את הסטטוס."""
+
+    node_id: str
+
+
+@dataclass
 class ReplacementAnnotation:
     """מצביעה על צומת (node_id) שעבר ReplaceWords, עם שני הביטויים
     כפי שנבחרו במפורש - ערוץ נפרד מ-.text, לא סמן מוטבע בתוכו (ראו
@@ -241,6 +254,7 @@ def apply(
     before: LegislativeNode,
     transformations: list[
         RepealSection
+        | RemoveUnit
         | InsertAfter
         | InsertSectionAfter
         | DeleteWords
@@ -263,6 +277,14 @@ def apply(
             if section is None:
                 raise ValueError(f"סעיף {t.section_number} לא נמצא ב'לפני'")
             section.status = "repealed"
+            continue
+        if isinstance(t, RemoveUnit):
+            unit = _find_by_id(after, t.node_id)
+            if unit is None:
+                raise ValueError(f"צומת {t.node_id} לא נמצא ב'לפני'")
+            if unit.node_type == "section":
+                raise ValueError("סעיף שלם מבוטל ב-RepealSection, לא ב-RemoveUnit")
+            unit.status = "repealed"
             continue
         if isinstance(t, InsertAfter):
             section = _find_section(after, t.section_number)

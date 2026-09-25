@@ -227,13 +227,22 @@ select { font-weight: 600; max-width: 420px; }
 /* כפתור "+": נשאר בסוף שורת התוכן של הצומת (לא ליד הכותרת, כמו
    שהמוקאפ ממקם אותו) - החלטת פונקציונליות גוברת, ראו
    docs/design/ui-overhaul-plan.md. רק העיצוב (עיגול, --flag) מהמוקאפ. */
-.node-add-btn, .remove-insertion-btn {
-  flex-shrink: 0; opacity: 0; transition: .12s;
-  width: 23px; height: 23px; border-radius: 50%; border: 1px solid var(--rule);
-  background: var(--page); color: var(--flag); font-size: 15px; line-height: 1;
+/* ח4 (25.9.2026): הפלוס והפח **גלויים תמיד** - עד כאן opacity: 0 עד
+   ריחוף, ו"קשה לראות אותם". גדולים יותר, מסגרת בצבע הממשק. */
+button.node-add-btn, button.node-del-btn, .remove-insertion-btn {
+  flex-shrink: 0; opacity: .8; transition: .12s;
+  width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--flag);
+  background: var(--tint); color: var(--flag); font-size: 18px; font-weight: 700; line-height: 1;
   display: flex; align-items: center; justify-content: center; padding: 0;
 }
-.node-body-row:hover .node-add-btn { opacity: 1; }
+.node-body-row:hover .node-add-btn, .node-body-row:hover .node-del-btn { opacity: 1; }
+/* button.X - גובר על button.subtle (שקוף, בלי מסגרת), שמחק עד כאן את
+   העיגול של הפלוס בשקט. */
+button.node-add-btn:hover { background: var(--flag); color: #fff; }
+button.node-del-btn { color: var(--del); border-color: var(--del); background: #fff; margin-inline-start: 4px; }
+button.node-del-btn:hover { background: var(--del); color: #fff; }
+.node-del-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; }
 .remove-insertion-btn {
   opacity: 1; width: auto; height: auto; border-radius: 20px; font-size: 11px;
   padding: 1px 9px; margin-inline-start: auto; color: var(--del); border-color: var(--del-bg);
