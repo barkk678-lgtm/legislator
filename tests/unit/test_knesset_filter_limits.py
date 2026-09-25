@@ -2,7 +2,8 @@
 (132, 26.9.2026).
 
 1. **חומת האש (473):** סינון עם 4 סוגריים פותחים ומעלה נחסם, תמיד (ש2/ש4).
-2. **מורכבות הביטוי (400):** 25 תנאי `or` ומעלה נדחים (נמדד ב-knesset_citations).
+2. **מורכבות הביטוי (400):** שרשרת `or` ארוכה נדחית - 25 נמדדו ב-knesset_citations,
+   ובאתר החי נדחו גם עד 24 שמות. הפיד המזויף כאן דוחה 20 ומעלה.
 
 ברק ביקש לבדוק שהמלכודת של ש2 לא קיימת בשני הכלים. **הסוגריים - לא:** כל
 סינון בהם עם סוגר אחד לכל היותר. **אבל מגבלת ה-or - כן, בהצעות הדומות:**
@@ -40,7 +41,7 @@ class FakeFeed:
         self.filters.append((entity, f))
         if f.count("(") >= 4:
             raise OdataError(f"כשל בקריאה ל-{entity}: 473 (WAF)")
-        if f.count(" or ") >= 24:
+        if f.count(" or ") >= 19:
             raise OdataError(f"כשל בקריאה ל-{entity}: 400 (מורכבות)")
         if entity == "KNS_Bill":
             return BILLS
@@ -72,7 +73,7 @@ def test_similar_bills_filters_stay_under_both_limits():
     kb.similar_bills("הצעת חוק העונשין (תיקון מס' 150) (עבירות מין (הגנה על קטינים))", knesset_num=25)
     for entity, f in feed.filters:
         assert f.count("(") < 4, (entity, f)
-        assert f.count(" or ") < 24, (entity, f.count(" or "))
+        assert f.count(" or ") < 19, (entity, f.count(" or "))
 
 
 def test_citations_filters_stay_under_both_limits():
@@ -84,7 +85,7 @@ def test_citations_filters_stay_under_both_limits():
     assert feed.filters, "לא נשלחה אף בקשה"
     for entity, f in feed.filters:
         assert f.count("(") < 4, (entity, f)
-        assert f.count(" or ") < 24, (entity, f.count(" or "))
+        assert f.count(" or ") < 19, (entity, f.count(" or "))
 
 
 for name, fn in sorted(list(globals().items())):
