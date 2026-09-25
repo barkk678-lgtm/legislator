@@ -1455,13 +1455,22 @@ async function exportQueryDraft(draft, btn) {
 // אין מה לייצא מהן. **פונקציה אחת לטיוטה חיה ולטיוטה משיחה שנפתחה
 // מחדש** (ש3): עד כאן openConv הציג את התור כטקסט גולמי, בלי אייקון -
 // ומכאן "לפעמים האייקון לא מופיע".
+// ש6: "נושא", "גוף" ו"רצוני לשאול" בבולד - בצ'אט בלבד. קובץ הוורד נבנה
+// מהנתונים (query_doc.py) ולא מה-HTML הזה, ונשאר כמו בדוגמאות.
+function queryBodyHtml(body) {
+  return String(body || "").split("\n").map((ln) =>
+    ln.trim() === "רצוני לשאול:" ? `<b>${escapeHtml(ln)}</b>` : escapeHtml(ln)).join("\n");
+}
+
 function renderQueryDraft(chat, draft) {
   const bubble = appendMsg(
     chat,
     "a",
     `ניסחתי טיוטה לפי הפורמט המקובל.` +
       `<div class="draft"><div class="to">שאילתה ${escapeHtml(draft.kind || "")} ${escapeHtml(draft.minister || "")}</div>` +
-      `${escapeHtml(draft.body || "")}${draft.word_count != null ? wordCountHtml(draft.word_count, draft.word_limit) : ""}${draft.removed_addressee ? `<div class="word-count">הוסרה פנייה לנמען מתחילת הגוף (${escapeHtml(draft.removed_addressee)}) — הנמען נקבע בשדה ומוזרק למסמך</div>` : ""}</div>`
+      `<div class="draft-field"><b>נושא:</b> ${escapeHtml(draft.subject || "")}</div>` +
+      `<div class="draft-field"><b>גוף:</b></div>` +
+      `${queryBodyHtml(draft.body)}${draft.word_count != null ? wordCountHtml(draft.word_count, draft.word_limit) : ""}${draft.removed_addressee ? `<div class="word-count">הוסרה פנייה לנמען מתחילת הגוף (${escapeHtml(draft.removed_addressee)}) — הנמען נקבע בשדה ומוזרק למסמך</div>` : ""}</div>`
   );
   attachQueryExport(bubble, { ...draft });
   return bubble;

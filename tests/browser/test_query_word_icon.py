@@ -1,4 +1,4 @@
-"""ש3 (25.9.2026) - אייקון הוורד בשאילתות: בפינה השמאלית העליונה, ועל כל
+"""ש3 + ש6 (25.9.2026) - אייקון הוורד בשאילתות: בפינה השמאלית העליונה, ועל כל
 שאילתה מנוסחת - גם בשיחה שנפתחת מחדש מ"שיחות קודמות".
 
 הסיבה ל"לפעמים הוא לא מופיע": openConv הציג את תור הטיוטה כטקסט גולמי,
@@ -50,6 +50,9 @@ def main() -> int:
         page.keyboard.press("Enter")
         page.wait_for_selector("#query-chat .msg.a .msg-action", timeout=10000)
         results.append(("טיוטה חיה - אייקון", icons(page) == 1, str(icons(page))))
+        bold = page.evaluate("() => [...document.querySelectorAll('#query-chat .draft b')].map(e => e.textContent)")
+        results.append(("ש6: 'נושא', 'גוף', 'רצוני לשאול' בבולד",
+                        bold == ["נושא:", "גוף:", "רצוני לשאול:"], str(bold)))
 
         geo = page.evaluate("""() => {
             const m = document.querySelector('#query-chat .msg.a.has-action');
@@ -66,7 +69,9 @@ def main() -> int:
         results.append(("שיחה שנפתחה מחדש - האייקון עדיין שם", icons(page) == 1, str(icons(page))))
         results.append(("שיחה שנפתחה מחדש - תיבת הטיוטה, לא 'נושא:' גולמי",
                         page.locator("#query-chat .draft").count() == 1
-                        and "גוף:" not in page.inner_text("#query-chat"), page.inner_text("#query-chat")[:200]))
+                        # הצורה הגולמית: "גוף: <הטקסט>" באותה שורה. "גוף:" כתווית (ש6) - תקין.
+                        and "גוף: " + DRAFT["body"].split("\n")[0] not in page.inner_text("#query-chat"),
+                        page.inner_text("#query-chat")[:200]))
 
         # שיחה שנשמרה לפני ש3 (בלי השדה draft)
         page.evaluate("(c) => localStorage.setItem('legislator.queryConversations.v1', JSON.stringify([c]))",
