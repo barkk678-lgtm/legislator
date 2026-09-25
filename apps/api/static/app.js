@@ -737,10 +737,54 @@ async function refreshPreview() {
   renderInsertionErrors(data.insertion_errors);
   scheduleDraftSave();
   renderDocxApprox(data.lines);
-  document.getElementById("download-hint").textContent = data.insertion_errors.length
-    ? `שים לב: ${data.insertion_errors.length} הוספות לא בוצעו (ראו כרטיסי השגיאה בעץ)`
-    : "";
+  // ח10: כל כשל בשורה משלו, בגוף ראשון ובמונחים של המשתמש - לא "1 הוספות
+  // לא בוצעו (ראו כרטיסי השגיאה בעץ)".
+  const failures = failureLines(data);
+  document.getElementById("download-hint").innerHTML =
+    failures.map((ln) => `<div class="failure-line">${escapeHtml(ln)}</div>`).join("");
   return data;
+}
+
+// המספר של הסעיף שהצומת יושב בו (הצומת עצמו, או האב הקרוב שהוא סעיף).
+function sectionNumberOf(tree, nodeId) {
+  const walk = (node, sec) => {
+    const here = node.node_type === "section" ? node.number : sec;
+    if (node.id === nodeId) return here;
+    for (const c of node.children || []) {
+      const found = walk(c, here);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  };
+  return tree ? walk(tree, null) : null;
+}
+
+const FAILURE_KIND = {
+  subsection: "סעיף קטן", paragraph: "פסקה", subparagraph: "פסקת משנה", definition: "הגדרה",
+};
+
+function failureLines(data) {
+  const lines = [];
+  for (const st of data.edit_statuses || []) {
+    if (st.ok) continue;
+    const sec = sectionNumberOf(data.tree, st.node_id);
+    lines.push(st.field === "margin_title"
+      ? `לא הצלחתי לקלוט את התיקון שביקשת בכותרת השוליים${sec ? ` של סעיף ${sec}` : ""}`
+      : `לא הצלחתי לקלוט את התיקון שביקשת לעשות${sec ? ` בסעיף ${sec}` : ""}`);
+  }
+  for (const err of data.insertion_errors || []) {
+    const ins = insertions.find((i) => i.clientId === err.client_id) || {};
+    const label = ins.label ? ` ${ins.label}` : "";
+    const sec = sectionNumberOf(data.tree, err.anchor_node_id);
+    if (err.kind === "section") {
+      lines.push(label ? `לא הצלחתי לקלוט את הוספת סעיף${label} כפי שביקשת`
+        : `לא הצלחתי לקלוט את הוספת הסעיף החדש${sec ? ` אחרי סעיף ${sec}` : ""} כפי שביקשת`);
+    } else {
+      const kind = FAILURE_KIND[err.kind] || "ההוספה";
+      lines.push(`לא הצלחתי לקלוט את הוספת ${kind}${label}${sec ? ` לסעיף ${sec}` : ""} כפי שביקשת`);
+    }
+  }
+  return [...new Set(lines)];
 }
 
 function renderDocxApprox(lines) {

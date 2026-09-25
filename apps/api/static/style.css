@@ -656,3 +656,6 @@ textarea.composer-input {
 .qconv-item.on { background: var(--tint); }
 .qconv-title { color: var(--ink); font-size: 13.5px; }
 .qconv-date { color: var(--soft); font-size: 12px; white-space: nowrap; }
+
+/* ח10: כשל בקליטת עריכה/הוספה - שורה לכל כשל, בולטת */
+#download-hint .failure-line { color: var(--del); font-weight: 600; margin-top: 4px; }
