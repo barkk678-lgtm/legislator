@@ -52,7 +52,9 @@ EXPECTED_LINES = [
         source_node_id="kaytanot-1990",
         as_of=_AS_OF,
     ),
-    Line(text='אחרי "בחוק זה" יבוא:', depth=0, source_node_id="kaytanot-1990/s1/p0", as_of=_AS_OF),
+    # ח13 (26.9): כל פריט בהוראה של כמה פריטים ממוספר - בזהב (1) ו-(2) הם
+    # מספור אוטומטי של Word, ועד התיקון יצאו אצלנו בלי מספר בכלל.
+    Line(marker="(1)", text='אחרי "בחוק זה" יבוא:', depth=0, source_node_id="kaytanot-1990/s1/p0", as_of=_AS_OF),
     Line(
         text='""ארגון נוער או תנועת נוער" – ארגון או תנועה או חוגי סיור '
         "הנתמכים על ידי משרד החינוך לפי מבחנים לצורך תמיכה;\";",
@@ -62,6 +64,7 @@ EXPECTED_LINES = [
         as_of=_AS_OF,
     ),
     Line(
+        marker="(2)",
         text='אחרי ההגדרה "ילד" יבוא:',
         depth=0,
         source_node_id="kaytanot-1990/s1/p2",

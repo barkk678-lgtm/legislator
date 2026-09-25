@@ -619,6 +619,55 @@ def _container_suffix(section: LegislativeNode, node: LegislativeNode, *, inclus
 
 
 
+_ITEM_UNIT_WORD = {"subsection": "בסעיף קטן", "paragraph": "בפסקה", "subparagraph": "בפסקת משנה"}
+
+
+def _item_address(section: LegislativeNode, node: LegislativeNode, *, inclusive: bool) -> str:
+    """הכתובת של פריט בתוך הוראה של כמה פריטים באותו סעיף (ח13, 26.9.2026).
+
+    מדריך משפטים §7.10.8, עמ' 30:
+        בסעיף 40 לחוק העיקרי –
+        (1) בסעיף קטן (א)(5), המילים "כפי שרצה" – יימחקו;
+        (2) סעיף קטן (ב) – בטל.
+    כלומר: שם היחידה העליונה במילים ("בסעיף קטן", "בפסקה") ואחריו שרשרת
+    התוויות בסוגריים - אותה שרשרת כמו `_container_suffix`, בלי מספר הסעיף
+    (הוא כבר בשורת הפתיח). נוסח שיושב ישירות בסעיף שיש לו יחידות - "ברישה".
+    מחרוזת ריקה כשהפריט הוא נוסח הסעיף עצמו (סעיף בלי יחידות).
+
+    עד כאן הענף של כמה הוראות כתב כל פריט `בסעיף 6 לחוק העיקרי, ...` - בלי
+    היחידה, בלי מספור, וחוזר על מספר הסעיף (הקובץ של ברק, law-2000037)."""
+    chain: list[LegislativeNode] = []
+    current: LegislativeNode | None = node if inclusive else find_parent(section, node.id)
+    while current is not None and current.id != section.id:
+        if current.number:
+            chain.append(current)
+        current = find_parent(section, current.id)
+    chain.reverse()
+    if chain:
+        word = _ITEM_UNIT_WORD.get(chain[0].node_type, "ב")
+        return f"{word} {''.join(n.number for n in chain)}, "
+    target = node if inclusive else None
+    if (target is not None and target.id != section.id and not target.number
+            and target.node_type != "definition"
+            and find_parent(section, target.id) is section
+            and any(c.number for c in section.children)):
+        return "ברישה, "
+    return ""
+
+
+def _as_item(line: Line, ordinal: int, address: str, terminator: str) -> Line:
+    """שורת הוראה עצמאית (`בסעיף N לחוק העיקרי, <גוף>.`) -> פריט ממוספר בתוך
+    הוראה של כמה פריטים: `(n) <כתובת><גוף>;`."""
+    head = f"לחוק העיקרי, "
+    text = line.text
+    body = text.split(head, 1)[1] if head in text else text
+    if body.endswith("."):
+        body = body[:-1] + terminator
+    line.text = address + body
+    line.marker = f"({ordinal})"
+    return line
+
+
 def _render_word_operation(annotation: ReplacementAnnotation) -> str:
     """ניסוח פעולת-מילים אחת, **בלי הנקודה הסוגרת** - היא נוספת פעם
     אחת בסוף, אחרי חיבור כל הפעולות.
@@ -1250,12 +1299,23 @@ def amend(
         lines.append(header)
 
         for i, instruction in enumerate(instructions):
+            # ח13: כל פריט - `(n)` + היחידה שבה הוא קורה, ו-";" עד האחרון.
+            terminator = "." if i == len(instructions) - 1 else ";"
             if isinstance(instruction, _Insertion):
-                terminator = "." if i == len(instructions) - 1 else ";"
                 footnote = footnotes_by_id.get(instruction.new_node.id)
                 insertion_lines = _render_insertion(
                     instruction, terminator, ordinal=i + 1, footnote=footnote
                 )
+                # המספור והמכולה - לכל פריט, לא רק ל"בסופו יבוא" (עד כאן
+                # פריטי "אחרי ... יבוא:" יצאו בלי מספר בקובץ, ובלי היחידה
+                # שבתוכה ההוספה).
+                anchor_before = _find_by_id(before, instruction.anchor.id)
+                if anchor_before is not None:
+                    insertion_lines[0].text = (
+                        _item_address(before_sec, anchor_before, inclusive=False)
+                        + _definition_clause(before_sec, anchor_before, inclusive=False)
+                        + (insertion_lines[0].text or ""))
+                insertion_lines[0].marker = f"({i + 1})"
                 # instruction.anchor הוא צומת מעץ ה"אחרי" (ראו _diff_section) -
                 # provenance צריך את המקבילה שלו ב"לפני" בפועל, כדי ש-
                 # effective_as_of יוכל לטפס מהשורש האמיתי. אם העוגן עצמו הוכנס
@@ -1275,19 +1335,27 @@ def amend(
                 found = replacements_by_id.get(instruction.node_id) or []
                 title_line = _render_margin_title_mutation(
                     number, instruction, found[0] if found else None)
+                _as_item(title_line, i + 1, "", terminator)
                 _stamp_provenance(title_line, instruction.before_node, before)
                 lines.append(title_line)
             elif isinstance(instruction, _Removal):
                 node = instruction.before_node
                 removal_line = _render_removal(
-                    number + _container_suffix(before_sec, node, inclusive=False), instruction,
+                    number, instruction,
                     prefix=_definition_clause(before_sec, node, inclusive=False))
+                _as_item(removal_line, i + 1,
+                         _item_address(before_sec, node, inclusive=False), terminator)
                 _stamp_provenance(removal_line, node, before)
                 lines.append(removal_line)
             else:
                 replacement = replacements_by_id.get(instruction.node_id) or []
-                mutation_line = _render_mutation(number, instruction, replacement)
-                _stamp_provenance(mutation_line, instruction.before_node, before)
+                node = instruction.before_node
+                mutation_line = _render_mutation(
+                    number, instruction, replacement,
+                    prefix=_definition_clause(before_sec, node, inclusive=True))
+                _as_item(mutation_line, i + 1,
+                         _item_address(before_sec, node, inclusive=True), terminator)
+                _stamp_provenance(mutation_line, node, before)
                 lines.append(mutation_line)
 
     _drop_principal_law_alias_if_single(lines, touched_count)

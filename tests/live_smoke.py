@@ -324,6 +324,37 @@ def journey_basic_law_search(base, res):
                   hits[0].get("title") if hits else "אפס תוצאות")
 
 
+def journey_subsection_locator(base, res):
+    """ח13 (26.9): שתי עריכות בסעיף 6 של חוק-יסוד: הכנסת - בסעיף קטן (ג)
+    ובסעיף קטן (ד). עד התיקון כל פריט יצא "בסעיף 6 לחוק העיקרי, ..." - בלי
+    היחידה ובלי מספור (הקובץ שברק קיבל). §7.10.8: "(1) בסעיף קטן (ג), ..."."""
+    print("\n[1ג] תיקון בסעיף קטן מפנה ליחידה")
+    _, body = _get(base, "/api/laws/law-2000037")
+    tree = json.loads(body)["tree"]
+    units = {}
+
+    def walk(n):
+        units[n["id"]] = n
+        for c in n.get("children", []):
+            walk(c)
+    walk(tree)
+    c, d = units.get("law-2000037/s6/ג"), units.get("law-2000037/s6/ד")
+    if not c or not d or "הורשע" not in c["text"] or "המרכזית" not in d["text"]:
+        res.check("סעיף 6(ג) ו-(ד) בחוק-יסוד: הכנסת כמו שהיו", False, "הנוסח במאגר השתנה")
+        return
+    payload = {"edits": [
+        {"node_id": c["id"], "field": "text", "text": c["text"].replace("הורשע", "נאשם", 1)},
+        {"node_id": d["id"], "field": "text", "text": d["text"].replace("המרכזית", "המרכזית או סגנו", 1)},
+    ], "insertions": [], "bill": {"title": "", "initiator": "", "explanatory": []}}
+    _, body = _post(base, "/api/laws/law-2000037/render", payload)
+    lines = [(ln.get("marker") or "") + " " + ln.get("text", "") + (ln.get("text_after") or "")
+             for ln in json.loads(body).get("lines", [])]
+    res.check("(1) בסעיף קטן (ג), במקום...", any(x.startswith('(1) בסעיף קטן (ג), במקום "הורשע"') for x in lines),
+              " | ".join(lines)[:200])
+    res.check("(2) בסעיף קטן (ד), אחרי...", any(x.startswith('(2) בסעיף קטן (ד), אחרי "המרכזית"') for x in lines),
+              " | ".join(lines)[:200])
+
+
 def journey_rules_reading(base, res):
     """ת3 (25.9): התקנון פתוח לקריאה לצד הצ'אט. שלושת המקורות, ובתקנון -
     סעיף 52 במזהה שהמודל מצטט (law-tkanon-haknesset/52); אחרת תגית או
@@ -560,6 +591,7 @@ def main():
         run("פרסומי החוק", journey_citations, base, res, law_id)
     run("חיפוש חוק יסוד", journey_basic_law_search, base, res)
     run("התקנון לקריאה", journey_rules_reading, base, res)
+    run("תיקון בסעיף קטן", journey_subsection_locator, base, res)
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)
     if args.with_llm:

@@ -206,6 +206,28 @@ def _known_anchor_pattern_correction(rows):
     return fixed
 
 
+def _known_auto_numbered_items_correction(rows):
+    """מתקנת פער **מתועד** בין מה שהקובץ מכיל לבין מה שהקורא רואה (ח13,
+    26.9.2026): בסעיף 1 של golden-kaytanot.docx, הפריטים (1) ו-(2) ממוספרים
+    **במספור האוטומטי של Word** (`w:numPr`) - המספר מוצג בוורד אבל אינו
+    חלק מהטקסט - ואילו (3) כתוב כטקסט ("(3)" + טאב). אנחנו כותבים את שלושתם
+    כטקסט, כמו (3); המספור האוטומטי אינו נתמך ב-render_bill, ועד לתיקון
+    הזה (1) ו-(2) יצאו **בלי מספר בכלל** בקובץ. הקורא רואה עכשיו בדיוק מה
+    שהוא רואה בקובץ הזהב. מתקנים את ה*ציפייה*: מוסיפים לפריטים האלה את
+    המספר שוורד מציג."""
+    fixed = []
+    for row in rows:
+        new_row = []
+        for (w, sp, st, text) in row:
+            if text.startswith('אחרי "בחוק זה" יבוא:'):
+                text = "(1)" + text
+            elif text.startswith('אחרי ההגדרה "ילד" יבוא:'):
+                text = "(2)" + text
+            new_row.append((w, sp, st, text))
+        fixed.append(new_row)
+    return fixed
+
+
 def _known_missing_first_number_correction(rows):
     """מתקנת פער **מתועד** נוסף במקור, לא סטייה כללית: golden-kaytanot.docx
     משאיר את הוראת התיקון הראשונה (סעיף 1, שורה 0) בלי מספר סידורי
@@ -236,16 +258,16 @@ def main():
     write_docx(BILL, REFS, SKELETON, out)
 
     got = table_shape(out)
-    want = _known_anchor_pattern_correction(
+    want = _known_auto_numbered_items_correction(_known_anchor_pattern_correction(
         _known_missing_first_number_correction(
             _known_source_typo_correction(table_shape(ORIGINAL))
         )
-    )
+    ))
 
     print(f"שורות: נוצרו {len(got)}, במקור {len(want)}\n")
-    print("(השוואה מול ORIGINAL עם שלושה תיקונים מתועדים - ראו "
-          "_known_source_typo_correction, _known_missing_first_number_correction "
-          "ו-_known_anchor_pattern_correction)\n")
+    print("(השוואה מול ORIGINAL עם ארבעה תיקונים מתועדים - ראו "
+          "_known_source_typo_correction, _known_missing_first_number_correction, "
+          "_known_anchor_pattern_correction ו-_known_auto_numbered_items_correction)\n")
     for i in range(max(len(got), len(want))):
         g = got[i] if i < len(got) else None
         w = want[i] if i < len(want) else None
