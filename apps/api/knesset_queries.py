@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -105,7 +106,10 @@ _EXPAND_SYSTEM = (
     "כלל לכל המילים: **החלק המשותף לכל הנטיות**, כי החיפוש הוא תת-מחרוזת. "
     "משטרה/משטרת/שוטרים -> 'משטר' ו'שוטר'; מורים/מורות -> 'מור'; "
     "ניתוחים/ניתוח -> 'ניתוח'. בלי ה' הידיעה ובלי ב/ל/מ/ו/ש/כ בתחילת מילה. "
-    "**כתיב מלא, כמו בכותרות הכנסת**: אוויר (לא אויר), תוכנית, כסיפה.\n\n"
+    "**כתיב מלא, כמו בכותרות הכנסת**: אוויר (לא אויר), תוכנית, כסיפה. "
+    "**בצירוף סמיכות** המילה שמשתנה (בית/בתי) וה' הידיעה נשמטות: בית ספר / "
+    "בתי הספר -> 'ספר'; מערכת החינוך -> 'חינוך' (אחרת 'בית ספר' לא ימצא "
+    "'בבתי הספר').\n\n"
     "domain: **מה שכל תוצאה חייבת לחלוק עם הנושא** - רשימה של עד שני היבטים. "
     "כל היבט הוא רשימת כל הדרכים שבהן הוא נכתב בכותרת (נרדפים, יחידות, "
     "תפקידים, צורות), ותוצאה חייבת להכיל מונח אחד לפחות **מכל** היבט.\n"
@@ -152,6 +156,31 @@ def _norm_title(text: str) -> str:
     return " ".join((text or "").translate(_QUOTES).split())
 
 
+_SHORT_STEM = 3
+_PREFIXES = "והבלמשכ"
+
+
+def term_in(term: str, title: str) -> bool:
+    """מונח מופיע בכותרת - **ברמת המילה, לא כמחרוזת רציפה** (ש4).
+
+    שני מקרים שנמדדו על האתר החי ושברו התאמה פשוטה:
+    - **מונח של כמה מילים:** "בתי ספר" לא נמצא ב"בבתי **ה**ספר" - ושורה
+      נכונה ("ביטול סקר האקלים והאלימות בבתי הספר") נזרקה. עכשיו כל
+      מילה נבדקת לחוד.
+    - **גזע קצר:** "מור" (מורים) הוא תת-מחרוזת של "ח**מור**" - ו"מחסור
+      **חמור** במוסכניקים" נכנס לנושא על מורים. גזע של עד 3 אותיות
+      חייב לפתוח מילה, אחרי עד שלוש אותיות שימוש (ו/ה/ב/ל/מ/ש/כ):
+      "במורים" כן, "חמור" לא."""
+    t = _norm_title(title)
+    for word in _norm_title(term).split():
+        if len(word) > _SHORT_STEM:
+            if word not in t:
+                return False
+        elif not re.search(rf"(?:^|[^א-ת])[{_PREFIXES}]{{0,3}}{re.escape(word)}", t):
+            return False
+    return True
+
+
 def domain_match(title: str, domain: list[list[str]]) -> bool:
     """**כל תוצאה חייבת להכיל מונח מכל היבט של התחום** (ש4, 25.9.2026):
     הגוף או התחום, ומקום אם נקבו בו. תחום ריק = אין סינון (המודל לא
@@ -163,8 +192,7 @@ def domain_match(title: str, domain: list[list[str]]) -> bool:
     זהה ל-pqDomainMatch ב-static/app.js."""
     if not domain:
         return True
-    t = _norm_title(title)
-    return all(any(_norm_title(term) in t for term in facet) for facet in domain)
+    return all(any(term_in(term, title) for term in facet) for facet in domain)
 
 
 def _clean_facet(raw) -> list[str]:
@@ -362,8 +390,9 @@ def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None
             time.sleep(0.5 * 2 ** attempt + random.uniform(0, 0.4))
     if keep_knessets is not None:
         rows = [r for r in rows if r.get("KnessetNum") in keep_knessets]
-    if len(feed_words) < len(words):
-        rows = [r for r in rows if all(w in (r.get("Name") or "") for w in words)]
+    # contains בפיד הוא על-קבוצה: המילים שלא נשלחו (מעל 3), וגזע קצר
+    # שנמצא באמצע מילה ("מור" ב"חמור") - נבדקים כאן, מקומית.
+    rows = [r for r in rows if all(term_in(w, r.get("Name") or "") for w in words)]
     result = {
         "words": words,
         "count": len(rows),
@@ -525,7 +554,10 @@ def search_queries(q: str, *, limit: int = 12, expand_fn=None, run_fn=None) -> d
         # זו סטייה מודעת ממה שברק ניסח ("דירוג 1 נחתך לארבעה"):
         # הזנב נשאר ארבעה מקומות, אבל הוא מתמלא משורות של צירופים
         # שנדחו במכסה - לא משורות של מילה בודדת.
-        if u["too_broad"] or _is_single_word(u["words"]):
+        # צירוף רחב (מעל GENERIC_CAP) מדרג בלבד - **אלא אם יש תחום**: אחרי
+        # הסינון לתחום הוא כבר צר ("תחבורה ציבורית" + יישובי הנגב), ורק כך
+        # נמצאו כסיפה ותל שבע, שכותרותיהן אינן אומרות "נגב".
+        if (u["too_broad"] and not domain) or _is_single_word(u["words"]):
             continue
         budget = unit_budget(u["count"])
         broad = u["count"] > HOLD_ABOVE

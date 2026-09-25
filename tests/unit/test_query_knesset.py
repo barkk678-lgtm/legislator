@@ -309,6 +309,55 @@ def test_expansion_failure_has_empty_domain():
     assert plan["domain"] == [] and plan["expanded"] is False
 
 
+# ── ש4, סבב 2: מה שנמדד באתר החי אחרי התיקון הראשון ─────────────
+def test_short_stem_does_not_match_inside_a_word():
+    """"מור" ב"חמור": "מחסור חמור במוסכניקים" נכנס לנושא על מורים."""
+    assert not kq.term_in("מור", "מחסור חמור במוסכניקים")
+    assert not kq.term_in("מור", "מחסור בשופטים והפגיעה החמורה בהליכים משפטיים")
+    assert kq.term_in("מור", "מחסור במורים במערכת החינוך")
+    assert kq.term_in("מור", "המורים שובתים")
+
+
+def test_multi_word_term_matches_word_by_word():
+    """"בתי ספר" לא נמצא ב"בבתי הספר" - ושורה נכונה נזרקה."""
+    title = "ביטול סקר האקלים והאלימות בבתי הספר"
+    assert kq.term_in("בתי ספר", title)
+    assert kq.domain_match(title, [["חינוך", "בתי ספר", "תלמיד"]])
+
+
+def test_unit_local_filter_drops_short_stem_false_hits():
+    kq._unit_cache.clear()
+    rows = [{"Id": 1, "Name": "מחסור חמור במוסכניקים", "KnessetNum": 25},
+            {"Id": 2, "Name": "מחסור משמעותי במורים", "KnessetNum": 25}]
+    original = with_fetch(lambda *a, **k: rows)
+    try:
+        out = kq.run_unit(["מחסור", "מור"])
+        assert [r["query_id"] for r in out["rows"]] == [2], out["rows"]
+    finally:
+        kq.fetch = original
+        kq._unit_cache.clear()
+
+
+def test_broad_unit_supplies_rows_once_the_domain_narrows_it():
+    """"תחבורה ציבורית" רחב (מעל 120) - אבל אחרי סינון ליישובי הנגב הוא
+    צר, ורק ממנו נמצאות כסיפה ותל שבע (כותרותיהן אינן אומרות "נגב")."""
+    titles = ["העדר תחבורה ציבורית בישוב כסיפה", "שירות תחבורה ציבורית הופסק בישוב תל שבע",
+              "תחבורה ציבורית בשבת בעיתות חירום למשרתי מילואים"] + \
+             [f"תחבורה ציבורית בעיר {i}" for i in range(130)]
+    plan = {"expanded": True, "domain": [["תחבורה ציבור", "אוטובוס"], ["נגב", "כסיפה", "תל שבע"]],
+            "units": [{"words": ["תחבורה", "ציבורית"], "kind": "phrase"}]}
+    def run(words):
+        return {"words": words, "count": len(titles), "too_broad": True,
+                "rows": [{"query_id": i, "title": t, "person_id": None} for i, t in enumerate(titles)]}
+    original = kq.enrich
+    kq.enrich = lambda ids, persons: {"docs": {}, "names": {}}
+    try:
+        out = kq.search_queries("תחבורה ציבורית בנגב", expand_fn=lambda q: plan, run_fn=run)
+    finally:
+        kq.enrich = original
+    assert [r["title"] for r in out["results"]] == titles[:2], out["results"]
+
+
 # ── ש1: המגדר של חבר הכנסת - מהמאגר, לא מהשם ────────────────────
 def test_mk_gender_exact_name_match_only():
     people = [{"FirstName": "עדי", "LastName": "עזוז", "GenderDesc": "נקבה"},

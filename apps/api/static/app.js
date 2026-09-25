@@ -2052,11 +2052,21 @@ function pqNorm(text) {
   return String(text || "").replace(/[״”“]/g, '"').replace(/[׳’]/g, "'")
     .replace(/[-־]/g, " ").split(/\s+/).filter(Boolean).join(" ");
 }
+// מונח מופיע בכותרת - ברמת המילה (knesset_queries.term_in): "בתי ספר"
+// נמצא ב"בבתי הספר"; גזע של עד 3 אותיות פותח מילה אחרי עד שלוש אותיות
+// שימוש - "מור" נמצא ב"במורים" ולא ב"חמור".
+function pqTermIn(term, title) {
+  const t = pqNorm(title);
+  return pqNorm(term).split(" ").filter(Boolean).every((w) => {
+    if (w.length > 3) return t.includes(w);
+    const esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?:^|[^א-ת])[והבלמשכ]{0,3}${esc}`).test(t);
+  });
+}
 // domain = היבטים (הגוף/התחום, ומקום אם נקבו בו): מונח אחד לפחות מכל היבט.
 function pqDomainMatch(title, domain) {
   if (!domain || !domain.length) return true;
-  const t = pqNorm(title);
-  return domain.every((facet) => facet.some((term) => t.includes(pqNorm(term))));
+  return domain.every((facet) => facet.some((term) => pqTermIn(term, title)));
 }
 
 function pqRowHtml(row) {
@@ -2152,7 +2162,8 @@ async function searchPastQueries() {
     // מילה אחת אינה מזהה נושא, גם כשהיא נושאית בפני עצמה.
     // מילה בודדת = איבר אחד בלי רווח בתוכו. ["מצוקת הדיור"] הוא
     // צירוף שנשלח כרצף אחד, לא מילה בודדת.
-    const rankOnly = unit.rankOnly || data.too_broad ||
+    // רחב מדרג בלבד - אלא אם יש תחום: אחרי הסינון הוא כבר צר (ש4).
+    const rankOnly = unit.rankOnly || (data.too_broad && !domain.length) ||
       (unit.words.length === 1 && !unit.words[0].trim().includes(" "));
     // המכסה לפי מה שנשאר אחרי התחום: "זיהום אוויר" (116) אחרי סינון
     // לחיפה הוא צירוף צר, לא רחב.
@@ -2255,14 +2266,20 @@ async function searchPastQueries() {
 
   // שלב ב - פירוק הנושא. כשל כאן אינו עוצר את החיפוש: נופלים חזרה
   // לחיפוש המילולי בדיוק כפי שהיה, ואומרים שההרחבה לא רצה.
-  let plan;
-  try {
-    const r = await fetch(`/api/queries/plan?q=${encodeURIComponent(q)}`);
-    if (!r.ok) throw new Error("plan");
-    plan = await r.json();
-  } catch {
-    plan = { units: [{ words: [q], kind: "literal" }], expanded: false };
+  // ניסיון חוזר אחד (ש4): באתר החי נמדד פירוק שנכשל פעם אחת מתוך
+  // שמונה, ובלעדיו אין תחום - והרעש חוזר ("זיהום אוויר בתל אביב" לנושא
+  // על מפרץ חיפה). מקומית, אותו פירוק: 8/8.
+  let plan = null;
+  for (let attempt = 0; attempt < 2 && !plan; attempt += 1) {
+    try {
+      const r = await fetch(`/api/queries/plan?q=${encodeURIComponent(q)}`);
+      if (!r.ok) throw new Error("plan");
+      const data = await r.json();
+      if (data.expanded === false && data.expansion_error && attempt === 0) throw new Error("plan");
+      plan = data;
+    } catch { /* ננסה שוב, ואחר כך הניסוח המדויק */ }
   }
+  if (!plan) plan = { units: [{ words: [q], kind: "literal" }], expanded: false };
   if (token !== pqToken) return;
   domain = plan.domain || [];
   planReady = true;
