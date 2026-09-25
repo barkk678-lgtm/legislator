@@ -50,8 +50,9 @@ def test_relabel_as_an_item_among_others():
     assert texts[3][0] == "(2)" and texts[3][1].startswith("בסעיף קטן (ב), במקום \"רואים אותו\" יבוא \"יראו אותו\""), texts[3]
 
 
-def test_changed_text_is_not_silently_relabeled():
-    """הנוסח עבר ל-(1) וגם השתנה - החוברת מפצלת לשתי הוראות; לא מנוסח כ"יסומן"."""
+def test_changed_text_is_split_into_two_instructions():
+    """הנוסח עבר ל-(1) וגם השתנה - שתי הוראות (ח11-ג; §7.10.6(ד), הערה), ולא
+    "יסומן" לבדו. עד 26.9 - NotImplementedError. הניסוח המלא: tests/golden/test_split_relabel.py."""
     before = _load()
     first, _ = build_insertion_transform(before, "kaytanot-1990/s6/א", "paragraph",
                                          text=NEW_TEXT, new_id="kaytanot-1990/s6/א/2")
@@ -59,11 +60,12 @@ def test_changed_text_is_not_silently_relabeled():
     import engine
     unit = next(c for c in engine._find_by_id(after, "kaytanot-1990/s6/א").children if c.number == "(1)")
     unit.text = unit.text.replace("השר", "השרה", 1)
-    try:
-        amend(before, after, annotations, law_footnote_key="kaytanot")
-    except NotImplementedError:
-        return
-    raise AssertionError("צפוי NotImplementedError")
+    lines = amend(before, after, annotations, law_footnote_key="kaytanot")
+    rows = [(ln.marker, ln.text + ln.text_after) for ln in lines]
+    assert rows[0][1].endswith("בסעיף 6(א) – "), rows[0]
+    assert rows[1][0] == "(1)" and rows[1][1].startswith('האמור בו יסומן "(1)", ובו, '), rows[1]
+    assert rows[2] == ("(2)", "אחרי פסקה (1) יבוא:"), rows[2]
+    assert not any("ואחריו יבוא" in text for _, text in rows), rows
 
 
 if __name__ == "__main__":

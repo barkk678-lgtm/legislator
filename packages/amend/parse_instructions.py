@@ -72,6 +72,17 @@ _RELABEL_RE = re.compile(
     r'האמור\s+בו\s+יסומן\s+[״"”]\((?P<label>[^)]+)\)[״"”]\s+'
     r'ואחריו\s+יבוא\s*:?\s*$')
 
+# ח11-ג: הפיצול לשתי הוראות (מדריך §7.10.6(ד), הערה) - פתיח עם מקף,
+# 'האמור בו יסומן "(א)", ובו, <פעולות מילים>;' ו-'אחרי סעיף קטן (א) יבוא:'.
+# התווית "(1)"/"(2)" של הפריט - בטקסט או בעמודה נפרדת (extract_docx), ולכן
+# אופציונלית כאן.
+_SPLIT_HEAD_RE = re.compile(r"\s[–־-]\s*$")
+_SPLIT_RELABEL_RE = re.compile(
+    r'^(?:\((?:1|א)\)\s*)?האמור\s+בו\s+יסומן\s+[״"”]\((?P<label>[^)]+)\)[״"”]\s*,?\s*'
+    r'ובו\s*,\s*(?P<ops>.+?)\s*[;.]?\s*$', re.S)
+_SPLIT_AFTER_RE = re.compile(
+    r'^(?:\((?:2|ב)\)\s*)?אחרי\s+(?:סעיף קטן|פסקה)\s+\((?P<label>[^)]+)\)\s+יבוא\s*:?\s*$')
+
 _KIND_TO_LEVEL = {
     "סעיף": "section",
     "סעיף קטן": "subsection",
@@ -177,6 +188,45 @@ def _strip_quotes(text: str) -> str:
     return text.strip().strip('״"”“').strip()
 
 
+def _parse_split(section_match, lines: list[tuple[str, str]], index: int) -> list | None:
+    """ח11-ג: `בסעיף 6(א) לחוק העיקרי –` / `(1) האמור בו יסומן "(1)", ובו, במקום
+    "X" יבוא "Y";` / `(2) אחרי פסקה (1) יבוא:` / `"(2) ..."`.
+
+    מחזירה [פעולות המילים על היחידה, ואחריהן RelabelAndInsert] - בסדר הזה:
+    המילים מוחלפות בנוסח הקיים, ורק אחר כך הוא מקבל תווית. None - אם אחת
+    השורות אינה בדיוק בצורה הזו, או שיש בפעולות משהו שאיני מכיר (אז כל
+    ההוראה נרשמת כלא-מזוהה, כמו בכל שורה אחרת)."""
+    relabel = _SPLIT_RELABEL_RE.match(lines[index + 1][1].strip())
+    after = _SPLIT_AFTER_RE.match(lines[index + 2][1].strip())
+    unit = _NEW_UNIT_RE.match(lines[index + 3][1].strip())
+    if not (relabel and after and unit):
+        return None
+    label = relabel.group("label").strip()
+    if after.group("label").strip() != label:
+        return None
+    section = section_match.group("section")
+    container = (section_match.group("sub") or "").strip()
+    ops_text = relabel.group("ops")
+    word_ops = [
+        ReplaceWords(section=section, container=container or None,
+                     old_phrase=m.group("old").strip(), new_phrase=m.group("new").strip(),
+                     source_line=index + 1)
+        for m in _REPLACE_RE.finditer(ops_text)
+    ] + [
+        AppendAtEnd(section=section, container=container or None,
+                    text=m.group("text").strip(), source_line=index + 1)
+        for m in _APPEND_RE.finditer(ops_text)
+    ]
+    remainder = _APPEND_RE.sub("", _REPLACE_RE.sub("", ops_text))
+    if not word_ops or "יבוא" in remainder or "יימחק" in remainder or "תימחק" in remainder:
+        return None
+    return [*word_ops, RelabelAndInsert(
+        section=section, relabeled_label=label,
+        new_label=unit.group("label").strip(), new_text=_strip_quotes(unit.group("text")),
+        source_line=index + 2, container=container,
+    )]
+
+
 def parse_instructions(lines: list[tuple[str, str]]) -> AmendmentPlan:
     """lines: [(מספר הוראה, טקסט)] כפי ש-extract_docx מחזיר.
 
@@ -204,6 +254,14 @@ def parse_instructions(lines: list[tuple[str, str]]) -> AmendmentPlan:
 
         section_match = _SECTION_RE.search(stripped)
         insert_match = _INSERT_AFTER_RE.search(stripped)
+
+        # ח11-ג: הפיצול - ארבע שורות (פתיח, יסומן+פעולות, אחרי ... יבוא, הנוסח).
+        if section_match and _SPLIT_HEAD_RE.search(stripped) and index + 3 < len(lines):
+            split = _parse_split(section_match, lines, index)
+            if split is not None:
+                plan.operations.extend(split)
+                index += 4
+                continue
 
         # מספור מחדש: הנוסח החדש יושב בשורה הבאה, כמו בהוספת יחידה.
         relabel_match = _RELABEL_RE.search(stripped)

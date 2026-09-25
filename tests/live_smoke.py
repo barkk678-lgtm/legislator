@@ -382,6 +382,41 @@ def journey_first_paragraph(base, res):
     res.check("אין כשל הוספה", not data.get("insertion_errors"), str(data.get("insertion_errors"))[:200])
 
 
+def journey_split_relabel(base, res):
+    """ח11-ג (26.9): התוכן הקיים מקבל תווית וגם משתנה - שתי הוראות. הדוגמה של
+    החוברת הסגולה עצמה (§7.10.6(ד), הערה): חוק רשות הספנות והנמלים, סעיף 6,
+    "בתחום פעולה" -> "בתחומי פעולה" + סעיף קטן (ב). עד כאן העריכה נבלעה בשקט."""
+    print("\n[1ו] פיצול לשתי הוראות")
+    body_id = "law-2001205/פרק ב/s6/p0"
+    _, body = _get(base, "/api/laws/law-2001205")
+    tree = json.loads(body)["tree"]
+    s6 = (_find_section(tree, "6") or {}).get("children", [{}])[0]
+    if s6.get("id") != body_id or "בתחום פעולה" not in s6.get("text", ""):
+        res.check("סעיף 6 בחוק רשות הספנות כמו בחוברת", False, str(s6)[:160])
+        return
+    new_text = "על אף הוראות סעיף קטן (א) לא יינתן רישיון לתקופה העולה על חמש שנים"
+    payload = {"edits": [{"node_id": body_id, "field": "text",
+                          "text": s6["text"].replace("בתחום פעולה", "בתחומי פעולה", 1)}],
+               "insertions": [{"kind": "subsection", "anchor_node_id": body_id, "text": new_text,
+                               "client_id": "live-split"}],
+               "bill": {"title": "", "initiator": "", "explanatory": []}}
+    status, body = _post(base, "/api/laws/law-2001205/render", payload)
+    data = json.loads(body) if status == 200 else {}
+    rows = [(ln.get("marker") or "", ln.get("text", "") + (ln.get("text_after") or ""))
+            for ln in data.get("lines", [])]
+    joined = " | ".join(f"{m} {t}" for m, t in rows)
+    res.check("פתיח: בסעיף 6 –", bool(rows) and rows[0][1].rstrip().endswith("בסעיף 6 –"), joined[:240])
+    res.check('(1) האמור בו יסומן "(א)", ובו, במקום "בתחום" יבוא "בתחומי";',
+              ("(1)", 'האמור בו יסומן "(א)", ובו, במקום "בתחום" יבוא "בתחומי";') in rows, joined[:240])
+    res.check("(2) אחרי סעיף קטן (א) יבוא:", ("(2)", "אחרי סעיף קטן (א) יבוא:") in rows, joined[:240])
+    res.check('"(ב) <הנוסח>" במרכאות', ("", f'"(ב) {new_text}".') in rows, joined[:240])
+    res.check("אין כשל עריכה או הוספה",
+              all(s.get("ok") for s in data.get("edit_statuses", [])) and not data.get("insertion_errors"),
+              str(data.get("edit_statuses"))[:160])
+    failed = [f for f in data.get("findings", []) if f.get("status") == "נכשל"]
+    res.check("בודק הניסוח - בלי בדיקה שנכשלה", not failed, str(failed)[:200])
+
+
 def journey_word_swap(base, res):
     """ח19 (26.9): החלפת סדר של שתי מילים ("אדם קייטנה" -> "קייטנה אדם")
     הפילה את /render (500, "השרת לא הצליח לעדכן"). עכשיו - עריכה שלא נקלטה,
@@ -697,6 +732,7 @@ def main():
     run("תיקון בסעיף קטן", journey_subsection_locator, base, res)
     run("החלפת סדר מילים", journey_word_swap, base, res)
     run("פסקה ראשונה בסעיף קטן", journey_first_paragraph, base, res)
+    run("פיצול לשתי הוראות", journey_split_relabel, base, res)
     run("הצעה לסדר - טופס", journey_agenda_form, base, res)
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)

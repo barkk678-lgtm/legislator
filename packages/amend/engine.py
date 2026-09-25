@@ -176,6 +176,10 @@ class _RelabelAndInsert:
     before_node: LegislativeNode
     relabeled_number: str
     new_node: LegislativeNode
+    # ח11-ג (26.9): התוכן הקיים גם השתנה - לא רק קיבל תווית. אז ההוראה
+    # מפוצלת לשתיים (§7.10.6(ד), הערה): "(1) האמור בו יסומן "(א)", ובו,
+    # במקום ... ; (2) אחרי סעיף קטן (א) יבוא:". None - הנוסח עבר כמו שהוא.
+    edit: "_Mutation | None" = None
 
     @property
     def node_id(self) -> str:
@@ -238,11 +242,21 @@ def _diff_section(before_section: LegislativeNode, after_section: LegislativeNod
                 f"(ha-hoveret-ha-sgula.pdf §7.10.6(ד)) - התקבל "
                 f"{new_child.number!r}."
             )
+        # ח11-ג: עד 26.9 הטקסט של התוכן הקיים לא הושווה כאן כלל - עריכה בו
+        # יחד עם הוספת הסעיף הקטן הראשון **נבלעה בשקט** ("האמור בו יסומן
+        # "(א)" ואחריו יבוא", בלי המילים שהוחלפו).
+        prior, relabeled = before_children[0], after_children[0]
+        if [c.text for c in prior.children] != [c.text for c in relabeled.children]:
+            raise NotImplementedError(
+                "תוכן שקיבל תווית '(א)' ושהשתנו היחידות שבתוכו - לא נתמך בכלי העריכה.")
+        edit = (_Mutation(before_node=prior, before_text=prior.text, after_text=relabeled.text)
+                if relabeled.text != prior.text else None)
         return [
             _RelabelAndInsert(
-                before_node=before_children[0],
+                before_node=prior,
                 relabeled_number=relabeled_number,
                 new_node=new_child,
+                edit=edit,
             )
         ]
 
@@ -330,8 +344,8 @@ def _first_paragraph_relabel(prior: LegislativeNode, child: LegislativeNode) -> 
 
     הניסוח - התקדים מהצעת חוק הממשלה 1924 (רשומות עמ' 676, פריט (8)):
     `בסעיף 34(א), האמור בו יסומן "(1)" ואחריו יבוא: "(2) ..."` - המקבילה
-    ברמת הסעיף הקטן של §7.10.6(ד). נבדק במפורש שהנוסח עבר **כמו שהוא**:
-    אם הוא גם השתנה, זה דפוס אחר (החוברת מפצלת אותו לשתי הוראות), לא זה."""
+    ברמת הסעיף הקטן של §7.10.6(ד). נוסח שעבר ל-(1) **וגם** השתנה (ח11-ג) -
+    edit, והמנסח מפצל לשתי הוראות (ראו _render_split_relabel)."""
     if prior.node_type != "subsection" or not prior.text or child.text:
         return None
     if any(c.is_normative for c in prior.children):
@@ -339,12 +353,12 @@ def _first_paragraph_relabel(prior: LegislativeNode, child: LegislativeNode) -> 
     kids = [c for c in child.children if c.is_normative]
     if len(kids) != 2 or kids[0].number != "(1)" or kids[1].number != "(2)":
         return None
-    if kids[0].text != prior.text:
+    if any(c.is_normative for c in kids[0].children):
         raise NotImplementedError(
-            "סעיף קטן שנוסחו הפך לפסקה (1) וגם השתנה - החוברת מפצלת זאת לשתי "
-            "הוראות (§7.10.6(ד), הערה) - לא נתמך בכלי העריכה."
-        )
-    return _RelabelAndInsert(before_node=prior, relabeled_number="(1)", new_node=kids[1])
+            "פסקה (1) שנוצרה מהסעיף הקטן קיבלה יחידות משלה - לא נתמך בכלי העריכה.")
+    edit = (_Mutation(before_node=prior, before_text=prior.text, after_text=kids[0].text)
+            if kids[0].text != prior.text else None)
+    return _RelabelAndInsert(before_node=prior, relabeled_number="(1)", new_node=kids[1], edit=edit)
 
 
 def _wrap_new_content(
@@ -609,6 +623,51 @@ def _render_relabel_and_insert(
 
 
 
+# התווית שהתוכן הקיים מקבל -> שם היחידה ב"אחרי ... יבוא:" של ההוראה השנייה.
+_RELABELED_UNIT_WORD = {"(א)": "סעיף קטן", "(1)": "פסקה"}
+
+
+def _render_split_relabel(
+    item: _RelabelAndInsert,
+    replacements: list[ReplacementAnnotation],
+    footnote: FootnoteAnnotation | None,
+    *,
+    markers: tuple[str, str],
+    terminator: str,
+    depth: int,
+) -> list[Line]:
+    """ח11-ג (26.9): התוכן הקיים מקבל תווית **וגם** משתנה - שתי הוראות.
+
+    מדריך משפטים §7.10.6(ד), עמ' 29 [PDF 58], ההערה:
+        "לעתים רוצים להוסיף סעיף קטן לסעיף שאינו כולל סעיפים קטנים וכן לתקן
+        את תוכן הסעיף הקיים. במקרה כזה יש לפצל את התיקון כלהלן:
+        בסעיף מס' הסעיף לחוק העיקרי -
+        (1) האמור בו יסומן "(א)", ובו, במקום "טקסט בסעיף הקיים" יבוא "טקסט חדש";
+        (2) אחרי סעיף קטן (א) יבוא:
+        "(ב) תוכן הסעיף הקטן החדש"."
+    כך גם ברשומות - הצעות חוק הממשלה 1924, עמ' 694 (סעיף 28א, ברמת הסעיף)
+    ועמ' 897 (בהגדרה: "(1) האמור בה יסומן כפסקה (1), ובה, ...; (3) אחרי
+    פסקה (1) יבוא:"). ברמת הסעיף הקטן - "(1)" ו"אחרי פסקה (1)", כמו
+    בתקדים של ח11-ב (עמ' 676, "בסעיף 34(א), האמור בו יסומן "(1)"").
+
+    מחזירה את שלוש השורות של הפריטים: שתי ההוראות והתוכן המצוטט. שורת
+    הפתיח (`בסעיף 6(א) לחוק העיקרי –`) - אצל הקורא: היא תלויה בהקשר.
+    markers: ("(1)", "(2)") בהוראה משלה; ("(א)", "(ב)") כתת-פריטים בתוך
+    פריט של הוראה של כמה פריטים (רשומות עמ' 672: "(3) בסעיף 10 - (א) האמור
+    בו יסומן "(א)", ובו, ...; (ב) בסופו יבוא:")."""
+    label = item.relabeled_number
+    body = _mutation_body(item.edit, replacements)
+    first = Line(marker=markers[0], depth=depth,
+                 text=f'האמור בו יסומן "{label}", ובו, {body[:-1]};')
+    second = Line(marker=markers[1], depth=depth,
+                  text=f"אחרי {_RELABELED_UNIT_WORD[label]} {label} יבוא:")
+    labeled = f"{item.new_node.number} {item.new_node.text}"
+    content_text, content_after, footnotes = _wrap_new_content(labeled, terminator, footnote)
+    content = Line(text=content_text, text_after=content_after, footnotes=footnotes,
+                   style="TableBlockOutdent", depth=depth)
+    return [first, second, content]
+
+
 def _container_suffix(section: LegislativeNode, node: LegislativeNode, *, inclusive: bool) -> str:
     """שרשרת ה"מכולה" שנוספת למספר הסעיף בכתובת ההוראה: `בסעיף 17(א)`,
     `בסעיף 5(א1)(1)`. ראו docs/drafting-rules.md §8.7.
@@ -776,6 +835,25 @@ def _render_mutation(
 
     כשהקיצור "(להלן – החוק העיקרי)" מוגדר באותה שורה, הוא לא משמש שוב
     בה: "בסעיף N," ולא "בסעיף N לחוק העיקרי," (ראו מקרה הזהב, סעיף 5)."""
+    body = prefix + _mutation_body(mutation, replacements)
+
+    if full_title is not None:
+        # ראו הערה מקבילה ב-_render_new_section: מראה המקום חייב לשבת
+        # מיד אחרי שם החוק, לפני "(להלן...".
+        return Line(
+            text=f"ב{full_title}",
+            text_after=f" (להלן – החוק העיקרי), בסעיף {section_number}, {body}",
+            footnotes=[law_footnote_key] if law_footnote_key else [],
+            depth=0,
+        )
+
+    text = f"בסעיף {section_number} לחוק העיקרי, {body}"
+    return Line(text=text, depth=0)
+
+
+def _mutation_body(mutation: _Mutation, replacements: list[ReplacementAnnotation]) -> str:
+    """גוף ההוראה על שינוי בנוסח קיים, עם הנקודה הסוגרת: `במקום "X" יבוא
+    "Y".`. משותף ל-_render_mutation ולפיצול של ח11-ג ("ובו, במקום ...")."""
     if replacements:
         # דפוס "החלפת מילים" ואחיו - הביטויים מגיעים מ-
         # ReplacementAnnotation, לא נגזרים מדיף.
@@ -805,20 +883,7 @@ def _render_mutation(
         # (§7.10.3) ו-`עד המילים`/`החל במילים` (ניב טווח) נשארים כפי
         # שהם - שם "המילים" היא הנושא הדקדוקי או חלק מניב קבוע.
         body = f'אחרי "{anchor}" יבוא "{inserted}".'
-    body = prefix + body
-
-    if full_title is not None:
-        # ראו הערה מקבילה ב-_render_new_section: מראה המקום חייב לשבת
-        # מיד אחרי שם החוק, לפני "(להלן...".
-        return Line(
-            text=f"ב{full_title}",
-            text_after=f" (להלן – החוק העיקרי), בסעיף {section_number}, {body}",
-            footnotes=[law_footnote_key] if law_footnote_key else [],
-            depth=0,
-        )
-
-    text = f"בסעיף {section_number} לחוק העיקרי, {body}"
-    return Line(text=text, depth=0)
+    return body
 
 
 _REMOVAL_WORDS = {
@@ -1285,6 +1350,26 @@ def amend(
             # ("בסעיף 6(א)", כמו בתקדים "בסעיף 34(א), האמור בו יסומן "(1)"").
             # ברמת הסעיף - התוכן הקיים בלי מספר, והסיומת ריקה.
             locator = number + _container_suffix(before_sec, item.before_node, inclusive=True)
+            if item.edit is not None:
+                # ח11-ג: פתיח עם מקף, ואחריו שתי ההוראות (_render_split_relabel).
+                if touched_count == 1:
+                    split_head = Line(
+                        text="ב" + (before.full_title or ""),
+                        text_after=f" (להלן – החוק העיקרי), בסעיף {locator} – ",
+                        footnotes=[law_footnote_key] if law_footnote_key else [],
+                        depth=0,
+                    )
+                else:
+                    split_head = Line(text=f"בסעיף {locator} לחוק העיקרי – ", depth=0)
+                split_head.side_heading = f"תיקון סעיף {number}"
+                split_head.number = f"{touched_count}."
+                split_lines = [split_head, *_render_split_relabel(
+                    item, replacements_by_id.get(item.node_id) or [], footnote,
+                    markers=("(1)", "(2)"), terminator=".", depth=0)]
+                for split_line in split_lines:
+                    _stamp_provenance(split_line, item.before_node, before)
+                lines.extend(split_lines)
+                continue
             if touched_count == 1:
                 relabel_lines = _render_relabel_and_insert(
                     locator, item, footnote,
@@ -1330,13 +1415,42 @@ def amend(
             _stamp_provenance(header, before_sections[number], before)
         lines.append(header)
 
+        # ח11-ג: המספור הסידורי אינו בהכרח i+1 - פיצול ברמת הסעיף תופס שני
+        # פריטים ברשימה (ראו למטה).
+        ordinal = 0
         for i, instruction in enumerate(instructions):
             # ח13: כל פריט - `(n)` + היחידה שבה הוא קורה, ו-";" עד האחרון.
             terminator = "." if i == len(instructions) - 1 else ";"
+            ordinal += 1
+            if isinstance(instruction, _RelabelAndInsert) and instruction.edit is not None:
+                node = instruction.before_node
+                footnote = footnotes_by_id.get(instruction.new_node.id)
+                found = replacements_by_id.get(instruction.node_id) or []
+                address = _item_address(before_sec, node, inclusive=True)
+                if address:
+                    # ברמת הסעיף הקטן: פריט עם מקף ותת-פריטים (א)/(ב) - רשומות
+                    # עמ' 672: "(3) בסעיף 10 - (א) האמור בו יסומן "(א)", ובו, ...".
+                    item_head = Line(marker=f"({ordinal})", depth=0,
+                                     text=address.rstrip(", ") + " – ")
+                    split_lines = [item_head, *_render_split_relabel(
+                        instruction, found, footnote, markers=("(א)", "(ב)"),
+                        terminator=terminator, depth=1)]
+                else:
+                    # ברמת הסעיף - הסעיף הוא כבר המכולה של הרשימה, ושתי ההוראות
+                    # הן פריטים שלה (כמו הפיצול בהגדרה, רשומות עמ' 897).
+                    split_lines = _render_split_relabel(
+                        instruction, found, footnote,
+                        markers=(f"({ordinal})", f"({ordinal + 1})"),
+                        terminator=terminator, depth=0)
+                    ordinal += 1
+                for split_line in split_lines:
+                    _stamp_provenance(split_line, node, before)
+                lines.extend(split_lines)
+                continue
             if isinstance(instruction, _Insertion):
                 footnote = footnotes_by_id.get(instruction.new_node.id)
                 insertion_lines = _render_insertion(
-                    instruction, terminator, ordinal=i + 1, footnote=footnote
+                    instruction, terminator, ordinal=ordinal, footnote=footnote
                 )
                 # המספור והמכולה - לכל פריט, לא רק ל"בסופו יבוא" (עד כאן
                 # פריטי "אחרי ... יבוא:" יצאו בלי מספר בקובץ, ובלי היחידה
@@ -1347,7 +1461,7 @@ def amend(
                         _item_address(before_sec, anchor_before, inclusive=False)
                         + _definition_clause(before_sec, anchor_before, inclusive=False)
                         + (insertion_lines[0].text or ""))
-                insertion_lines[0].marker = f"({i + 1})"
+                insertion_lines[0].marker = f"({ordinal})"
                 # instruction.anchor הוא צומת מעץ ה"אחרי" (ראו _diff_section) -
                 # provenance צריך את המקבילה שלו ב"לפני" בפועל, כדי ש-
                 # effective_as_of יוכל לטפס מהשורש האמיתי. אם העוגן עצמו הוכנס
@@ -1369,7 +1483,7 @@ def amend(
                 node = instruction.before_node
                 footnote = footnotes_by_id.get(instruction.new_node.id)
                 relabel_lines = _render_relabel_and_insert(number, instruction, footnote)
-                _as_item(relabel_lines[0], i + 1,
+                _as_item(relabel_lines[0], ordinal,
                          _item_address(before_sec, node, inclusive=True), terminator)
                 labeled = f"{instruction.new_node.number} {instruction.new_node.text}"
                 (relabel_lines[1].text, relabel_lines[1].text_after,
@@ -1381,7 +1495,7 @@ def amend(
                 found = replacements_by_id.get(instruction.node_id) or []
                 title_line = _render_margin_title_mutation(
                     number, instruction, found[0] if found else None)
-                _as_item(title_line, i + 1, "", terminator)
+                _as_item(title_line, ordinal, "", terminator)
                 _stamp_provenance(title_line, instruction.before_node, before)
                 lines.append(title_line)
             elif isinstance(instruction, _Removal):
@@ -1389,7 +1503,7 @@ def amend(
                 removal_line = _render_removal(
                     number, instruction,
                     prefix=_definition_clause(before_sec, node, inclusive=False))
-                _as_item(removal_line, i + 1,
+                _as_item(removal_line, ordinal,
                          _item_address(before_sec, node, inclusive=False), terminator)
                 _stamp_provenance(removal_line, node, before)
                 lines.append(removal_line)
@@ -1399,7 +1513,7 @@ def amend(
                 mutation_line = _render_mutation(
                     number, instruction, replacement,
                     prefix=_definition_clause(before_sec, node, inclusive=True))
-                _as_item(mutation_line, i + 1,
+                _as_item(mutation_line, ordinal,
                          _item_address(before_sec, node, inclusive=True), terminator)
                 _stamp_provenance(mutation_line, node, before)
                 lines.append(mutation_line)
