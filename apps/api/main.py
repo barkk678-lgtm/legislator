@@ -54,6 +54,7 @@ from knesset_citations import OdataError, citations_for_law  # noqa: E402
 from knesset_queries import (  # noqa: E402
     GENERIC_CAP as QUERY_GENERIC_CAP,
     FeedBlockedError,
+    mk_gender,
     current_knesset,
     default_knesset_nums,
     enrich,
@@ -1103,7 +1104,7 @@ def api_query_export(req: QueryExportRequestIn):
         "body": req.body,
     }
     out_path = Path(tempfile.mkstemp(suffix=".docx")[1])
-    write_query_docx(query, skeleton=SKELETON, out=out_path)
+    write_query_docx(query, out=out_path, gender=mk_gender(req.mk_name))
     return FileResponse(
         out_path,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

@@ -36,7 +36,6 @@ from service import (  # noqa: E402
     draft,
     draft_conversation,
 )
-from simple_doc import write_simple_docx  # noqa: E402
 
 QueryKind = Literal["רגילה", "דחופה", "ישירה"]
 
@@ -349,21 +348,19 @@ def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: s
     }
 
 
-def write_query_docx(query: dict, *, skeleton: Path, out: Path) -> Path:
-    """**הקובץ מכיל את מה שחבר הכנסת מגיש, ולא תבנית מומצאת** (ב2).
+def write_query_docx(query: dict, *, out: Path, gender: str | None = None) -> Path:
+    """**הקובץ נראה כמו שאילתה אמיתית של הכנסת** (ש1, 25.9.2026) - נבנה
+    על שלד של שאילתה אמיתית, ראו packages/render/query_doc.py.
 
-    עד 22.9.2026 נכתבה כאן כותרת מזכר - "אל: השר X", "מאת: Y, חבר/ת
-    הכנסת", "נושא: Z" - שלוש שורות ש**אינן קיימות באף שאילתה
-    אמיתית** (נבדקו שבע, reference/sheiltot). הכנסת מרכיבה בעצמה את
-    שורת "חבר הכנסת X שאל את השר Y ביום..." אחרי ההגשה והאישור.
-
-    מה שכן נשאר: הכותרת "שאילתה {kind}" ושורת הנושא, כי הן מה
-    שמזהה את הקובץ אצל מי שמגיש אותו - אבל הן מחוץ לגוף, ולא
-    בתוכו."""
-    return write_simple_docx(
-        title=f"שאילתה {query['kind']}",
-        meta_lines=[query["subject"]],
-        paragraphs=[ln for ln in (query["body"] or "").split("\n") if ln.strip()],
-        skeleton=skeleton,
+    ב2 (22.9.2026) הוציא מכאן את שורות המזכר המומצאות ("אל:", "מאת:").
+    ש1 מחזיר את שורת "חבר הכנסת X שאל את Y" - **היא כן מופיעה בכל שש
+    הדוגמאות**, מתחת לנושא ובקו תחתון. מה שהכנסת מוסיפה בעצמה - המספר,
+    התאריך העברי והמועד האחרון לתשובה - לא נכנס."""
+    from query_doc import asker_line, write_query_docx_knesset  # noqa: PLC0415
+    return write_query_docx_knesset(
+        kind=query["kind"],
+        subject=query["subject"],
+        asker=asker_line(query.get("mk_name") or "", query.get("minister") or "", gender),
+        body=query["body"] or "",
         out=out,
     )

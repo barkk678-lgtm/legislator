@@ -401,6 +401,38 @@ def _person_names(person_ids: list[int]) -> dict[int, str]:
     return names
 
 
+_gender_cache: tuple[float, dict[str, set[str]]] | None = None
+_GENDER_TTL = 24 * 3600
+
+
+def mk_gender(full_name: str) -> str | None:
+    """"זכר"/"נקבה" מ-`KNS_Person.GenderDesc` לפי **התאמה מדויקת של השם
+    המלא** בין המכהנים (ש1, 25.9.2026) - לשורת "חבר/חברת הכנסת X
+    שאל/שאלה" בקובץ השאילתה.
+
+    **לא מסיקים מגדר מהשם.** אין התאמה, יש שתי התאמות במגדר שונה, או
+    שהפיד לא זמין -> None, והקובץ כותב את הצורה הכפולה. קריאה אחת
+    לפיד ליום (כל המכהנים, בעימוד), לא קריאה לכל ייצוא."""
+    global _gender_cache
+    name = " ".join((full_name or "").split())
+    if not name:
+        return None
+    if not _gender_cache or time.time() - _gender_cache[0] > _GENDER_TTL:
+        try:
+            rows = fetch("KNS_Person", filter="IsCurrent eq true",
+                         select="FirstName,LastName,GenderDesc")
+        except OdataError:
+            return None
+        by_name: dict[str, set[str]] = {}
+        for r in rows:
+            full = " ".join(f"{r.get('FirstName') or ''} {r.get('LastName') or ''}".split())
+            if full and r.get("GenderDesc") in ("זכר", "נקבה"):
+                by_name.setdefault(full, set()).add(r["GenderDesc"])
+        _gender_cache = (time.time(), by_name)
+    found = _gender_cache[1].get(name, set())
+    return next(iter(found)) if len(found) == 1 else None
+
+
 def _document_links(query_ids: list[int]) -> dict[int, str]:
     """קישור לקובץ המקורי של כל שאילתה. `KNS_DocumentQuery` מחזיר
     מערך חשוף עם מפתחות camelCase (ראו odata.fetch_raw_array), ולכן
@@ -549,5 +581,5 @@ def search_queries(q: str, *, limit: int = 12, expand_fn=None, run_fn=None) -> d
 
 
 __all__ = ["FeedBlockedError", "OdataError", "current_knesset", "default_knesset_nums",
-           "domain_match", "enrich", "expand_query", "feed_filter", "page_url", "run_unit",
+           "domain_match", "enrich", "mk_gender", "expand_query", "feed_filter", "page_url", "run_unit",
            "search_queries", "unit_budget"]

@@ -309,6 +309,37 @@ def test_expansion_failure_has_empty_domain():
     assert plan["domain"] == [] and plan["expanded"] is False
 
 
+# ── ש1: המגדר של חבר הכנסת - מהמאגר, לא מהשם ────────────────────
+def test_mk_gender_exact_name_match_only():
+    people = [{"FirstName": "עדי", "LastName": "עזוז", "GenderDesc": "נקבה"},
+              {"FirstName": "יוראי", "LastName": "להב הרצנו", "GenderDesc": "זכר"},
+              {"FirstName": "נועם", "LastName": "כהן", "GenderDesc": "זכר"},
+              {"FirstName": "נועם", "LastName": "כהן", "GenderDesc": "נקבה"}]
+    original = with_fetch(lambda *a, **k: people)
+    kq._gender_cache = None
+    try:
+        assert kq.mk_gender("עדי עזוז") == "נקבה"
+        assert kq.mk_gender("  יוראי   להב הרצנו ") == "זכר"
+        assert kq.mk_gender("עזוז") is None, "שם חלקי אינו התאמה"
+        assert kq.mk_gender("נועם כהן") is None, "שני מגדרים לאותו שם -> לא מנחשים"
+        assert kq.mk_gender("") is None
+    finally:
+        kq.fetch = original
+        kq._gender_cache = None
+
+
+def test_mk_gender_feed_failure_is_none():
+    def boom(*a, **k):
+        raise OdataError("474")
+    original = with_fetch(boom)
+    kq._gender_cache = None
+    try:
+        assert kq.mk_gender("עדי עזוז") is None
+    finally:
+        kq.fetch = original
+        kq._gender_cache = None
+
+
 for name, fn in sorted(list(globals().items())):
     if name.startswith("test_"):
         fn()

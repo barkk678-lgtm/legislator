@@ -105,10 +105,11 @@ def main():
             "subject": "זמני המתנה במוקד 100",
             "body": "האם נבדקו זמני ההמתנה הממוצעים במוקד 100 בשנה האחרונה?",
         }
-        out = write_query_docx(query, skeleton=SKELETON, out=Path("/tmp") / "test_query_tool_output.docx")
+        out = write_query_docx(query, out=Path("/tmp") / "test_query_tool_output.docx")
         d = docx.Document(str(out))
         texts = [p.text for p in d.paragraphs]
-        passed = any("שאילתה רגילה" in t for t in texts) and any(query["subject"] in t for t in texts) and any(
+        # רגילה = "שאילתה" לבדה (ש1: כך בכל שש הדוגמאות)
+        passed = any(t.strip() == "שאילתה" for t in texts) and any(query["subject"] in t for t in texts) and any(
             query["body"] in t for t in texts
         )
         ok = ok and passed

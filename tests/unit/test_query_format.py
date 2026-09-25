@@ -80,13 +80,16 @@ def test_instructions_forbid_inventing_a_source():
 
 
 def test_docx_has_no_memo_header():
+    """אל:/מאת: - לא. שורת "חבר הכנסת X שאל את Y" - **כן** (ש1, 25.9.2026):
+    היא מופיעה בכל שש הדוגמאות של הכנסת ה-25, מתחת לנושא."""
     out = Path("/tmp/_q_fmt.docx")
-    qt.write_query_docx(draft(), skeleton=ROOT / "reference" / "skeleton-pshia.docx", out=out)
+    qt.write_query_docx(draft(), out=out, gender="זכר")
     with zipfile.ZipFile(out) as z:
         xml = z.read("word/document.xml").decode("utf-8")
     text = re.sub(r"<[^>]+>", "", xml)
-    for forbidden in ("אל: השר", "מאת:", "חבר/ת הכנסת"):
+    for forbidden in ("אל: השר", "מאת:"):
         assert forbidden not in text, f"נמצאה שורת מזכר: {forbidden}"
+    assert "חבר הכנסת ברק שאל את לביטחון לאומי" in text
     assert "רצוני לשאול:" in text
     out.unlink()
 
