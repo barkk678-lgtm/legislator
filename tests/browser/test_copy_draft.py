@@ -73,6 +73,9 @@ def main() -> int:
         results.append(("הצעה לסדר - שורה לכל חלק", text.split("\n")[0] == "הצעה לסדר היום"
                         and "\nאבקש לדון בנושא במליאה." in text, repr(text)))
 
+        # ס1: הכפתור הכחול "העתקה" בפינה ירד - האייקון בהודעה הוא ההעתקה
+        results.append(("ס1: בלי הכפתור הכחול 'העתקה' בהצעה לסדר", page.locator("#agenda-copy-btn").count() == 0, ""))
+
         # הודעה בלי נוסח - כל ההודעה, עם שבירות השורה
         page.evaluate("""() => appendMsg(document.getElementById('agenda-chat'), 'a', 'שורה ראשונה<br>שורה שנייה')""")
         text = copied(page, "#agenda-chat")

@@ -2195,7 +2195,6 @@ let currentAgendaDraft = null;
 let agendaTurns = [];   // ס2: לשיחות השמורות - כמו queryTurns
 
 function renderAgendaDraft(chat, data) {
-  document.getElementById("agenda-copy-btn").disabled = false;
   return appendMsg(
     chat,
     "a",
@@ -2286,7 +2285,6 @@ const agendaHistory = mountConvHistory({
     agendaTurns = [];
     agendaTopicHistory = [];
     currentAgendaDraft = null;
-    document.getElementById("agenda-copy-btn").disabled = true;
     document.getElementById("agenda-chat").innerHTML = "";
     document.getElementById("agenda-composer-input").focus();
   },
@@ -2295,21 +2293,8 @@ const agendaHistory = mountConvHistory({
 document.getElementById("agenda-send-btn").addEventListener("click", sendAgendaMessage);
 bindComposer(document.getElementById("agenda-composer-input"), sendAgendaMessage);
 
-document.getElementById("agenda-copy-btn").addEventListener("click", async () => {
-  if (!currentAgendaDraft) return;
-  const text =
-    `הצעה לסדר היום - ${currentAgendaDraft.subject}\n\n` +
-    `${currentAgendaDraft.reasoning}\n\n${currentAgendaDraft.request_text}\n\n${currentAgendaDraft.mk_name}`;
-  try {
-    await navigator.clipboard.writeText(text);
-    const btn = document.getElementById("agenda-copy-btn");
-    const original = btn.textContent;
-    btn.textContent = "הועתק!";
-    setTimeout(() => { btn.textContent = original; }, 1500);
-  } catch (e) {
-    appendMsg(document.getElementById("agenda-chat"), "err", "ההעתקה נכשלה - יש להעתיק ידנית.");
-  }
-});
+// ס1 (26.9.2026): הכפתור הכחול "העתקה" בפינה ירד - אייקון ההעתקה בהודעה (צ6)
+// מעתיק את הנוסח.
 
 /* ═══ ת7 + ס2 (26.9.2026): היסטוריית שיחות - רכיב אחד לשלושת הצ'אטים ═══
  * מה שנבנה לשאילתות (ב4, ש5) - כפתור "היסטוריה" עם רשימה צפה, חיפוש,
