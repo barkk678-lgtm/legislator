@@ -28,6 +28,7 @@ _STOPWORDS = {"חוק", "הצעת", "הצעה", "תיקון", "מס", "מספר"
               "הוראת", "שעה", "של", "את", "על", "לתיקון", "התשפ", "התשפב", "התשפג"}
 
 _STATUS_PASSED = 118  # התקבלה בקריאה שלישית
+_ID_CHUNK = 150  # מזהים ב-`in (...)` אחד - 200 עובר בפיד, 400 נשבר
 
 
 # שנה לועזית (1990, 2026) ושנה עברית על כל הטיותיה. **שתיהן
@@ -91,8 +92,14 @@ def _attach_initiators(bills: list[dict]) -> None:
 
     **שתי קריאות בסך הכול, לא אחת לכל הצעה:** הראשונה מביאה את כל
     שיוכי-היוזמים של ההצעות שכבר נבחרו, והשנייה את שמות האנשים.
-    הסינון הוא `BillID eq A or BillID eq B ...` כי ל-OData של הכנסת
-    אין `in`.
+
+    **`in (...)` ולא שרשרת `or`** (132, 26.9.2026): הפיד דוחה 25 תנאי
+    `or` ומעלה (מגבלת מורכבות, נמדד ב-knesset_citations). השמות נשלפו
+    במנות של 40 `Id eq X or ...`, ועשר הצעות פרטיות עם הרבה חותמים עברו
+    את המגבלה - כל עשר התוצאות הוצגו "לא הצלחתי לבדוק את היוזמים". שוחזר
+    באתר החי ("הגנת הצרכן (תיקון – עסקה ברוכלות)": 10/10, שלוש פעמים).
+    `in` עובר עם 200 מזהים (knesset_citations), וסוגר אחד בלבד - הרחק
+    מחומת האש (4 סוגריים ומעלה, ש2).
 
     **כישלון כאן אינו מפיל את התוצאה.** שמות היוזמים הם תוספת נוחות;
     אם הפיד לא החזיר אותם, ההצעות הדומות עדיין מוצגות עם כל השאר.
@@ -111,23 +118,23 @@ def _attach_initiators(bills: list[dict]) -> None:
         ids = [b["bill_id"] for b in bills if b.get("bill_id")]
         if not ids:
             return
-        clause = " or ".join(f"BillID eq {int(i)}" for i in ids)
-        links = fetch("KNS_BillInitiator", filter=f"({clause}) and IsInitiator eq true",
-                      select="BillID,PersonID,Ordinal", top=200)
+        clause = "BillID in (" + ",".join(str(int(i)) for i in ids) + ")"
+        links = fetch("KNS_BillInitiator", filter=f"{clause} and IsInitiator eq true",
+                      select="BillID,PersonID,Ordinal", top=500)
         if not links:
             return
         person_ids = sorted({row["PersonID"] for row in links if row.get("PersonID")})
         people: dict[int, str] = {}
-        # חלוקה למנות - שאילתה עם מאות תנאי `or` נדחית על ידי השרת.
-        for start in range(0, len(person_ids), 40):
-            chunk = person_ids[start:start + 40]
+        # מנות של 150, כמו ב-knesset_citations (200 עובר, 400 נשבר).
+        for start in range(0, len(person_ids), _ID_CHUNK):
+            chunk = person_ids[start:start + _ID_CHUNK]
             # **המפתח ב-KNS_Person הוא `Id`, לא `PersonID`** - זה
             # השם ב-KNS_BillInitiator בלבד. `$select=PersonID` על
             # KNS_Person מחזיר 400, והשגיאה נבלעה ב-except שלמטה
             # והתבטאה כ"אין יוזמים" בלי שום סימן. אומת מול הפיד.
-            person_clause = " or ".join(f"Id eq {int(p)}" for p in chunk)
+            person_clause = "Id in (" + ",".join(str(int(p)) for p in chunk) + ")"
             for row in fetch("KNS_Person", filter=person_clause,
-                             select="Id,FirstName,LastName", top=200):
+                             select="Id,FirstName,LastName", top=_ID_CHUNK):
                 name = f"{row.get('FirstName') or ''} {row.get('LastName') or ''}".strip()
                 if name:
                     people[row["Id"]] = name
