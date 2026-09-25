@@ -2188,9 +2188,13 @@ async function searchPastQueries() {
     // מילה אחת אינה מזהה נושא, גם כשהיא נושאית בפני עצמה.
     // מילה בודדת = איבר אחד בלי רווח בתוכו. ["מצוקת הדיור"] הוא
     // צירוף שנשלח כרצף אחד, לא מילה בודדת.
-    // רחב מדרג בלבד - אלא אם יש תחום: אחרי הסינון הוא כבר צר (ש4).
-    const rankOnly = unit.rankOnly || (data.too_broad && !domain.length) ||
-      (unit.words.length === 1 && !unit.words[0].trim().includes(" "));
+    // רחב ומילה בודדת מדרגים בלבד - אלא אם יש שני היבטים ומעלה (ש4):
+    // אז כל שורה נבדקת על תופעה + גוף, ו"שוטר" לבדה רשאית לספק את
+    // כותרות המשטרה שיש בהן מחסור. חייב להיות זהה ל-search_queries.
+    const strict = domain.length >= 2;
+    const single = unit.words.length === 1 && !unit.words[0].trim().includes(" ");
+    const rankOnly = unit.rankOnly ||
+      (!strict && ((data.too_broad && !domain.length) || single));
     // המכסה לפי מה שנשאר אחרי התחום: "זיהום אוויר" (116) אחרי סינון
     // לחיפה הוא צירוף צר, לא רחב.
     const rows = (data.rows || []).filter((r) => pqDomainMatch(r.title, domain));

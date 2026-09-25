@@ -358,6 +358,55 @@ def test_broad_unit_supplies_rows_once_the_domain_narrows_it():
     assert [r["title"] for r in out["results"]] == titles[:2], out["results"]
 
 
+# ── ש4, סבב 3: התופעה כהיבט; שליפה לפי הגוף ────────────────────────
+def test_single_word_supplies_rows_when_two_facets_check_every_row():
+    """"שוטר" לבדה: כל כותרות המשטרה - ומהן רק מה שיש בו גם מחסור."""
+    titles = ["דוח מבקר המדינה מצביע על חוסר תקנים משטרתיים באגף התנועה",
+              "ירידה עקבית באיכות השוטרים וחשש מהורדת תנאי הקבלה",
+              "מחסור בכוח אדם רפואי במרכז הרפואי לגליל"]
+    plan = {"expanded": True,
+            "domain": [["מחסור", "חוסר", "תקנ", "כוח אדם"], ["משטר", "שוטר"]],
+            "units": [{"words": ["שוטר"], "kind": "domain"}]}
+    def run(words):
+        return {"words": words, "count": 3, "too_broad": False,
+                "rows": [{"query_id": i, "title": t, "person_id": None} for i, t in enumerate(titles)]}
+    original = kq.enrich
+    kq.enrich = lambda ids, persons: {"docs": {}, "names": {}}
+    try:
+        out = kq.search_queries("מחסור בשוטרים", expand_fn=lambda q: plan, run_fn=run)
+    finally:
+        kq.enrich = original
+    assert [r["title"] for r in out["results"]] == titles[:1], out["results"]
+
+
+def test_single_word_still_ranks_only_with_one_facet():
+    plan = {"expanded": True, "domain": [["משטר", "שוטר"]],
+            "units": [{"words": ["שוטר"], "kind": "phrase"}]}
+    run = lambda words: {"words": words, "count": 1, "too_broad": False,
+                         "rows": [{"query_id": 1, "title": "ירידה באיכות השוטרים", "person_id": None}]}
+    original = kq.enrich
+    kq.enrich = lambda ids, persons: {"docs": {}, "names": {}}
+    try:
+        out = kq.search_queries("שוטרים", expand_fn=lambda q: plan, run_fn=run)
+    finally:
+        kq.enrich = original
+    assert out["results"] == [], out["results"]
+
+
+def test_expand_adds_units_from_the_body_facet():
+    import json as _json
+    reply = _json.dumps({"domain": [["מחסור", "חוסר"], ["משטר", "שוטר", "מג\"ב"]],
+                         "phrases": [["מחסור", "שוטר"]], "alternatives": []}, ensure_ascii=False)
+    original = kq.draft
+    kq.draft = lambda **k: reply
+    try:
+        plan = kq.expand_query("מחסור בשוטרים")
+    finally:
+        kq.draft = original
+    words = [u["words"] for u in plan["units"]]
+    assert ["משטר"] in words and ["שוטר"] in words, words
+
+
 # ── ש1: המגדר של חבר הכנסת - מהמאגר, לא מהשם ────────────────────
 def test_mk_gender_exact_name_match_only():
     people = [{"FirstName": "עדי", "LastName": "עזוז", "GenderDesc": "נקבה"},
