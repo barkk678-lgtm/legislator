@@ -520,6 +520,18 @@ def journey_rules_citations(base, res):
     res.check("גם הטקסט הסופי נקי", "[מקור:" not in (done.get("text") or ""))
 
 
+def journey_rules_interpretation(base, res):
+    """ת6 (26.9): הפרשנות שברק הזין - "הכותרת והנושא אינם נספרים" - נטענת
+    בתוך סעיף 49 והתשובה מפנה אליו, לא למקור נפרד."""
+    print("\n[6ג] מומחה התקנון - פרשנות שלפיה נוהגים")
+    streamed, done = _rules_stream(base, "האם הכותרת נספרת במגבלת המילים בשאילתה דחופה?")
+    text = done.get("text") or streamed
+    res.check("התשובה: הכותרת לא נספרת", text.lstrip().startswith("לא") or "אינם נספרים" in text,
+              text[:90])
+    res.check("מפנה לסעיף 49", "law-tkanon-haknesset/49" in (done.get("cited_ids") or []),
+              str(done.get("cited_ids")))
+
+
 def journey_chat_smalltalk(base, res):
     """ת4 + ת5 (25.9): מחמאה קיבלה תשובה חמה - ואז שומר הציטוט החליף
     אותה ב"לא מצאתי תשובה". עכשיו הסיווג קודם לתשובה."""
@@ -652,6 +664,7 @@ def main():
     if args.with_llm:
         run("כלי הצ'אט", journey_chat, base, res)
         run("מומחה התקנון - מקורות", journey_rules_citations, base, res)
+        run("מומחה התקנון - פרשנות", journey_rules_interpretation, base, res)
         if edited:
             run("דברי ההסבר ברקע", journey_explanatory, base, res, *edited)
         run("צ'אטבוטים - חולין וקללה", journey_chat_smalltalk, base, res)
