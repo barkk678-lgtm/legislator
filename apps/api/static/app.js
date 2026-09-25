@@ -1399,21 +1399,14 @@ async function sendQueryMessage() {
       return;
     }
     currentQueryDraft = data;
+    // ש3: הטיוטה נשמרת עם התור - כדי ששיחה שנפתחת מחדש תציג אותה
+    // בדיוק כמו עכשיו, כולל אייקון הוורד.
     queryTurns.push({
       role: "assistant",
       content: `נושא: ${currentQueryDraft.subject}\nגוף: ${currentQueryDraft.body}`,
+      draft: { ...currentQueryDraft },
     });
-    // ב3 - אייקון הייצוא יושב **על ההודעה עצמה**, ורק על הודעה
-    // שהיא שאילתה מנוסחת. הודעת שגיאה, סירוב או הודעה רגילה אינן
-    // מקבלות אותו - אין מה לייצא מהן.
-    const bubble = appendMsg(
-      chat,
-      "a",
-      `ניסחתי טיוטה לפי הפורמט המקובל.` +
-        `<div class="draft"><div class="to">שאילתה ${escapeHtml(currentQueryDraft.kind)} ${escapeHtml(minister)}</div>` +
-        `${escapeHtml(currentQueryDraft.body)}${wordCountHtml(currentQueryDraft.word_count, currentQueryDraft.word_limit)}${currentQueryDraft.removed_addressee ? `<div class="word-count">הוסרה פנייה לנמען מתחילת הגוף (${escapeHtml(currentQueryDraft.removed_addressee)}) — הנמען נקבע בשדה ומוזרק למסמך</div>` : ""}</div>`
-    );
-    attachQueryExport(bubble, { ...currentQueryDraft });
+    renderQueryDraft(chat, currentQueryDraft);
     // ב5 - **החיפוש רץ מעצמו, ואינו מעכב את הניסוח.** הטיוטה כבר
     // על המסך; זה יוצא לדרך אחריה ומופיע כשהוא מוכן.
     autoSearchPastQueries(currentQueryDraft.subject || text);
@@ -1457,6 +1450,33 @@ async function exportQueryDraft(draft, btn) {
   }
 }
 
+// ב3 - אייקון הייצוא יושב **על ההודעה עצמה**, ורק על הודעה שהיא
+// שאילתה מנוסחת. הודעת שגיאה, סירוב או הודעה רגילה אינן מקבלות אותו -
+// אין מה לייצא מהן. **פונקציה אחת לטיוטה חיה ולטיוטה משיחה שנפתחה
+// מחדש** (ש3): עד כאן openConv הציג את התור כטקסט גולמי, בלי אייקון -
+// ומכאן "לפעמים האייקון לא מופיע".
+function renderQueryDraft(chat, draft) {
+  const bubble = appendMsg(
+    chat,
+    "a",
+    `ניסחתי טיוטה לפי הפורמט המקובל.` +
+      `<div class="draft"><div class="to">שאילתה ${escapeHtml(draft.kind || "")} ${escapeHtml(draft.minister || "")}</div>` +
+      `${escapeHtml(draft.body || "")}${draft.word_count != null ? wordCountHtml(draft.word_count, draft.word_limit) : ""}${draft.removed_addressee ? `<div class="word-count">הוסרה פנייה לנמען מתחילת הגוף (${escapeHtml(draft.removed_addressee)}) — הנמען נקבע בשדה ומוזרק למסמך</div>` : ""}</div>`
+  );
+  attachQueryExport(bubble, { ...draft });
+  return bubble;
+}
+
+// שיחה ששמורה מלפני ש3 - התור של הטיוטה בלי השדה draft. טיוטה, ורק
+// טיוטה, נשמרה בצורה "נושא: ...\nגוף: ..." (סירוב וחולין נשמרים כטקסט).
+function draftFromTurn(turn, conv) {
+  if (turn.draft) return turn.draft;
+  const m = /^נושא: ([^\n]*)\nגוף: ([\s\S]*)$/.exec(turn.content || "");
+  if (!m) return null;
+  return { kind: conv.kind || "רגילה", minister: conv.minister || "", mk_name: conv.mk || "",
+           subject: m[1], body: m[2] };
+}
+
 function attachQueryExport(bubble, draft) {
   const btn = document.createElement("button");
   btn.className = "msg-action";
@@ -1468,7 +1488,11 @@ function attachQueryExport(bubble, draft) {
     '<path d="M14 3v5h5"/><path d="M9 13l1.5 4L12 13l1.5 4L15 13"/></svg>';
   btn.addEventListener("click", () => exportQueryDraft(draft, btn));
   bubble.classList.add("has-action");
-  bubble.appendChild(btn);
+  // **בראש הבועה, ליד אייקון ההעתקה** (ש3). float משמאל עובד רק על מה
+  // שבא לפני הטקסט: appendChild שם אותו אחרי תיבת הטיוטה - משמאל, אבל
+  // 231px מתחת לראש ההודעה (נמדד בדפדפן).
+  const copy = bubble.querySelector(":scope > .msg-copy");
+  if (copy) copy.after(btn); else bubble.prepend(btn);
 }
 
 // --- הצעות לסדר ---
@@ -1641,7 +1665,9 @@ function openConv(id) {
   const chat = document.getElementById("query-chat");
   chat.innerHTML = "";
   for (const t of queryTurns) {
-    if (t.role === "user") appendMsg(chat, "u", escapeHtml(t.content));
+    if (t.role === "user") { appendMsg(chat, "u", escapeHtml(t.content)); continue; }
+    const draft = draftFromTurn(t, conv);
+    if (draft) { currentQueryDraft = draft; renderQueryDraft(chat, draft); }
     else appendMsg(chat, "a", escapeHtml(t.content).replace(/\n/g, "<br>"));
   }
   renderConvs();
