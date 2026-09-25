@@ -1847,10 +1847,20 @@ const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8"
   '<path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
 const COPIED_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
 
+/* צ6 (26.9.2026): **בהודעה עם נוסח - רק הנוסח.** לא "ניסחתי טיוטה לפי
+ * הפורמט המקובל" ולא מונה המילים; בהודעה בלי נוסח - ההודעה. הטקסט נקרא
+ * מהאלמנט שבדף ולא מעותק: innerText של עותק מנותק מתנהג כמו textContent
+ * ומאבד את שבירות השורה (<br>, <div>) - עד כאן כך הועתקו כל ההודעות. */
 function messageText(bubble) {
-  const clone = bubble.cloneNode(true);
-  clone.querySelectorAll(".msg-copy, .msg-action").forEach((b) => b.remove());
-  return clone.innerText.trim();
+  const source = bubble.querySelector(".draft") || bubble;
+  const hidden = [...source.querySelectorAll(".msg-copy, .msg-action, .word-count")];
+  const prev = hidden.map((el) => el.style.display);
+  hidden.forEach((el) => { el.style.display = "none"; });
+  try {
+    return source.innerText.replace(/\n{3,}/g, "\n\n").trim();
+  } finally {
+    hidden.forEach((el, i) => { el.style.display = prev[i]; });
+  }
 }
 
 function addCopyAction(bubble) {
