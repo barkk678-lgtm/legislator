@@ -1216,13 +1216,116 @@ function appendThinking(container, label) {
   return div;
 }
 
+/* ═══ שכבה משותפת לכל הצ'אטבוטים (ברק, 25.9.2026) ═══
+ * כל חלון צ'אט - תקנון, שאילתות, הצעות לסדר, ומה שיתווסף - עובר דרך
+ * appendMsg / followStream / bindComposer. צ'אטבוט חדש מקבל את כל
+ * ההתנהגות הזו אוטומטית, בלי להעתיק אותה.
+ *
+ * צ2 - אייקון העתקה בפינה הימנית העליונה של כל תשובה, sticky: בהודעה
+ *      ארוכה שגוללים בה הוא נשאר גלוי. אייקון הוורד (ש3) בפינה השמאלית.
+ * צ1 - גלילה: תשובה שארוכה מהחלון נעצרת על **ראש** ההודעה. הקורא לא
+ *      קורא בקצב שהמודל כותב. רק אם המשתמש גלל למטה בעצמו - ממשיכים
+ *      לעקוב אחרי הסוף.
+ * צ3 - Shift+Enter יורד שורה, Enter לבד שולח. */
+
+const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/>' +
+  '<path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
+const COPIED_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
+
+function messageText(bubble) {
+  const clone = bubble.cloneNode(true);
+  clone.querySelectorAll(".msg-copy, .msg-action").forEach((b) => b.remove());
+  return clone.innerText.trim();
+}
+
+function addCopyAction(bubble) {
+  const btn = document.createElement("button");
+  btn.className = "msg-copy";
+  btn.type = "button";
+  btn.title = "העתקה";
+  btn.setAttribute("aria-label", "העתקת ההודעה");
+  btn.innerHTML = COPY_ICON;
+  btn.addEventListener("click", async () => {
+    const text = messageText(bubble);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // clipboard API חסום (http, הרשאה) - נסיגה ל-execCommand
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove();
+    }
+    btn.innerHTML = COPIED_ICON; btn.title = "הועתק";
+    setTimeout(() => { btn.innerHTML = COPY_ICON; btn.title = "העתקה"; }, 1500);
+  });
+  bubble.prepend(btn);
+}
+
+function scrollToBottom(container) {
+  container.scrollTop = container.scrollHeight;
+  container._lastAutoScroll = container.scrollTop;
+}
+
+// מציג הודעה שהגיעה בשלמותה: אם היא נכנסת בחלון - לתחתית; אם היא
+// ארוכה ממנו - ראש ההודעה בראש החלון (צ1).
+function revealMessage(container, bubble) {
+  if (bubble.offsetHeight <= container.clientHeight - 24) {
+    scrollToBottom(container);
+    return;
+  }
+  const delta = bubble.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
+  container.scrollTop += delta;
+  container._lastAutoScroll = container.scrollTop;
+}
+
+// מעקב אחרי הודעה מוזרמת (צ1). update() אחרי כל קטע.
+function followStream(container, bubble) {
+  let follow = false;           // המשתמש גלל לתחתית בעצמו
+  let userMoved = false;        // המשתמש גלל - לא זזים עד שיחזור לתחתית
+  const onScroll = () => {
+    if (Math.abs(container.scrollTop - (container._lastAutoScroll ?? -1)) <= 2) return; // אנחנו גללנו
+    userMoved = true;
+    follow = container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+  };
+  container.addEventListener("scroll", onScroll);
+  return {
+    update() {
+      if (follow) { scrollToBottom(container); return; }
+      if (userMoved) return;
+      revealMessage(container, bubble);
+    },
+    stop() { container.removeEventListener("scroll", onScroll); },
+  };
+}
+
 function appendMsg(container, cls, html) {
   const div = document.createElement("div");
   div.className = `msg ${cls}`;
   div.innerHTML = html;
   container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
+  if (cls === "a") {
+    addCopyAction(div);
+    revealMessage(container, div);
+  } else {
+    scrollToBottom(container);
+  }
   return div;
+}
+
+// צ3: Enter שולח, Shift+Enter יורד שורה. השדה גדל עם הטקסט עד 6 שורות.
+function bindComposer(input, send) {
+  const grow = () => {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 160) + "px";
+  };
+  input.addEventListener("input", grow);
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" || ev.shiftKey || ev.isComposing) return;
+    ev.preventDefault();
+    send();
+  });
+  // אחרי שליחה הקוד מרוקן את value ומנטרל/מפעיל את השדה - מחזירים גובה
+  new MutationObserver(grow).observe(input, { attributes: true, attributeFilter: ["disabled"] });
 }
 
 function wordCountHtml(wordCount, wordLimit) {
@@ -1323,9 +1426,7 @@ async function sendQueryMessage() {
 }
 
 document.getElementById("query-send-btn").addEventListener("click", sendQueryMessage);
-document.getElementById("query-composer-input").addEventListener("keydown", (ev) => {
-  if (ev.key === "Enter") sendQueryMessage();
-});
+bindComposer(document.getElementById("query-composer-input"), sendQueryMessage);
 
 async function exportQueryDraft(draft, btn) {
   const original = btn ? btn.getAttribute("title") : "";
@@ -1429,9 +1530,7 @@ async function sendAgendaMessage() {
 }
 
 document.getElementById("agenda-send-btn").addEventListener("click", sendAgendaMessage);
-document.getElementById("agenda-composer-input").addEventListener("keydown", (ev) => {
-  if (ev.key === "Enter") sendAgendaMessage();
-});
+bindComposer(document.getElementById("agenda-composer-input"), sendAgendaMessage);
 
 document.getElementById("agenda-copy-btn").addEventListener("click", async () => {
   if (!currentAgendaDraft) return;
@@ -1614,13 +1713,14 @@ async function sendRulesMessage() {
   hideRulesExamples();
 
   const thinking = appendThinking(chat, "קורא את התקנון…");
-  let bubble = null, body = null, acc = "";
+  let bubble = null, body = null, acc = "", follower = null;
   const ensureBubble = () => {
     if (bubble) return;
     thinking.remove();
     bubble = appendMsg(chat, "a", "");
     body = document.createElement("span");
     bubble.appendChild(body);
+    follower = followStream(chat, bubble);
   };
 
   try {
@@ -1655,7 +1755,7 @@ async function sendRulesMessage() {
           ensureBubble();
           acc += ev.delta;
           body.textContent = acc;
-          chat.scrollTop = chat.scrollHeight;
+          follower.update();   // צ1 - לא scrollHeight בכל קטע
         } else if (ev.done) {
           done = ev.done;
         } else if (ev.error) {
@@ -1693,6 +1793,7 @@ async function sendRulesMessage() {
     if (bubble) bubble.remove();
     appendMsg(chat, "err", "החיבור נקטע לפני שהתשובה הושלמה. נסו שוב.");
   } finally {
+    if (follower) follower.stop();
     thinking.remove();
     input.disabled = false;
     input.focus();
@@ -1700,9 +1801,7 @@ async function sendRulesMessage() {
 }
 
 document.getElementById("rules-send-btn").addEventListener("click", sendRulesMessage);
-document.getElementById("rules-composer-input").addEventListener("keydown", (ev) => {
-  if (ev.key === "Enter") sendRulesMessage();
-});
+bindComposer(document.getElementById("rules-composer-input"), sendRulesMessage);
 
 /* החיפוש הסמנטי הוסר (ברק, 25.9.2026 - ביצועים, ערך למשתמש).
  * הקוד בענף archive/semantic-search-v1; ראו DECISION_HISTORY. */

@@ -602,19 +602,31 @@ select { font-weight: 600; max-width: 420px; }
 }
 
 
-/* --- אייקון פעולה על הודעת צ'אט (ב3) --- */
-.msg.has-action { position: relative; padding-inline-start: 38px; }
-.msg-action {
-  position: absolute; inset-inline-start: 8px; top: 8px;
+/* --- אייקונים על הודעת צ'אט ---
+   צ2: העתקה בפינה הימנית העליונה, ש3: וורד בפינה השמאלית העליונה.
+   **sticky ולא absolute:** בהודעה ארוכה שגוללים בה, האייקון נשאר
+   בראש החלון ולא צריך לגלול לסוף כדי להגיע אליו. float כדי שהטקסט
+   יזרום סביבו ולא מתחתיו. */
+.msg-copy, .msg-action {
+  position: sticky; top: 6px; z-index: 1;
   width: 26px; height: 26px; padding: 4px; border-radius: 6px;
   border: 1px solid var(--rule); background: var(--page);
   cursor: pointer; display: grid; place-items: center;
+  margin-bottom: 4px;
 }
-.msg-action:hover { border-color: var(--flag); background: var(--tint); }
+.msg-copy { float: right; margin-left: 10px; }
+.msg-action { float: left; margin-right: 10px; }
+.msg-copy:hover, .msg-action:hover { border-color: var(--flag); background: var(--tint); }
 .msg-action:disabled { opacity: .5; cursor: default; }
-.msg-action svg {
+.msg-copy svg, .msg-action svg {
   width: 16px; height: 16px; fill: none; stroke: var(--flag);
   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* צ3: שדה ההקלדה הוא textarea - Shift+Enter יורד שורה */
+textarea.composer-input {
+  resize: none; overflow-y: auto; min-height: 38px; max-height: 160px;
+  line-height: 24px; font-family: inherit;
 }
 
 
