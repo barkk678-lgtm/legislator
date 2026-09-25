@@ -395,6 +395,18 @@ def journey_rules_citations(base, res):
     res.check("גם הטקסט הסופי נקי", "[מקור:" not in (done.get("text") or ""))
 
 
+def journey_chat_smalltalk(base, res):
+    """ת4 + ת5 (25.9): מחמאה קיבלה תשובה חמה - ואז שומר הציטוט החליף
+    אותה ב"לא מצאתי תשובה". עכשיו הסיווג קודם לתשובה."""
+    print("\n[6ב] שיחת חולין וקללה - בלי החלפה")
+    streamed, done = _rules_stream(base, "אתה נהדר כל הכבוד!")
+    res.check("מחמאה: תשובה חמה שלא מוחלפת", bool(streamed.strip()) and done.get("refused") is False,
+              done.get("refusal_reason") or streamed[:60])
+    streamed, done = _rules_stream(base, "אתה מטומטם")
+    res.check("קללה: 'נא להתבטא בכבוד'", "בכבוד" in streamed and done.get("refused") is False,
+              streamed[:60])
+
+
 def journey_chat(base, res):
     print("\n[6] כלי הצ'אט")
     status, body = _post(base, "/api/rules/ask",
@@ -511,6 +523,7 @@ def main():
     if args.with_llm:
         run("כלי הצ'אט", journey_chat, base, res)
         run("מומחה התקנון - מקורות", journey_rules_citations, base, res)
+        run("צ'אטבוטים - חולין וקללה", journey_chat_smalltalk, base, res)
     else:
         print("\n(דילוג על כלי ה-LLM - הרץ עם --with-llm)")
 

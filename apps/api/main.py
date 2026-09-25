@@ -70,6 +70,30 @@ from rules_expert import (  # noqa: E402
     CitationHumanizer as RulesCitationHumanizer,
 )
 from service import LLMConfigError, LLMRequestError  # noqa: E402
+from chat_layer import (  # noqa: E402 - ת4+ת5: שכבה משותפת לכל הצ'אטבוטים
+    chitchat_reply as chat_chitchat_reply,
+    chitchat_reply_stream as chat_chitchat_reply_stream,
+    preflight as chat_preflight,
+)
+
+# מה כל צ'אטבוט יודע לעשות - לתשובת חולין ("אני כאן בשביל...").
+_CHAT_TOOLS = {
+    "rules": ("מומחה התקנון", "שאלות על תקנון הכנסת, חוק הכנסת וחוק-יסוד: הכנסת"),
+    "query": ("מנסח השאילתות", "ניסוח שאילתה לשר בפורמט המקובל"),
+    "agenda": ("מנסח ההצעות לסדר", "ניסוח הצעה לסדר היום"),
+}
+
+
+def _chat_side_reply(tool: str, text: str) -> tuple[str, str] | None:
+    """(kind, reply) להודעת חולין או עלבון; None לשאלה עניינית -
+    שממשיכה לכלי עצמו, עם כל השומרים שלו. ראו chat_layer."""
+    pf = chat_preflight(text)
+    if pf.kind == "insult":
+        return pf.kind, pf.reply
+    if pf.kind == "chitchat":
+        name, can_do = _CHAT_TOOLS[tool]
+        return pf.kind, chat_chitchat_reply(text, tool=name, can_do=can_do)
+    return None
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "config"))
 from env_file import MissingSecret  # noqa: E402
 from semantic_search import (  # noqa: E402
@@ -1055,6 +1079,9 @@ def api_query_draft(req: QueryDraftRequestIn) -> dict:
         # שיחה בת תור אחד. הלקוח שלנו שולח turns.
         turns = ([tn.model_dump() for tn in req.turns]
                  or [{"role": "user", "content": req.topic_description}])
+        side = _chat_side_reply("query", turns[-1].get("content", "") if turns else "")
+        if side:
+            return {"chat_reply": side[1], "chat_kind": side[0]}
         return draft_query(turns=turns, kind=req.kind,
                            minister=req.minister, mk_name=req.mk_name)
     except QueryDraftError as e:
@@ -1086,6 +1113,11 @@ def api_query_export(req: QueryExportRequestIn):
 
 @app.post("/api/agenda/draft")
 def api_agenda_draft(req: AgendaDraftRequestIn) -> dict:
+    # הלקוח שולח את כל ההיסטוריה מודבקת; מסווגים רק את ההודעה האחרונה.
+    last = (req.topic_description or "").strip().split("\n")[-1]
+    side = _chat_side_reply("agenda", last)
+    if side:
+        return {"chat_reply": side[1], "chat_kind": side[0]}
     try:
         return draft_agenda(topic_description=req.topic_description, mk_name=req.mk_name)
     except AgendaDraftError as e:
@@ -1100,6 +1132,10 @@ def api_agenda_draft(req: AgendaDraftRequestIn) -> dict:
 
 @app.post("/api/rules/ask")
 def api_rules_ask(req: RulesAskRequestIn) -> dict:
+    side = _chat_side_reply("rules", req.question)
+    if side:
+        return {"text": side[1], "refused": False, "refusal_reason": None,
+                "cited_sources": [], "chat_kind": side[0]}
     try:
         result = rules_expert_ask(req.question)
     except RulesExpertError as e:
@@ -1129,6 +1165,25 @@ def api_rules_ask_stream(req: RulesAskRequestIn) -> StreamingResponse:
         # המשתמש רואה "(תקנון הכנסת, סעיף 52)". תג שנחתך בין שני קטעים
         # נשמר בחוצץ עד שהוא נסגר - ראו rules_expert.CitationHumanizer.
         humanizer = RulesCitationHumanizer()
+        # ת4+ת5: סיווג **לפני** התשובה. חולין מוזרם בלי שומר ציטוט - אין
+        # לו מקור ולא צריך להיות; עלבון מקבל תשובה קבועה. רק שאלה
+        # עניינית מגיעה לשומר, בדיוק כפי שהוא.
+        pf = chat_preflight(req.question)
+        if pf.kind != "substantive":
+            if pf.kind == "insult":
+                reply = pf.reply
+                yield json.dumps({"delta": reply}, ensure_ascii=False) + "\n"
+            else:
+                name, can_do = _CHAT_TOOLS["rules"]
+                parts = []
+                for piece in chat_chitchat_reply_stream(req.question, tool=name, can_do=can_do):
+                    parts.append(piece)
+                    yield json.dumps({"delta": piece}, ensure_ascii=False) + "\n"
+                reply = "".join(parts).strip()
+            yield json.dumps({"done": {"text": reply, "refused": False, "refusal_reason": None,
+                                       "cited_sources": [], "chat_kind": pf.kind}},
+                             ensure_ascii=False) + "\n"
+            return
         try:
             for piece in rules_expert_stream(req.question):
                 if isinstance(piece, str):

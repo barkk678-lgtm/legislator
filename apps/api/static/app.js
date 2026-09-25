@@ -1286,7 +1286,16 @@ async function sendQueryMessage() {
       appendMsg(chat, "err", escapeHtml(detail));
       return;
     }
-    currentQueryDraft = await resp.json();
+    const data = await resp.json();
+    // ת4+ת5: חולין או עלבון - תשובה רגילה, בלי טיוטה ובלי אייקון וורד.
+    // היא נכנסת להיסטוריה כתור של המודל, כמו כל תשובה.
+    if (data.chat_reply) {
+      queryTurns.push({ role: "assistant", content: data.chat_reply });
+      appendMsg(chat, "a", escapeHtml(data.chat_reply));
+      saveCurrentConv();
+      return;
+    }
+    currentQueryDraft = data;
     queryTurns.push({
       role: "assistant",
       content: `נושא: ${currentQueryDraft.subject}\nגוף: ${currentQueryDraft.body}`,
@@ -1394,7 +1403,15 @@ async function sendAgendaMessage() {
       appendMsg(chat, "err", escapeHtml(err.detail || "שגיאה בניסוח ההצעה."));
       return;
     }
-    currentAgendaDraft = await resp.json();
+    const data = await resp.json();
+    // ת4+ת5: חולין/עלבון אינם נושא להצעה - יוצאים מההיסטוריה שנשלחת
+    // בפעם הבאה, אחרת "תודה" הייתה נדבקת לנושא ההצעה הבאה.
+    if (data.chat_reply) {
+      agendaTopicHistory.pop();
+      appendMsg(chat, "a", escapeHtml(data.chat_reply));
+      return;
+    }
+    currentAgendaDraft = data;
     document.getElementById("agenda-copy-btn").disabled = false;
     appendMsg(
       chat,
