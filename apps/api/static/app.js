@@ -2649,14 +2649,24 @@ function linkifyRulesCitations(el) {
   if (!rulesDocs || el.dataset.linked) return [];
   const names = rulesDocs.map((d) => d.name).sort((a, b) => b.length - a.length);
   const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(${names.map((n) => esc(escapeHtml(n))).join("|")}), סעיף (\\d+[א-ת]?)`, "g");
+  // ת9: גם רצף מאותו מקור - "תקנון הכנסת סעיף 56, סעיף 57 וסעיף 60" -
+  // כל "סעיף N" לחיץ בנפרד. הראשון נושא את שם המקור.
+  const SEC = "סעיף (\\d+[א-ת]?)";
+  const re = new RegExp(`(${names.map((n) => esc(escapeHtml(n))).join("|")}),? (סעיף \\d+[א-ת]?(?:(?:, | ו)סעיף \\d+[א-ת]?)*)`, "g");
   const found = [];
-  el.innerHTML = el.innerHTML.replace(re, (m, name, num) => {
+  el.innerHTML = el.innerHTML.replace(re, (m, name, run) => {
     const doc = rulesDocs.find((d) => escapeHtml(d.name) === name);
-    const id = `${doc.law_id}/${num}`;
-    if (!rulesSectionById(id)[1]) return m;
-    found.push(id);
-    return `<a class="rules-cite" data-sec="${escapeHtml(id)}" role="button" tabindex="0">${m}</a>`;
+    const head = m.slice(0, m.length - run.length);   // "תקנון הכנסת, " / "תקנון הכנסת "
+    let first = true;
+    const linked = run.replace(new RegExp(SEC, "g"), (secText, num) => {
+      const id = `${doc.law_id}/${num}`;
+      const text = first ? head + secText : secText;
+      first = false;
+      if (!rulesSectionById(id)[1]) return text;
+      found.push(id);
+      return `<a class="rules-cite" data-sec="${escapeHtml(id)}" role="button" tabindex="0">${text}</a>`;
+    });
+    return linked;
   });
   el.dataset.linked = "1";
   return found;

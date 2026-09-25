@@ -190,6 +190,20 @@ def test_reading_items_ids_match_cited_source_ids():
     assert s2["title"], s2
 
 
+
+def test_consecutive_citations_from_one_source_are_grouped():
+    """ת9 (26.9.2026): "תקנון הכנסת סעיף 56, סעיף 57, סעיף 59 וסעיף 60" -
+    בלי לחזור על שם המקור. מקור שונה באמצע מתחיל קבוצה חדשה."""
+    saved = rx._sources_cache
+    rx._sources_cache = SRC + [SourceChunk(id=f"law-tkanon-haknesset/{n}", label=f"תקנון הכנסת, סעיף {n}", text="-")
+                               for n in (56, 57, 59, 60)]
+    tags = "".join(f"[מקור:law-tkanon-haknesset/{n}]" for n in (56, 57, 59, 60))
+    out = rx.humanize_citations(f"כך {tags}.")
+    assert out == "כך (תקנון הכנסת סעיף 56, סעיף 57, סעיף 59 וסעיף 60).", out
+    out = rx.humanize_citations("כך [מקור:law-tkanon-haknesset/56][מקור:law-tkanon-haknesset/57][מקור:law-2000325/12].")
+    assert out == "כך (תקנון הכנסת סעיף 56 וסעיף 57; חוק הכנסת, סעיף 12).", out
+    rx._sources_cache = saved
+
 for name, fn in sorted(list(globals().items())):
     if name.startswith("test_"):
         fn()

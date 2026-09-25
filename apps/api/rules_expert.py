@@ -112,9 +112,39 @@ def humanize_citations(text: str) -> str:
 
     def repl(m: re.Match) -> str:
         labels = [by_id[i.strip()] for i in _TAG_ONE.findall(m.group(0)) if i.strip() in by_id]
-        return f" ({'; '.join(dict.fromkeys(labels))})" if labels else ""
+        return f" ({group_citation_labels(list(dict.fromkeys(labels)))})" if labels else ""
 
     return _TAG_RUN.sub(repl, text)
+
+
+_SECTION_SEP = ", סעיף "
+
+
+def group_citation_labels(labels: list[str]) -> str:
+    """ת9 (26.9.2026): אזכורים רצופים מאותו מקור - בלי לחזור על שם המקור:
+    "תקנון הכנסת סעיף 56, סעיף 57, סעיף 59 וסעיף 60" (הנוסח של ברק). מקור
+    אחד עם סעיף אחד - כמו שהיה ("תקנון הכנסת, סעיף 52"); מקורות שונים -
+    מופרדים ב-"; ". כל "סעיף N" נשאר לחיץ בנפרד (linkifyRulesCitations)."""
+    groups: list[tuple[str, list[str]]] = []
+    for label in labels:
+        source, sep, number = label.partition(_SECTION_SEP)
+        if not sep:
+            groups.append((label, []))
+            continue
+        if groups and groups[-1][0] == source and groups[-1][1]:
+            groups[-1][1].append(number)
+        else:
+            groups.append((source, [number]))
+    out = []
+    for source, numbers in groups:
+        if not numbers:
+            out.append(source)
+        elif len(numbers) == 1:
+            out.append(f"{source}{_SECTION_SEP}{numbers[0]}")
+        else:
+            secs = [f"סעיף {n}" for n in numbers]
+            out.append(f"{source} {', '.join(secs[:-1])} ו{secs[-1]}")
+    return "; ".join(out)
 
 
 class CitationHumanizer:

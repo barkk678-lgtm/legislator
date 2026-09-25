@@ -747,9 +747,9 @@ button.undo-btn svg {
 .rules-unit { margin: 2px 0; }
 .rules-unit .lbl { color: var(--soft); margin-inline-end: 4px; }
 .rules-sec.rules-hit { background: #FFF4CC; box-shadow: inset -3px 0 0 #E0A800; }
-a.rules-cite { color: var(--flag); text-decoration: underline; text-decoration-style: dotted;
-  text-underline-offset: 3px; cursor: pointer; }
-a.rules-cite:hover { text-decoration-style: solid; }
+/* ת8 (26.9.2026): בלי קו מקווקו - הכחול מספיק. */
+a.rules-cite { color: var(--flag); text-decoration: none; cursor: pointer; }
+a.rules-cite:hover, a.rules-cite:focus { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ש13: "?" משמאל לכנסת הוותיקה ביותר - למה אין כנסות קודמות */
 .pq-knesset-help {
