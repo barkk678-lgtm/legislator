@@ -759,3 +759,8 @@ a.rules-cite:hover, a.rules-cite:focus { text-decoration: underline; text-underl
   cursor: help; vertical-align: middle;
 }
 .pq-knesset-help:hover, .pq-knesset-help:focus { color: var(--ink, #222); border-color: var(--soft); }
+
+/* ת6: פרשנות שלפיה נוהגים בכנסת, מתחת לסעיף */
+.rules-interp { margin-top: 6px; padding: 6px 10px; border-inline-start: 3px solid var(--flag);
+  background: var(--page); font-size: 0.95em; }
+.rules-interp .lbl { display: block; font-size: 12px; font-weight: 700; color: var(--flag); margin-bottom: 2px; }

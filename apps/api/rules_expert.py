@@ -79,6 +79,10 @@ _EXTRA_INSTRUCTIONS = (
     "אל תוסיף סימון.\n"
     # ת1 (25.9.2026): התשובה נפתחה ב"# ההבדל בין..." ו"## הצעה לסדר היום",
     # עם 7 זוגות **. הממשק מציג טקסט ולא Markdown, וסולמית היא רעש.
+    # ת6: הפרשנות נטענת בתוך הסעיף שהיא משויכת אליו.
+    "חלק מהסעיפים כוללים בסופם \"פרשנות שלפיה נוהגים בכנסת\". זו פרשנות "
+    "מוסמכת של אותו סעיף: כשאתה נשען עליה, אזכר את הסעיף עצמו (אותו תג "
+    "מקור), ואמור שזו הפרשנות שלפיה נוהגים בכנסת.\n"
     "צורת התשובה: פסקאות רגילות. **בלי כותרות ובלי סימן #.** מותר להדגיש "
     "מונח מרכזי אחד או שניים ב-**כך**, לא יותר."
 )
@@ -192,12 +196,62 @@ def _tokenize(text: str) -> set[str]:
     return {w for w in _WORD_RE.findall(text.lower()) if len(w) > 1}
 
 
+# ── ת6 (26.9.2026): פרשנות שלפיה נוהגים בכנסת ──────────────────────────
+# קובץ שברק מזין (reference/takanon/interpretations.md). כל רשומה משויכת
+# לסעיף אמיתי: הנוסח שלה נטען **בתוך** המקור של הסעיף, ולכן המודל מאזכר את
+# הסעיף עצמו ושומר הציטוט בודק מול סעיף אמיתי, בלי מזהה חדש.
+INTERPRETATIONS_PATH = Path(__file__).resolve().parents[2] / "reference" / "takanon" / "interpretations.md"
+_ENTRY_HEAD = re.compile(r"^##\s+(\S+)\s*$")
+_FIELD = re.compile(r"^(יחידה|נוסף|פרשנות):\s*(.*)$")
+
+
+def load_interpretations(path: Path | None = None) -> list[dict]:
+    """[{"source_id", "unit", "added", "text"}] לפי סדר הקובץ. רק מה שמתחת
+    לקו ה-"---" הראשון נחשב רשומה (מעליו - ההסבר והדוגמה)."""
+    path = path or INTERPRETATIONS_PATH
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    _, sep, body = raw.partition("\n---\n")
+    if not sep:
+        return []
+    entries: list[dict] = []
+    cur: dict | None = None
+    in_text = False
+    for line in body.splitlines():
+        head = _ENTRY_HEAD.match(line)
+        if head:
+            cur = {"source_id": head.group(1), "unit": "", "added": "", "text": ""}
+            entries.append(cur)
+            in_text = False
+            continue
+        if cur is None or line.strip().startswith("<!--"):
+            continue
+        field = _FIELD.match(line.strip())
+        if field and not in_text:
+            key = {"יחידה": "unit", "נוסף": "added", "פרשנות": "text"}[field.group(1)]
+            cur[key] = field.group(2).strip()
+            in_text = key == "text"
+        elif in_text and line.strip():
+            cur["text"] = f"{cur['text']} {line.strip()}".strip()
+    return [e for e in entries if e["text"]]
+
+
+def _interpretation_note(entry: dict) -> str:
+    where = f" (לסעיף קטן {entry['unit']})" if entry["unit"] else ""
+    return f"פרשנות שלפיה נוהגים בכנסת{where}: {entry['text']}"
+
+
 def _load_sources() -> list[SourceChunk]:
     """כל סעיף בשלושת החוקים הופך ל-SourceChunk מועמד (לא עדיין
     מדורג) - id ייחודי (law_id/section_number), label קריא, text
     מלא (כולל צאצאים, ראו chunking.collect_text - אותו הליכת-עץ
     בדיוק כמו ה-chunking ל-embeddings, שימוש חוזר לא שכפול)."""
     candidates: list[SourceChunk] = []
+    notes: dict[str, list[str]] = {}
+    for entry in load_interpretations():
+        notes.setdefault(entry["source_id"], []).append(_interpretation_note(entry))
     for law_id in SOURCE_LAW_IDS:
         try:
             root = load_law(law_id)
@@ -208,8 +262,11 @@ def _load_sources() -> list[SourceChunk]:
             text = collect_text(section)
             if not text:
                 continue
+            sid = f"{law_id}/{number}"
+            if sid in notes:
+                text = text + "\n" + "\n".join(notes[sid])
             label = f"{law_title}, סעיף {number}"
-            candidates.append(SourceChunk(id=f"{law_id}/{number}", label=label, text=text))
+            candidates.append(SourceChunk(id=sid, label=label, text=text))
     return candidates
 
 
@@ -253,6 +310,10 @@ def reading_items(root, law_id: str) -> list[dict]:
     {"kind": "section", "id", "number", "title", "text", "units"}."""
     anchors = {id(node): number for number, node in find_sections(root).items()}
     items: list[dict] = []
+    notes: dict[str, list[dict]] = {}
+    for entry in load_interpretations():
+        notes.setdefault(entry["source_id"], []).append(
+            {"unit": entry["unit"], "added": entry["added"], "text": entry["text"]})
 
     def walk(node):
         if node.node_type == "section":
@@ -264,6 +325,7 @@ def reading_items(root, law_id: str) -> list[dict]:
                 "title": node.margin_title or "",
                 "text": node.text or "",
                 "units": _unit_lines(node),
+                "interpretations": notes.get(f"{law_id}/{number}", []) if number is not None else [],
             })
             return
         if node is not root and node.node_type in _HEADING_TYPES:

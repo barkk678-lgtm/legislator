@@ -2595,9 +2595,13 @@ function showRulesDoc(lawId) {
     if (it.kind === "heading") return `<h3>${escapeHtml(it.text)}</h3>`;
     const units = it.units.map((u) => `<div class="rules-unit" style="padding-inline-start:${u.depth * 18}px">` +
       (u.label ? `<span class="lbl">${escapeHtml(u.label)}</span>` : "") + escapeHtml(u.text) + "</div>").join("");
+    // ת6: פרשנות שלפיה נוהגים בכנסת - מתחת לסעיף שהיא משויכת אליו.
+    const interp = (it.interpretations || []).map((x) => `<div class="rules-interp">` +
+      `<span class="lbl">פרשנות שלפיה נוהגים בכנסת${x.unit ? ` · ${escapeHtml(x.unit)}` : ""}</span>` +
+      `${escapeHtml(x.text)}</div>`).join("");
     return `<div class="rules-sec"${it.id ? ` data-sec="${escapeHtml(it.id)}"` : ""}>` +
       `<div class="rules-sec-head"><span class="num">${escapeHtml(it.number)}.</span>${escapeHtml(it.title)}</div>` +
-      (it.text ? `<div class="rules-unit">${escapeHtml(it.text)}</div>` : "") + units + "</div>";
+      (it.text ? `<div class="rules-unit">${escapeHtml(it.text)}</div>` : "") + units + interp + "</div>";
   }).join("");
   box.scrollTop = 0;
 }
