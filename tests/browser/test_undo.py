@@ -128,6 +128,8 @@ def main() -> int:
         menu.locator(".insert-margin-title-input").fill("סעיף בדיקה")
         menu.locator(".insert-text-input").fill("תוכן הסעיף החדש.")
         menu.locator(".insert-submit-btn").click()
+        # ההוספה לא מציגה "מעדכן..." - מחכים לסעיף עצמו (באתר החי התשובה איטית)
+        page.wait_for_selector(".node.inserted", timeout=20000)
         settle(page)
         added = page.locator(".node.inserted").count()
         page.keyboard.press("Control+z")
@@ -137,6 +139,7 @@ def main() -> int:
                         and not any("סעיף בדיקה" in x for x in lines(page))
                         and page.evaluate("() => insertions.length === 0"), f"{added} / {lines(page)}"))
         page.keyboard.press("Control+y")
+        page.wait_for_selector(".node.inserted", timeout=20000)
         settle(page)
         results.append(("Ctrl+Y - הסעיף החדש חוזר", page.locator(".node.inserted").count() == 1,
                         str(page.locator(".node.inserted").count())))

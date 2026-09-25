@@ -302,6 +302,21 @@ def journey_basic_law_search(base, res):
                   hits[0].get("title") if hits else "אפס תוצאות")
 
 
+def journey_rules_reading(base, res):
+    """ת3 (25.9): התקנון פתוח לקריאה לצד הצ'אט. שלושת המקורות, ובתקנון -
+    סעיף 52 במזהה שהמודל מצטט (law-tkanon-haknesset/52); אחרת תגית או
+    אזכור בתשובה לא מגיעים לשום מקום."""
+    print("\n[1ב] התקנון לקריאה")
+    _, body = _get(base, "/api/rules/reading")
+    docs = json.loads(body).get("docs") or []
+    names = [d.get("name") for d in docs]
+    res.check("שלושת המקורות", names == ["תקנון הכנסת", "חוק הכנסת", "חוק-יסוד: הכנסת"], str(names))
+    secs = {i.get("id"): i for d in docs for i in d.get("items", []) if i.get("kind") == "section"}
+    s52 = secs.get("law-tkanon-haknesset/52") or {}
+    res.check("תקנון הכנסת, סעיף 52 - במזהה המקור, עם כותרת ויחידות",
+              bool(s52.get("title")) and len(s52.get("units") or []) >= 3, str(s52)[:120])
+
+
 def journey_query_docx(base, res):
     """הלקוח מוריד שאילתה כקובץ Word. הייצוא עצמו בלי LLM - חינמי."""
     print("\n[2א] הורדת שאילתה כקובץ Word")
@@ -518,6 +533,7 @@ def main():
         run("הורדת Word", journey_docx, base, res, law_id, payload)
         run("פרסומי החוק", journey_citations, base, res, law_id)
     run("חיפוש חוק יסוד", journey_basic_law_search, base, res)
+    run("התקנון לקריאה", journey_rules_reading, base, res)
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)
     if args.with_llm:
