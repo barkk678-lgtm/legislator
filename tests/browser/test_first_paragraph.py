@@ -28,6 +28,7 @@ def main() -> int:
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(BASE)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
         page.evaluate("onLawChange('law-2000037')")
         page.wait_for_selector(f'.node[data-node-id="{UNIT}"]', timeout=60000)
 

@@ -21,6 +21,7 @@ def main() -> int:
         b = p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
         page = b.new_page(viewport={"width": 1400, "height": 900})
         page.goto(BASE)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
         page.evaluate(f"onLawChange('{LAW}')")
         el = page.locator(f'.node-text[data-node-id="{LAW}/s2/p0"]')
         el.wait_for(timeout=20000)

@@ -34,6 +34,7 @@ def main() -> int:
         # 1. התפריט שורד רענון שחוזר בזמן שהוא פתוח
         page = b.new_page()
         page.goto(BASE)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
         page.evaluate(f"onLawChange('{LAW}')")
         page.wait_for_selector(f'.node-text[data-node-id="{LAW}/s2/p0"]', timeout=20000)
         page.route("**/render", lambda r: (time.sleep(RENDER_DELAY), r.continue_()))
@@ -63,6 +64,7 @@ def main() -> int:
         # 2. סעיף ראשי בלי כותרת שוליים - הודעה גלויה, לא פוקוס שקט
         page = b.new_page()
         page.goto(BASE)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
         page.evaluate(f"onLawChange('{LAW}')")
         page.wait_for_selector(f'.node-text[data-node-id="{LAW}/s2/p0"]', timeout=20000)
         w = page.locator(f'#law-tree .node[data-node-id="{LAW}/s2"]').first

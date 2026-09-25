@@ -24,8 +24,10 @@ def main() -> int:
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(BASE)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
         page.evaluate("() => { try { localStorage.clear(); } catch (e) {} }")
         page.reload()
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
 
         # ח20 - לפני שנבחר חוק, והחלונית סגורה
         st = page.evaluate("""() => { const b = document.getElementById('draft-new-btn');

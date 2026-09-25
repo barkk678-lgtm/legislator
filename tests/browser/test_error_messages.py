@@ -44,6 +44,7 @@ def main() -> int:
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(BASE)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
         page.evaluate(f"onLawChange('{K}')")
         page.wait_for_selector(S2, timeout=20000)
         orig = page.evaluate(f"() => fieldOriginal(document.querySelector('{S2}'))")

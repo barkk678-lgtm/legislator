@@ -14,8 +14,15 @@
 
   <nav class="rail">
     <div class="brand"><img src="/static/logo.webp" alt="Legislator AI – ארגז הכלים הפרלמנטרי" width="2000" height="727"></div>
-    <div class="nav">
-      <button class="on" data-t="bills"><span class="ico">§</span>הצעות חוק</button>
+    <!-- דף הבית (27.9.2026): אורח רואה רק הרשמה/כניסה, בלי פריטי ניווט -->
+    <div class="rail-guest" id="rail-guest" hidden>
+      <a class="btn-mint" href="/auth/signup">הרשמה</a>
+      <div class="rail-login">כבר רשומים? <a href="/auth/login">כניסה</a></div>
+    </div>
+    <div class="nav" id="nav">
+      <button class="on" data-t="home"><span class="ico">⌂</span>דף הבית</button>
+      <div class="nav-sep"></div>
+      <button data-t="bills"><span class="ico">§</span>הצעות חוק</button>
       <button data-t="merge"><span class="ico">⇄</span>נוסח משולב</button>
       <div class="nav-sep"></div>
       <button data-t="query"><span class="ico">?</span>שאילתות</button>
@@ -25,10 +32,14 @@
       <button data-t="critique"><span class="ico">✓</span>בודק הניסוח</button>
       <button data-t="reservations"><span class="ico">≠</span>הסתייגויות</button>
     </div>
+    <div class="rail-foot">
+      <button type="button" id="contact-open" class="contact-btn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5 12 13l8.5-6.5"/></svg>יצירת קשר</button>
+    </div>
   </nav>
 
   <div class="main">
-    <div class="topbar" data-bar="bills">
+    <div class="topbar" data-bar="bills" hidden>
       <div class="law-picker">
         <input id="law-search-input" class="inp" type="text"
                placeholder="חיפוש חוק לפי שם… (למשל: עונשין, פקודת הנזיקין)"
@@ -66,7 +77,53 @@
     </div>
 
     <div class="stage">
-      <div class="tab on" id="bills">
+      <!-- דף הבית (27.9.2026): כל הארגז, והמשך מאיפה שעצרת. שלושה מצבים -
+           אורח / נרשם חדש / חוזר (app.js, applyHomeView). -->
+      <div class="tab on" id="home">
+        <div class="home">
+          <div class="home-head">
+            <h1 id="home-greeting">ברוכים הבאים</h1>
+            <div class="grow"></div>
+            <button type="button" id="home-new-bill" class="primary" hidden>+ הצעת חוק חדשה</button>
+          </div>
+
+          <section class="home-signup" id="home-signup" hidden>
+            <h2>כל העבודה הפרלמנטרית, בארגז כלים אחד</h2>
+            <p>מנוי חודשי אישי. נרשמים עם חשבון Google, ומתחילים לעבוד.</p>
+            <a class="btn-google" href="/auth/signup">הרשמה עם חשבון Google</a>
+            <div class="home-login">כבר רשומים? <a href="/auth/login">כניסה</a></div>
+          </section>
+
+          <section class="home-recent" id="home-recent" hidden>
+            <h2 class="home-h2">המשך מאיפה שעצרת</h2>
+            <div id="home-recent-list" class="recent-grid"></div>
+          </section>
+
+          <section class="home-tools">
+            <h2 class="home-h2">הכלים</h2>
+            <div class="tool-grid" id="home-tools">
+              <button type="button" class="tool-card" data-tool="bills"><span class="tool-ico">§</span>
+                <b>הצעות חוק</b><span>עורכים את החוק כמו טקסט רגיל, והוראות התיקון נכתבות לבד — לפי כללי הניסוח.</span></button>
+              <button type="button" class="tool-card" data-tool="merge"><span class="tool-ico">⇄</span>
+                <b>נוסח משולב</b><span>מעלים הצעת חוק, ורואים את החוק כפי שייראה אם תתקבל.</span></button>
+              <button type="button" class="tool-card" data-tool="query"><span class="tool-ico">?</span>
+                <b>שאילתות</b><span>שאילתה לשר בפורמט המקובל, ולצדה שאילתות קודמות באותו נושא.</span></button>
+              <button type="button" class="tool-card" data-tool="agenda"><span class="tool-ico">!</span>
+                <b>הצעה לסדר</b><span>הצעה לסדר היום ליו"ר הכנסת, בטופס של הכנסת.</span></button>
+              <button type="button" class="tool-card" data-tool="rules"><span class="tool-ico">✦</span>
+                <b>מומחה התקנון</b><span>שאלות על התקנון בשפה פשוטה, עם הפניה לסעיף בכל תשובה.</span></button>
+              <button type="button" class="tool-card" data-tool="proto"><span class="tool-ico">≡</span>
+                <b>תקציר הצעה</b><span>מעלים הצעת חוק, ומקבלים תקציר של מה שהיא מבקשת לשנות.</span></button>
+              <button type="button" class="tool-card" data-tool="critique"><span class="tool-ico">✓</span>
+                <b>בודק הניסוח</b><span>כתבת הצעת חוק בעצמך? בדיקה מול כללי ניסוח החקיקה, תוך שניות.</span></button>
+              <button type="button" class="tool-card" data-tool="reservations"><span class="tool-ico">≠</span>
+                <b>הסתייגויות</b><span>מעלים את ההצעה לקריאה שנייה ושלישית, ומקבלים הסתייגויות מוכנות להגשה.</span></button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="tab" id="bills">
         <div id="drafts-panel" class="drafts-panel" hidden>
           <div class="drafts-head">
             <b>ההצעות שלי</b>
@@ -359,6 +416,56 @@
       </div>
     </div>
   </template>
+
+  <!-- אורח שלוחץ על כלי: חלון הרשמה קטן, לא הכלי -->
+  <div class="modal-backdrop" id="signup-modal" hidden>
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="signup-modal-title">
+      <button type="button" class="modal-x" data-close aria-label="סגירה">×</button>
+      <h2 id="signup-modal-title">כדי להשתמש ב<span id="signup-tool"></span> — נרשמים</h2>
+      <p class="modal-sub">מנוי חודשי אישי. נרשמים עם חשבון Google, ומתחילים לעבוד.</p>
+      <a class="btn-mint btn-wide" href="/auth/signup">הרשמה עם חשבון Google</a>
+      <div class="home-login">כבר רשומים? <a href="/auth/login">כניסה</a></div>
+    </div>
+  </div>
+
+  <!-- יצירת קשר (דף הבית 3). אורח: שם, אימייל ותוכן; רשום: תוכן בלבד -->
+  <div class="modal-backdrop" id="contact-modal" hidden>
+    <form class="modal" id="contact-form" novalidate role="dialog" aria-modal="true" aria-labelledby="contact-title">
+      <button type="button" class="modal-x" data-close aria-label="סגירה">×</button>
+      <h2 id="contact-title">יצירת קשר</h2>
+      <div id="contact-body">
+        <div class="contact-as" id="contact-as" hidden></div>
+        <div class="fld required" id="contact-name-fld">
+          <label for="contact-name">שם מלא</label>
+          <input id="contact-name" class="inp" type="text" autocomplete="name" />
+          <div class="fld-err" data-err="name" hidden></div>
+        </div>
+        <div class="fld required" id="contact-email-fld">
+          <label for="contact-email">אימייל</label>
+          <input id="contact-email" class="inp" type="email" autocomplete="email" dir="ltr" />
+          <div class="fld-err" data-err="email" hidden></div>
+        </div>
+        <div class="fld required">
+          <label for="contact-message">תוכן הפנייה</label>
+          <textarea id="contact-message" rows="6"></textarea>
+          <div class="fld-err" data-err="message" hidden></div>
+        </div>
+        <!-- שדה נסתר: בני אדם לא רואים אותו, בוטים ממלאים (contact.py) -->
+        <div class="hp-field" aria-hidden="true">
+          <label for="contact-website">אתר</label>
+          <input id="contact-website" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+        <div id="contact-error" class="msg err contact-error" hidden></div>
+        <div class="modal-actions">
+          <button type="submit" class="primary" id="contact-send">שליחה</button>
+          <button type="button" data-close>ביטול</button>
+        </div>
+      </div>
+      <div id="contact-done" class="contact-done" role="status" hidden>
+        <span class="contact-done-mark" aria-hidden="true">✓</span>הפנייה נשלחה
+      </div>
+    </form>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

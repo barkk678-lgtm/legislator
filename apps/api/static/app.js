@@ -1782,8 +1782,13 @@ document.getElementById("draft-new-btn").addEventListener("click", newDraft);
 window.addEventListener("beforeunload", flushDraftSave);
 
 /* ═══ ניווט לשוניות (משימה ח, 2026-09-16) - בלי state בשרת, כל
- * לשונית מסתירה/מציגה DOM בלבד. bills נשארת ברירת המחדל. ═══ */
+ * לשונית מסתירה/מציגה DOM בלבד. **דף הבית הוא ברירת המחדל** (27.9.2026):
+ * כולם נוחתים בו בכניסה למערכת. ═══ */
+let homeViewName = null;   // נקבע ב-applyHomeView (סוף הקובץ)
 function switchTab(tabName) {
+  // דף הבית: אורח רואה את הכלים אבל לא נכנס אליהם - חלון הרשמה במקום
+  if (tabName !== "home" && homeViewName === "guest") { openSignupModal(tabName); return; }
+  if (tabName === "home") renderHomeRecent();
   if (tabName === "rules") loadRulesDocs();   // ת3 - התקנון לצד הצ'אט
   for (const btn of document.querySelectorAll(".nav button[data-t]")) {
     btn.classList.toggle("on", btn.dataset.t === tabName);
@@ -2315,6 +2320,13 @@ async function sendAgendaMessage() {
 }
 
 // ס2 (26.9.2026): אותו רכיב היסטוריה כמו בשאילתות.
+/* **חייבים להיות מוגדרים לפני הרכיב הראשון שנטען** (באג 186, 27.9.2026):
+ * const שנקרא לפני שורת ההגדרה זורק (TDZ). ההגדרה ישבה אחרי agendaHistory, וכל
+ * מי ששמר שיחה בהצעה לסדר קיבל שגיאה בטעינה - ושאר app.js (השאילתות, מומחה
+ * התקנון) פשוט לא רץ. tests/browser/test_home.py. */
+const CONV_LIMIT = 30;
+const CONV_SHOWN = 5;
+
 const agendaHistory = mountConvHistory({
   prefix: "aconv",
   storageKey: "legislator.agendaConversations.v1",
@@ -2365,8 +2377,8 @@ bindComposer(document.getElementById("agenda-composer-input"), sendAgendaMessage
  *
  * מהשאילתות נשמר גם הלקח: localStorage עם מכסה, שמירה אחרי כל תור (סגירת
  * לשונית באמצע אינה מאבדת), וכישלון קריאה **שאינו מוצג כ"אין שיחות"**. */
-const CONV_LIMIT = 30;
-const CONV_SHOWN = 5;
+// CONV_LIMIT/CONV_SHOWN - בראש הקובץ (באג 186): ההגדרה כאן הייתה אחרי ש-agendaHistory
+// כבר נטען, ושיחה שמורה אחת בהצעה לסדר הפילה את כל הסקריפט בטעינה.
 
 function convDate(at) {
   const d = new Date(at), now = new Date();
@@ -2542,7 +2554,8 @@ function mountConvHistory(opts) {
   render();
   // צ7: מזהה השיחה נקבע כבר בהודעה הראשונה - כדי שהרישום בשרת יקבץ אותה
   function ensureId() { st.currentId = st.currentId || `c${Date.now()}`; return st.currentId; }
-  return { save, render, open, newConv, ensureId, get currentId() { return st.currentId; } };
+  // list - לדף הבית ("המשך מאיפה שעצרת"): אותה היסטוריה, לא מקור נתונים חדש
+  return { save, render, open, newConv, ensureId, list: () => read(), get currentId() { return st.currentId; } };
 }
 
 /* צ7 (26.9.2026): השרת רושם כל הודעה בכל שיחה (chat_log.py). **אין הרשמה** -
@@ -4235,3 +4248,251 @@ async function buildMergedText() {
 }
 
 document.getElementById("merge-btn").addEventListener("click", buildMergedText);
+
+/* ═══ דף הבית (27.9.2026) ═══════════════════════════════════════════
+ * כל הארגז, והמשך מאיפה שעצרת. **שלושה מצבים של אותו דף:**
+ *   guest     - לא רשום: לוגו + הרשמה/כניסה בתפריט, בלי פריטי ניווט; פס הרשמה;
+ *               לחיצה על כלי -> חלון הרשמה, לא הכלי.
+ *   new       - נרשם, כניסה ראשונה: "שלום, [שם]", ומצב ריק ב"המשך מאיפה שעצרת".
+ *   returning - חוזר: ברכה לפי שעה, וארבעת הפריטים האחרונים מכל הכלים.
+ *
+ * **אין עדיין הרשמה** (נבנית אחרונה). מתג פיתוח: ?view=guest|new|returning.
+ * בלי המתג - נרשם, והמצב נגזר מההיסטוריה (יש פריטים -> חוזר). ברירת המחדל
+ * אינה "אורח" כי אז האתר החי היה ננעל לכולם - וזה יהיה הצעד של ההרשמה.
+ * החשבון - DEV_ACCOUNT; כשתהיה הרשמה הוא יבוא מהסשן, ב-currentAccount בלבד.
+ * ════════════════════════════════════════════════════════════════════ */
+const HOME_VIEWS = ["guest", "new", "returning"];
+const DEV_ACCOUNT = { first_name: "ישראל", full_name: "ישראל ישראלי", email: "israel@example.com" };
+const TOOL_NAMES = {
+  bills: "הצעות חוק", merge: "נוסח משולב", query: "שאילתות", agenda: "הצעה לסדר",
+  rules: "מומחה התקנון", proto: "תקציר הצעה", critique: "בודק הניסוח", reservations: "הסתייגויות",
+};
+const RECENT_SHOWN = 4;
+
+function devHomeView() {
+  try {
+    const v = new URLSearchParams(location.search).get("view");
+    return HOME_VIEWS.includes(v) ? v : null;
+  } catch { return null; }
+}
+
+function currentAccount() {
+  return homeViewName === "guest" ? null : DEV_ACCOUNT;
+}
+
+function homeGreeting(now = new Date()) {
+  const h = now.getHours();
+  if (h >= 5 && h < 12) return "בוקר טוב";
+  if (h >= 12 && h < 17) return "צהריים טובים";
+  return "ערב טוב";
+}
+
+/** "לפני שעתיים", "אתמול". מספרים קטנים בצורה העברית (דקה, שעתיים, יומיים). */
+function relativeTime(at, now = Date.now()) {
+  const diff = Math.max(0, now - at), min = 60000, hour = 60 * min;
+  const d = new Date(at), today = new Date(now); today.setHours(0, 0, 0, 0);
+  const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+  const days = Math.round((today - dayStart) / 86400000);
+  if (diff < min) return "עכשיו";
+  if (days === 0 || diff < 6 * hour) {
+    if (diff < hour) {
+      const m = Math.floor(diff / min);
+      return m === 1 ? "לפני דקה" : m === 2 ? "לפני שתי דקות" : `לפני ${m} דקות`;
+    }
+    const hrs = Math.floor(diff / hour);
+    return hrs === 1 ? "לפני שעה" : hrs === 2 ? "לפני שעתיים" : `לפני ${hrs} שעות`;
+  }
+  if (days === 1) return "אתמול";
+  if (days === 2) return "לפני יומיים";
+  if (days < 7) return `לפני ${days} ימים`;
+  return convDate(at);
+}
+
+/** ארבעת הפריטים האחרונים מכל הכלים יחד - מההיסטוריה שכבר נשמרת:
+ *  ההצעות השמורות (readDrafts) והשיחות ברכיב המשותף (mountConvHistory). */
+function recentItems() {
+  const items = [];
+  for (const d of readDrafts()) {
+    const at = Date.parse(d.saved_at);
+    if (!Number.isFinite(at)) continue;
+    items.push({ tool: "bills", id: d.id, title: d.title || d.law_title || "הצעת חוק",
+                 detail: draftSummary(d), at });
+  }
+  const userTurns = (c) => (c.turns || []).filter((t) => t.role === "user").length;
+  const sources = [
+    ["query", queryHistory, (c) => `שאילתה ${c.kind || "רגילה"}`],
+    ["agenda", agendaHistory, (c) => `הצעה ${c.kind || "דחופה"}`],
+    ["rules", rulesHistory, (c) => { const n = userTurns(c); return n === 1 ? "שאלה אחת" : `${n} שאלות`; }],
+  ];
+  for (const [tool, history, detail] of sources) {
+    for (const c of history.list()) {
+      if (!Number.isFinite(c.at)) continue;
+      items.push({ tool, id: c.id, title: c.title || "שיחה", detail: detail(c), at: c.at });
+    }
+  }
+  return items.sort((a, b) => b.at - a.at).slice(0, RECENT_SHOWN);
+}
+
+/** לחיצה ממשיכה בדיוק מאיפה שעצר: ההצעה או השיחה נפתחות בכלי שלהן. */
+function openRecent(item) {
+  switchTab(item.tool);
+  if (item.tool === "bills") { openDraft(item.id); return; }
+  ({ query: queryHistory, agenda: agendaHistory, rules: rulesHistory })[item.tool].open(item.id);
+}
+
+function renderHomeRecent() {
+  const box = document.getElementById("home-recent-list");
+  if (!box || homeViewName === "guest") return;
+  const items = homeViewName === "new" ? [] : recentItems();
+  if (!items.length) {
+    box.innerHTML = `<div class="recent-empty">כאן תופיע העבודה האחרונה שלך. הצעות, שאילתות ושיחות
+      שתתחיל יופיעו כאן — ולחיצה תמשיך בדיוק מאיפה שעצרת.</div>`;
+    box.classList.add("is-empty");
+    return;
+  }
+  box.classList.remove("is-empty");
+  box.innerHTML = items.map((it, i) => `
+    <button type="button" class="recent-item" data-i="${i}" data-tool="${it.tool}">
+      <span class="recent-tag">${escapeHtml(TOOL_NAMES[it.tool])}</span>
+      <span class="recent-title" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</span>
+      <span class="recent-meta">${escapeHtml(it.detail)} · ${escapeHtml(relativeTime(it.at))}</span>
+    </button>`).join("");
+  box.querySelectorAll(".recent-item").forEach((b) =>
+    b.addEventListener("click", () => openRecent(items[Number(b.dataset.i)])));
+}
+
+function applyHomeView() {
+  const forced = devHomeView();
+  homeViewName = forced || (recentItems().length ? "returning" : "new");
+  const guest = homeViewName === "guest";
+  document.body.dataset.view = homeViewName;
+  document.getElementById("nav").hidden = guest;
+  document.getElementById("rail-guest").hidden = !guest;
+  document.getElementById("home-signup").hidden = !guest;
+  document.getElementById("home-recent").hidden = guest;
+  document.getElementById("home-new-bill").hidden = guest;
+  const acc = currentAccount();
+  document.getElementById("home-greeting").textContent = guest ? "ברוכים הבאים"
+    : homeViewName === "returning" ? `${homeGreeting()}, ${acc.first_name}` : `שלום, ${acc.first_name}`;
+  renderHomeRecent();
+}
+
+// --- חלונות קופצים ---
+let modalReturnFocus = null;
+
+function openModal(id, focusSel) {
+  const m = document.getElementById(id);
+  modalReturnFocus = document.activeElement;
+  m.hidden = false;
+  const f = focusSel && m.querySelector(focusSel);
+  (f || m.querySelector("[data-close]")).focus();
+}
+
+function closeModal(m) {
+  if (!m || m.hidden) return;
+  m.hidden = true;
+  if (modalReturnFocus && modalReturnFocus.focus) modalReturnFocus.focus();
+}
+
+for (const m of document.querySelectorAll(".modal-backdrop")) {
+  m.addEventListener("click", (e) => { if (e.target === m) closeModal(m); });
+  m.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => closeModal(m)));
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  for (const m of document.querySelectorAll(".modal-backdrop:not([hidden])")) closeModal(m);
+});
+
+function openSignupModal(tool) {
+  document.getElementById("signup-tool").textContent = TOOL_NAMES[tool] || "כלי";
+  openModal("signup-modal", ".btn-mint");
+}
+
+// --- יצירת קשר ---
+const CONTACT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function contactFieldErrors(errors) {
+  for (const el of document.querySelectorAll("#contact-form .fld-err")) {
+    const msg = errors[el.dataset.err];
+    el.textContent = msg || "";
+    el.hidden = !msg;
+    el.closest(".fld").classList.toggle("has-err", !!msg);
+  }
+}
+
+function openContactModal() {
+  const acc = currentAccount();
+  const form = document.getElementById("contact-form");
+  form.reset();
+  contactFieldErrors({});
+  document.getElementById("contact-error").hidden = true;
+  document.getElementById("contact-body").hidden = false;
+  document.getElementById("contact-done").hidden = true;
+  document.getElementById("contact-send").disabled = false;
+  document.getElementById("contact-name-fld").hidden = !!acc;
+  document.getElementById("contact-email-fld").hidden = !!acc;
+  const as = document.getElementById("contact-as");
+  as.hidden = !acc;
+  as.textContent = acc ? `הפנייה תישלח בשם ${acc.full_name} · ${acc.email}` : "";
+  openModal("contact-modal", acc ? "#contact-message" : "#contact-name");
+}
+
+async function sendContact(ev) {
+  ev.preventDefault();
+  const acc = currentAccount();
+  const val = (id) => document.getElementById(id).value.trim();
+  const payload = acc
+    ? { name: acc.full_name, email: acc.email, message: val("contact-message"), account: true }
+    : { name: val("contact-name"), email: val("contact-email"), message: val("contact-message"), account: false };
+  payload.website = document.getElementById("contact-website").value;
+  const errors = {};
+  if (!payload.message) errors.message = "נא לכתוב את תוכן הפנייה.";
+  if (!acc) {
+    if (!payload.name) errors.name = "נא למלא שם מלא.";
+    if (!payload.email) errors.email = "נא למלא אימייל.";
+    else if (!CONTACT_EMAIL_RE.test(payload.email)) errors.email = "כתובת האימייל אינה תקינה.";
+  }
+  contactFieldErrors(errors);
+  const errBox = document.getElementById("contact-error");
+  errBox.hidden = true;
+  if (Object.keys(errors).length) return;
+  const btn = document.getElementById("contact-send");
+  btn.disabled = true;
+  try {
+    const resp = await fetch("/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Chat-User": anonUserId() },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      contactFieldErrors(data.errors || {});
+      errBox.textContent = data.detail || "הפנייה לא נשלחה. נסו שוב.";
+      errBox.hidden = false;
+      return;
+    }
+    document.getElementById("contact-body").hidden = true;
+    document.getElementById("contact-done").hidden = false;
+  } catch {
+    errBox.textContent = "הפנייה לא נשלחה - אין חיבור לשרת. נסו שוב.";
+    errBox.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("contact-open").addEventListener("click", openContactModal);
+document.getElementById("contact-form").addEventListener("submit", sendContact);
+
+// --- כרטיסי הכלים ו"הצעת חוק חדשה" ---
+for (const card of document.querySelectorAll(".tool-card[data-tool]")) {
+  card.addEventListener("click", () => switchTab(card.dataset.tool));   // אורח -> חלון הרשמה (switchTab)
+}
+document.getElementById("home-new-bill").addEventListener("click", () => {
+  switchTab("bills");
+  newDraft();
+  document.getElementById("law-search-input").focus();
+});
+
+applyHomeView();
+switchTab("home");

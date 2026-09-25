@@ -549,6 +549,56 @@ def journey_static(base, res):
         res.check(f"הודעת מפתח הוסרה: {phrase!r}", phrase not in html)
 
 
+def journey_home(base, res):
+    """דף הבית (27.9.2026): כולם נוחתים בו, שמונת הכלים, יצירת קשר, והמקום
+    השמור להרשמה ולכניסה."""
+    print("\n[דף הבית]")
+    status, body = _get(base, "/")
+    html = body.decode("utf-8", "replace")
+    res.check("דף הבית הוא הלשונית הפעילה בטעינה", '<div class="tab on" id="home">' in html)
+    res.check("שמונה כרטיסי כלים", html.count('class="tool-card"') == 8, str(html.count('class="tool-card"')))
+    res.check("כפתור יצירת קשר וחלון יצירת קשר", 'id="contact-open"' in html and 'id="contact-form"' in html)
+    st, js = _get(base, "/static/app.js")
+    js = js.decode("utf-8", "replace")
+    res.check("הקוד של דף הבית נפרס", "function applyHomeView()" in js and js.rstrip().endswith('switchTab("home");'))
+    res.check("באג 186: קבועי ההיסטוריה לפני הרכיב הראשון",
+              js.find("const CONV_SHOWN") != -1 and js.find("const CONV_SHOWN") < js.find("= mountConvHistory({"))
+    for kind, word in (("signup", "ההרשמה"), ("login", "הכניסה")):
+        st, b = _get(base, f"/auth/{kind}")
+        res.check(f"/auth/{kind} - מקום שמור", st == 200 and f"{word} עוד לא פתוחה" in b.decode("utf-8", "replace"))
+
+
+def journey_contact(base, res):
+    """יצירת קשר: שליחה אמיתית (מסומנת כבדיקה), שדה חסר נדחה, והדפדפן לא יכול
+    לקרוא את הטבלה. 429 (הגבלת הקצב) - "לא נבדק", לא כשל."""
+    print("\n[יצירת קשר]")
+    bad = urllib.request.Request(base + "/api/contact", method="POST", headers={"Content-Type": "application/json"},
+                                 data=json.dumps({"message": "", "account": False}).encode())
+    try:   # בלי _post: 422 כאן הוא התשובה הנכונה, לא תקלה חולפת לנסות שוב
+        urllib.request.urlopen(bad, timeout=TIMEOUT)
+        res.check("פנייה בלי שדות נדחית", False, "התקבל 200")
+    except urllib.error.HTTPError as e:
+        errors = json.loads(e.read().decode()).get("errors", {})
+        res.check("פנייה בלי שדות נדחית (422, שלושה שדות)", e.code == 422 and set(errors) == {"name", "email", "message"},
+                  f"HTTP {e.code} {errors}")
+    status, body = _post(base, "/api/contact", {
+        "name": "בדיקה חיה", "email": "live-smoke@example.com", "account": False,
+        "message": "[בדיקה חיה] פנייה מ-tests/live_smoke.py"})
+    res.check("פנייה נשלחה ונשמרה", status == 200 and json.loads(body) == {"ok": True}, body.decode()[:120])
+    key = os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+    url = os.environ.get("SUPABASE_URL", "https://aamxwjmmlsqkinrzirdz.supabase.co").rstrip("/")
+    if not key:
+        res.not_checked("הדפדפן לא יכול לקרוא את הטבלה", "SUPABASE_PUBLISHABLE_KEY לא הוגדר")
+        return
+    req = urllib.request.Request(f"{url}/rest/v1/contact_messages?select=id&limit=1", headers={"apikey": key})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            res.check("הדפדפן לא יכול לקרוא את הטבלה", False, f"HTTP {r.status} - הקריאה הצליחה")
+    except urllib.error.HTTPError as e:
+        res.check("הדפדפן לא יכול לקרוא את הטבלה", e.code in (401, 403) and "permission denied" in e.read().decode(),
+                  f"HTTP {e.code}")
+
+
 def _rules_stream(base, question):
     """התשובה **המוזרמת** של מומחה התקנון, כפי שהלקוח מקבל אותה:
     (הטקסט שהוזרם, אירוע ה-done)."""
@@ -737,6 +787,8 @@ def main():
     run("הצעה לסדר - טופס", journey_agenda_form, base, res)
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)
+    run("דף הבית", journey_home, base, res)
+    run("יצירת קשר", journey_contact, base, res)
     if args.with_llm:
         run("כלי הצ'אט", journey_chat, base, res)
         run("מומחה התקנון - מקורות", journey_rules_citations, base, res)

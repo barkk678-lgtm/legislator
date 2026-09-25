@@ -25,6 +25,10 @@
   --touched-bg: #FFF9E6;
   --touched-accent: #EFC15E;
   --r: 10px;
+  /* דף הבית (27.9.2026) - מהמוקאפ של ברק: מנטה המותג, והנייבי של פס ההרשמה */
+  --mint: #5EE0A8;
+  --mint-deep: #3FCB8F;
+  --band: #0E2A5A;
 }
 
 * { box-sizing: border-box; }
@@ -768,3 +772,140 @@ a.rules-cite:hover, a.rules-cite:focus { text-decoration: underline; text-underl
 .rules-interp { margin-top: 6px; padding: 6px 10px; border-inline-start: 3px solid var(--flag);
   background: var(--page); font-size: 0.95em; }
 .rules-interp .lbl { display: block; font-size: 12px; font-weight: 700; color: var(--flag); margin-bottom: 2px; }
+
+
+/* ═══ דף הבית (27.9.2026) ═══════════════════════════════════════════
+   שלושה מצבים של אותו דף - body[data-view]: guest / new / returning.
+   בשפת העיצוב הקיימת: כרטיסים לבנים על --shell, Assistant לממשק,
+   --flag כאקסנט בלבד. המנטה (--mint) - רק לכפתורי ההרשמה. */
+.rail-guest { padding: 16px 14px 6px; display: flex; flex-direction: column; gap: 10px; }
+.btn-mint {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--mint); color: var(--navy); font-weight: 700; font-size: 15px;
+  border-radius: 8px; padding: 10px 16px; text-decoration: none; border: 1px solid var(--mint);
+}
+.btn-mint:hover { background: var(--mint-deep); border-color: var(--mint-deep); }
+.btn-wide { width: 100%; }
+.rail-login { font-size: 13.5px; color: #C6D4EC; text-align: center; }
+.rail-login a, .home-signup .home-login a { color: #fff; font-weight: 700; }
+body[data-view="guest"] .rail-guest { flex: 1; }
+.rail-foot { padding: 10px 12px 14px; border-top: 1px solid rgba(255,255,255,.13); }
+.contact-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  background: transparent; color: #DCE6F7; border: 1px solid rgba(255,255,255,.35);
+  font-size: 14px; padding: 8px 12px;
+}
+.contact-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.6); color: #fff; }
+.contact-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+#home.tab.on { overflow-y: auto; }
+.home { max-width: 1120px; width: 100%; margin: 0 auto; padding: 12px 8px 40px; }
+.home-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+.home-head h1 { margin: 0; font-size: 26px; font-weight: 700; color: var(--navy); }
+.home-h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; color: var(--navy); }
+.home-recent, .home-tools { margin-bottom: 26px; }
+
+.home-signup {
+  background: var(--band); color: #fff; border-radius: 14px;
+  padding: 30px 32px; margin-bottom: 28px;
+}
+.home-signup h2 { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
+.home-signup p { margin: 0 0 20px; color: #C6D4EC; font-size: 15px; }
+.btn-google {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #fff; color: var(--navy); font-weight: 700; font-size: 16px;
+  border-radius: 10px; padding: 13px 28px; text-decoration: none;
+}
+.btn-google:hover { background: var(--tint); }
+.home-login { margin-top: 12px; font-size: 13.5px; }
+.home-signup .home-login { color: #C6D4EC; }
+.modal .home-login { text-align: center; color: var(--soft); }
+.modal .home-login a { color: var(--flag); font-weight: 700; }
+
+.tool-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tool-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: start;
+  background: var(--page); border: 1px solid var(--rule); border-radius: var(--r);
+  padding: 16px 16px 18px; line-height: 1.55;
+}
+.tool-card:hover { border-color: var(--flag); box-shadow: 0 6px 18px rgba(11,42,91,.08); }
+.tool-card b { font-size: 15.5px; color: var(--navy); }
+.tool-card span:not(.tool-ico) { font-size: 13.5px; color: var(--soft); }
+.tool-ico {
+  width: 34px; height: 34px; border-radius: 9px; background: var(--tint); color: var(--flag);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700;
+}
+
+.recent-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.recent-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 5px; text-align: start;
+  background: var(--page); border: 1px solid var(--rule); border-radius: var(--r); padding: 14px 16px;
+  min-width: 0;
+}
+.recent-item:hover { border-color: var(--flag); }
+.recent-tag {
+  font-size: 12px; font-weight: 600; color: var(--flag); background: var(--tint);
+  border-radius: 999px; padding: 2px 10px;
+}
+.recent-title {
+  font-size: 14.5px; font-weight: 700; color: var(--ink); width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.recent-meta { font-size: 12.5px; color: var(--soft); }
+.recent-empty {
+  background: var(--page); border: 1px dashed var(--rule); border-radius: var(--r);
+  padding: 20px 22px; color: var(--soft); font-size: 14px; line-height: 1.7;
+}
+@media (max-width: 1150px) {
+  .tool-grid, .recent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .tool-grid, .recent-grid { grid-template-columns: 1fr; }
+  .home-signup { padding: 22px 18px; }
+}
+
+/* ═══ חלון קופץ (הרשמה, יצירת קשר) ═══ */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 100; background: rgba(11,42,91,.45);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal {
+  position: relative; background: var(--page); border-radius: 14px; width: 100%; max-width: 520px;
+  padding: 26px 26px 22px; box-shadow: 0 24px 60px rgba(11,42,91,.3); max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.modal-sm { max-width: 420px; }
+.modal h2 { margin: 0 0 14px; font-size: 19px; font-weight: 700; color: var(--navy); padding-inline-end: 28px; }
+.modal-sub { margin: -6px 0 18px; color: var(--soft); font-size: 14px; }
+.modal-x {
+  position: absolute; top: 12px; inset-inline-end: 12px; width: 32px; height: 32px; padding: 0;
+  border: 0; background: transparent; font-size: 22px; line-height: 1; color: var(--soft);
+}
+.modal-x:hover { background: var(--tint); color: var(--navy); }
+.modal .fld { margin-bottom: 12px; }
+.modal textarea { resize: vertical; min-height: 110px; }
+.fld-err { font-size: 12.5px; color: var(--del); margin-top: 4px; }
+.fld.has-err .inp, .fld.has-err textarea { border-color: var(--del); }
+.contact-as {
+  font-size: 13.5px; color: var(--soft); background: var(--tint-2); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;
+}
+.contact-error { max-width: none; margin-bottom: 12px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 6px; }
+.contact-done { text-align: center; padding: 26px 0 14px; font-size: 17px; font-weight: 700; color: var(--ins); }
+.contact-done-mark {
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;
+  width: 44px; height: 44px; border-radius: 50%; background: var(--ins-bg); font-size: 22px;
+}
+/* השדה הנסתר: מחוץ למסך ולא display:none - בוטים מדלגים על שדות מוסתרים מפורשות */
+.hp-field { position: absolute; inset-inline-start: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+/* מקום שמור להרשמה ולכניסה (/auth/*) */
+body.auth-pending { align-items: center; justify-content: center; background: var(--navy); }
+.auth-card {
+  background: var(--page); border-radius: 14px; padding: 28px 30px; max-width: 440px; margin: 16px;
+  text-align: center;
+}
+.auth-card img { width: 220px; height: auto; background: var(--band); border-radius: 10px; margin-bottom: 14px; }
+.auth-card h1 { margin: 0 0 8px; font-size: 20px; color: var(--navy); }
+.auth-card p { color: var(--soft); margin: 0 0 18px; }

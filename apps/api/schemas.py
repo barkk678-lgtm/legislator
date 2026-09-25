@@ -10,7 +10,7 @@ frontend בלי לגעת ב-API, וגם "ייצוא זמין תמיד" (docx) ה
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TextEditIn(BaseModel):
@@ -173,3 +173,13 @@ class ResearchAskRequestIn(BaseModel):
     """שאלת מחקר בשפה חופשית (משימה 1.4)."""
 
     question: str
+
+
+class ContactRequest(BaseModel):
+    """חלון "יצירת קשר" (דף הבית 3). website - השדה הנסתר נגד בוטים.
+    account - משתמש רשום (השם והאימייל מהחשבון; לאורח - חובה)."""
+    name: str = Field(default="", max_length=400)
+    email: str = Field(default="", max_length=400)
+    message: str = Field(default="", max_length=20000)
+    website: str = Field(default="", max_length=400)
+    account: bool = False

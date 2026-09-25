@@ -114,6 +114,7 @@ from schemas import (  # noqa: E402
     AgendaDraftRequestIn,
     AgendaExportRequestIn,
     BillMetaIn,
+    ContactRequest,
     DraftRequestIn,
     InsertPreviewRequestIn,
     QueryDraftRequestIn,
@@ -137,6 +138,35 @@ _jinja_env = Environment(loader=FileSystemLoader(HERE / "templates"))
 def index() -> str:
     template = _jinja_env.get_template("index.html")
     return template.render()
+
+
+# ── דף הבית (27.9.2026): הרשמה, כניסה ויצירת קשר ─────────────────────
+# **הרשמה עוד אין** (נבנית אחרונה). כפתורי ההרשמה והכניסה מובילים לכאן -
+# מקום שמור. כשתהיה הרשמה עם Google, רק שני הנתיבים האלה משתנים.
+_AUTH_PAGES = {"signup": "ההרשמה", "login": "הכניסה"}
+
+
+@app.get("/auth/{kind}", response_class=HTMLResponse)
+def auth_placeholder(kind: str) -> str:
+    if kind not in _AUTH_PAGES:
+        raise HTTPException(404, "הדף לא נמצא")
+    return _jinja_env.get_template("auth_pending.html").render(what=_AUTH_PAGES[kind])
+
+
+@app.post("/api/contact")
+def api_contact(req: ContactRequest, request: Request,
+                x_chat_user: str | None = Header(default=None)) -> JSONResponse:
+    """פנייה מחלון "יצירת קשר" - נשמרת בטבלה שרק השרת ניגש אליה (contact.py)."""
+    import contact  # noqa: PLC0415
+
+    sub = contact.Submission(name=req.name, email=req.email, message=req.message,
+                             website=req.website, account=req.account)
+    ip = contact.client_ip(dict(request.headers), request.client.host if request.client else "")
+    try:
+        result = contact.submit(sub, ip=ip, user_id=x_chat_user, store=contact.SupabaseStore())
+    except contact.ContactError as e:
+        return JSONResponse({"detail": str(e), "errors": e.errors}, status_code=e.status)
+    return JSONResponse({"ok": True})
 
 
 # ── שגיאות תצורה -> 503 עם הסבר, לא 500 ───────────────────────────
