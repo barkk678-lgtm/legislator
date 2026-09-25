@@ -36,6 +36,15 @@ from client import (  # noqa: F401 (re-exported)
 )
 
 _CITATION_RE = re.compile(r"\[מקור:([^\]]+)\]")
+
+
+def _cited_ids(text: str) -> list[str]:
+    """המזהים שצוטטו, לפי הסדר. **תג אחד יכול לשאת כמה מזהים** -
+    "[מקור:law-tkanon-haknesset/54, law-tkanon-haknesset/53]" (נצפה בבדיקה
+    החיה, 26.9): עד כאן כל התג נקרא כמזהה אחד לא מוכר, והתשובה - תקינה -
+    הוחלפה בסירוב. מזהים אינם מכילים פסיק."""
+    return [part.strip() for tag in _CITATION_RE.findall(text)
+            for part in tag.split(",") if part.strip()]
 _NO_SOURCES_REFUSAL = "אין מקורות רלוונטיים סופקו - לא ניתן לענות בלי עיגון בקורפוס."
 _MODEL_REFUSAL_PREFIX = "אין מקור מספיק:"
 
@@ -138,7 +147,7 @@ def answer_with_sources(
             output_tokens=completion.output_tokens,
         )
 
-    cited = _CITATION_RE.findall(text)
+    cited = _cited_ids(text)
     unknown = [c for c in cited if c not in known_ids]
     if unknown:
         return LLMResult(
@@ -176,7 +185,7 @@ def _grounding_verdict(text: str, known_ids: set[str]) -> tuple[bool, str | None
     עותק שני שנסחף. מחזיר (refused, reason, cited)."""
     if text.startswith(_MODEL_REFUSAL_PREFIX):
         return True, text[len(_MODEL_REFUSAL_PREFIX):].strip() or "המודל דיווח שאין מספיק מידע במקורות.", []
-    cited = _CITATION_RE.findall(text)
+    cited = _cited_ids(text)
     unknown = [c for c in cited if c not in known_ids]
     if unknown:
         return True, f"התשובה ציטטה מזהי מקור לא מוכרים: {unknown} - נדחתה כהפרת-עיגון, לא הוצגה כתקינה.", []

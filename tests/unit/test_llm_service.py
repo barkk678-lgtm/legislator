@@ -93,6 +93,18 @@ def main():
     ok = ok and passed
     print(("OK " if passed else "FAIL"), "בניית ההקשר כוללת את כל המקורות עם מזהיהם ותוכנם")
 
+    # --- תג אחד עם כמה מזהים (נצפה בבדיקה החיה, 26.9) - לא "מזהה לא מוכר" ---
+    fake_multi = _fake_complete_factory("הכנסת בוחרת יושב ראש [מקור:law-1/s6, law-1/s5].")
+    res = answer_with_sources(question="שאלה", sources=sources, complete_fn=fake_multi)
+    passed = not res.refused and res.cited_source_ids == ["law-1/s5", "law-1/s6"]
+    ok = ok and passed
+    print(("OK " if passed else "FAIL"), "תג עם שני מזהים מופרדים בפסיק - שניהם מוכרים, התשובה עוברת", res.refusal_reason or "")
+    fake_multi_bad = _fake_complete_factory("טענה [מקור:law-1/s5, law-9/s1].")
+    res = answer_with_sources(question="שאלה", sources=sources, complete_fn=fake_multi_bad)
+    passed = res.refused and "law-9/s1" in (res.refusal_reason or "")
+    ok = ok and passed
+    print(("OK " if passed else "FAIL"), "ואם אחד מהם לא מוכר - עדיין נדחית")
+
     print("\nתוצאה:", "עבר" if ok else "נכשל")
     return 0 if ok else 1
 

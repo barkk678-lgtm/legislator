@@ -115,7 +115,9 @@ def humanize_citations(text: str) -> str:
     by_id = {c.id: c.label for c in sources()} if _TAG_PREFIX in text else {}
 
     def repl(m: re.Match) -> str:
-        labels = [by_id[i.strip()] for i in _TAG_ONE.findall(m.group(0)) if i.strip() in by_id]
+        # תג אחד יכול לשאת כמה מזהים, מופרדים בפסיק (ראו service._cited_ids)
+        ids = [p.strip() for tag in _TAG_ONE.findall(m.group(0)) for p in tag.split(",")]
+        labels = [by_id[i] for i in ids if i in by_id]
         return f" ({group_citation_labels(list(dict.fromkeys(labels)))})" if labels else ""
 
     return _TAG_RUN.sub(repl, text)
