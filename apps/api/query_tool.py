@@ -273,9 +273,18 @@ def body_word_count(body: str) -> int:
 
 _LEADING_NUMBER_RE = re.compile(r"^\s*(?:\d{1,2}|[א-י])\s*[.)\-–]\s+")
 
-_FIT_RETRY = ("הגוף שניסחת כולל {count} מילים, והמגבלה היא {limit}. נסח מחדש כך "
-              "שהגוף יהיה עד {limit} מילים - שלם ותקין, באותו נושא ובאותו פורמט. "
-              "קצר קודם את הרקע.")
+# **מספר מילים להוריד, לא יעד.** נמדד באתר החי (26.9): עם "עד 40 מילים"
+# המודל החזיר 44 בשני הניסיונות - הוא לא סופר מילים בעברית באמינות. יעד
+# נמוך מהמגבלה ומספר מילים להוריד, ושאלה שאפשר לוותר עליה, עובדים טוב יותר.
+_FIT_RETRY = ("הגוף שניסחת כולל {count} מילים, והמגבלה היא {limit}. הורד לפחות {cut} "
+              "מילים (יעד: {target} מילים לכל היותר) - קצר את הרקע למשפט אחד, ואם צריך "
+              "ותר על השאלה האחרונה. השאילתה חייבת להישאר שלמה ותקינה, באותו נושא "
+              "ובאותו פורמט.")
+
+
+def _fit_retry_message(count: int, limit: int) -> str:
+    target = max(limit - max(3, limit // 10), 1)
+    return _FIT_RETRY.format(count=count, limit=limit, cut=count - target, target=target)
 
 
 def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: str,
@@ -287,7 +296,7 @@ def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: s
     if fit_limit and not result["within_limit"]:
         retry = list(turns) + [
             {"role": "assistant", "content": f"{_SUBJECT_MARK} {result['subject']}\n{_BODY_MARK} {result['body']}"},
-            {"role": "user", "content": _FIT_RETRY.format(count=result["word_count"], limit=result["word_limit"])},
+            {"role": "user", "content": _fit_retry_message(result["word_count"], result["word_limit"])},
         ]
         result = _draft_query_once(turns=retry, kind=kind, minister=minister, mk_name=mk_name)
         result["fit_attempts"] = 2
