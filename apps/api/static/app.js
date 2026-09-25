@@ -1999,7 +1999,7 @@ async function sendQueryMessage(preset = null) {
   try {
     const resp = await fetch("/api/query/draft", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: chatHeaders(queryHistory),
       body: JSON.stringify({
         turns: queryTurns,
         kind,
@@ -2282,7 +2282,7 @@ async function sendAgendaMessage() {
   try {
     const resp = await fetch("/api/agenda/draft", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: chatHeaders(agendaHistory),
       body: JSON.stringify({ topic_description: agendaTopicHistory.join("\n"), mk_name: mkName,
                              kind: document.getElementById("agenda-kind-input").value }),
     });
@@ -2540,7 +2540,30 @@ function mountConvHistory(opts) {
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
   render();
-  return { save, render, open, newConv, get currentId() { return st.currentId; } };
+  // צ7: מזהה השיחה נקבע כבר בהודעה הראשונה - כדי שהרישום בשרת יקבץ אותה
+  function ensureId() { st.currentId = st.currentId || `c${Date.now()}`; return st.currentId; }
+  return { save, render, open, newConv, ensureId, get currentId() { return st.currentId; } };
+}
+
+/* צ7 (26.9.2026): השרת רושם כל הודעה בכל שיחה (chat_log.py). **אין הרשמה** -
+ * מזהה אנונימי נוצר כאן פעם אחת ונשמר בדפדפן. הלקוח לא ניגש לטבלה; הוא רק
+ * שולח את שני המזהים בכותרות הבקשה. */
+function anonUserId() {
+  const KEY = "legislator.anonUserId";
+  try {
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      id = (crypto.randomUUID && crypto.randomUUID()) || `u${Date.now()}${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
+
+function chatHeaders(history) {
+  return { "Content-Type": "application/json", "X-Chat-User": anonUserId(), "X-Chat-Conv": history.ensureId() };
 }
 
 // --- שאילתות ---
@@ -2829,7 +2852,7 @@ async function sendRulesMessage() {
   try {
     const resp = await fetch("/api/rules/ask/stream", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: chatHeaders(rulesHistory),
       body: JSON.stringify({ question: text }),
     });
     if (!resp.ok || !resp.body) {

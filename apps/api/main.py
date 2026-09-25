@@ -18,7 +18,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
@@ -40,6 +40,7 @@ from explanatory_draft import draft_explanatory_notes  # noqa: E402
 from insert_preview import preview_insertion_label  # noqa: E402
 from agenda_tool import AgendaDraftError, draft_agenda  # noqa: E402
 from agenda_doc import write_agenda_docx  # noqa: E402
+import chat_log  # noqa: E402
 from knesset_speaker import current_speaker  # noqa: E402
 from llm_draft import draft_bill_title_llm, draft_explanatory_llm  # noqa: E402
 from law_registry import LawNotFoundError, get_law_config, load_law, law_summaries, search_law_titles  # noqa: E402
@@ -1104,21 +1105,39 @@ def api_docx(law_id: str, req: RenderRequest):
 # (אחרי עריכת המשתמש), לא רק מזהה - כמו /docx לעיל.
 
 
+def _log_later(background: BackgroundTasks, **fields) -> None:
+    """צ7: רישום השיחה אחרי שהתשובה נשלחה - לא מעכב ולא מפיל."""
+    background.add_task(chat_log.log_turn, **fields)
+
+
 @app.post("/api/query/draft")
-def api_query_draft(req: QueryDraftRequestIn) -> dict:
+def api_query_draft(req: QueryDraftRequestIn, background: BackgroundTasks,
+                    x_chat_user: str | None = Header(None),
+                    x_chat_conv: str | None = Header(None)) -> dict:
+    # תמיכה לאחור: לקוח ישן ששולח topic_description בלבד מקבל
+    # שיחה בת תור אחד. הלקוח שלנו שולח turns.
+    turns = ([tn.model_dump() for tn in req.turns]
+             or [{"role": "user", "content": req.topic_description}])
+    message = turns[-1].get("content", "") if turns else ""
+    log = dict(tool="query", conversation_id=x_chat_conv, user_id=x_chat_user, message=message)
     try:
-        # תמיכה לאחור: לקוח ישן ששולח topic_description בלבד מקבל
-        # שיחה בת תור אחד. הלקוח שלנו שולח turns.
-        turns = ([tn.model_dump() for tn in req.turns]
-                 or [{"role": "user", "content": req.topic_description}])
-        side = _chat_side_reply("query", turns[-1].get("content", "") if turns else "")
+        side = _chat_side_reply("query", message)
         if side:
+            _log_later(background, **log, reply=side[1], kind=side[0])
             return {"chat_reply": side[1], "chat_kind": side[0]}
-        return draft_query(turns=turns, kind=req.kind,
-                           minister=req.minister, mk_name=req.mk_name,
-                           fit_limit=req.fit_limit)
+        result = draft_query(turns=turns, kind=req.kind,
+                             minister=req.minister, mk_name=req.mk_name,
+                             fit_limit=req.fit_limit)
     except QueryDraftError as e:
+        # 422 - FastAPI לא מריץ BackgroundTasks כשנזרקת שגיאה; לכן ישירות
+        chat_log.log_turn(**log, reply=str(e), kind=chat_log.draft_error_kind(str(e)),
+                          meta={"kind": req.kind})
         raise HTTPException(422, str(e))
+    _log_later(background, **log, reply=f"נושא: {result['subject']}\nגוף: {result['body']}",
+               kind="substantive", meta={"kind": req.kind, "word_count": result.get("word_count"),
+                                         "within_limit": result.get("within_limit"),
+                                         "fit_limit": req.fit_limit})
+    return result
 
 
 @app.get("/api/queries/mk-gender")
@@ -1155,17 +1174,24 @@ def api_query_export(req: QueryExportRequestIn):
 
 
 @app.post("/api/agenda/draft")
-def api_agenda_draft(req: AgendaDraftRequestIn) -> dict:
+def api_agenda_draft(req: AgendaDraftRequestIn, background: BackgroundTasks,
+                     x_chat_user: str | None = Header(None),
+                     x_chat_conv: str | None = Header(None)) -> dict:
     # הלקוח שולח את כל ההיסטוריה מודבקת; מסווגים רק את ההודעה האחרונה.
     last = (req.topic_description or "").strip().split("\n")[-1]
+    log = dict(tool="agenda", conversation_id=x_chat_conv, user_id=x_chat_user, message=last)
     side = _chat_side_reply("agenda", last)
     if side:
+        _log_later(background, **log, reply=side[1], kind=side[0])
         return {"chat_reply": side[1], "chat_kind": side[0]}
     try:
         result = draft_agenda(topic_description=req.topic_description, mk_name=req.mk_name,
                               kind=req.kind)
     except AgendaDraftError as e:
+        chat_log.log_turn(**log, reply=str(e), kind=chat_log.draft_error_kind(str(e)))
         raise HTTPException(422, str(e))
+    _log_later(background, **log, kind="substantive", meta={"kind": req.kind},
+               reply=f"נושא: {result['subject']}\nדברי הסבר: " + "\n".join(result["explanation"]))
     # ס4: היו"ר מהמאגר (במטמון 12 שעות), או הגיבוי הידני - מגיע עם הטיוטה
     result["speaker"] = current_speaker()
     return result
@@ -1230,7 +1256,9 @@ def api_rules_reading() -> dict:
 
 
 @app.post("/api/rules/ask/stream")
-def api_rules_ask_stream(req: RulesAskRequestIn) -> StreamingResponse:
+def api_rules_ask_stream(req: RulesAskRequestIn,
+                         x_chat_user: str | None = Header(None),
+                         x_chat_conv: str | None = Header(None)) -> StreamingResponse:
     """NDJSON: שורת JSON אחת לכל אירוע. {"delta": "..."} לכל קטע
     טקסט, ובסוף {"done": {...}} עם פסק הדין של שומר הציטוט.
 
@@ -1240,7 +1268,10 @@ def api_rules_ask_stream(req: RulesAskRequestIn) -> StreamingResponse:
 
     שורת שגיאה ({"error": "..."}) נשלחת בתוך הזרם כשהכשל קורה
     אחרי שה-200 כבר יצא - אחרת הוא היה נראה כמו תשובה שנגמרה."""
+    log = dict(tool="rules", conversation_id=x_chat_conv, user_id=x_chat_user, message=req.question)
+
     def events():
+        # צ7: הרישום בסוף הזרם - אחרי שה-done כבר יצא למשתמש.
         # ת2: המודל כותב "[מקור:law-...]" (הפורמט ששומר הציטוט בודק);
         # המשתמש רואה "(תקנון הכנסת, סעיף 52)". תג שנחתך בין שני קטעים
         # נשמר בחוצץ עד שהוא נסגר - ראו rules_expert.CitationHumanizer.
@@ -1263,6 +1294,7 @@ def api_rules_ask_stream(req: RulesAskRequestIn) -> StreamingResponse:
             yield json.dumps({"done": {"text": reply, "refused": False, "refusal_reason": None,
                                        "cited_sources": [], "chat_kind": pf.kind}},
                              ensure_ascii=False) + "\n"
+            chat_log.log_turn(**log, reply=reply, kind=pf.kind)
             return
         try:
             for piece in rules_expert_stream(req.question):
@@ -1284,8 +1316,13 @@ def api_rules_ask_stream(req: RulesAskRequestIn) -> StreamingResponse:
                         # ת3: המזהים - לתגיות מעל התקנון ולגלילה לסעיף
                         "cited_ids": list(piece.cited_source_ids),
                     }}, ensure_ascii=False) + "\n"
+                    chat_log.log_turn(**log, reply=rules_humanize_citations(piece.text) or piece.refusal_reason,
+                                      kind=chat_log.rules_kind(piece.refused, piece.refusal_reason),
+                                      meta={"cited_ids": list(piece.cited_source_ids),
+                                            "refusal_reason": piece.refusal_reason})
         except RulesExpertError as e:
             yield json.dumps({"error": str(e)}, ensure_ascii=False) + "\n"
+            chat_log.log_turn(**log, reply=str(e), kind="error")
 
     return StreamingResponse(events(), media_type="application/x-ndjson",
                              headers={"X-Accel-Buffering": "no",
