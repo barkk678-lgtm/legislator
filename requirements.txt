@@ -12,3 +12,4 @@ lxml  # validator._check_14 (בדיקת סגנונות ב-docx) + tests/golden -
 # מיובא בקוד ולא מוצהר עד 2026-09-18; הבדיקה לא התפוצצה רק כי
 # docx_path=None בנתיב הפרודקשן ולא הגיעה ל-import.
 olefile  # packages/documents/extract_doc.py - קריאת .doc בינארי (Word 97)
+pdfminer.six  # packages/reservations/pdf_bill.py - קריאת הצעה לקריאה שנייה-שלישית מ-PDF (רישיון MIT; לא PyMuPDF, שהוא AGPL)
