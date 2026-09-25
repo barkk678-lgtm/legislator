@@ -252,7 +252,10 @@ class QueryDraftError(Exception):
 def _instructions(kind: QueryKind) -> str:
     limit = _WORD_LIMITS[kind]
     word_limit_instruction = (
-        f"חייב להיות עד {limit} מילים בדיוק (מגבלת תקנון הכנסת, לא המלצה)."
+        f"מוגבל ל-{limit} מילים (מגבלת תקנון הכנסת, לא המלצה). **כוון ל-"
+        f"{target_words(limit)} מילים לכל היותר** - מרווח מכוון, כי קל לטעות בכמה "
+        "מילים בספירה בעברית; שאילתה קצרה מהיעד תקינה לגמרי. **התקציב:** "
+        f"{_budget_text(limit)}"
         if limit
         else "אינו מוגבל במספר מילים (שאילתה ישירה)."
     )
@@ -282,8 +285,35 @@ _FIT_RETRY = ("הגוף שניסחת כולל {count} מילים, והמגבלה
               "ובאותו פורמט.")
 
 
+def target_words(limit: int) -> int:
+    """ש14-ב (ברק, 26.9): המודל מכוון **מתחת** למגבלה, עם מרווח - 35 כשהמגבלה
+    40, 44 כשהיא 50. נמדד באתר החי: עם "עד 40" המודל חרג בעד 8 מילים (2 מתוך 10
+    טיוטות נכנסו). הספירה שהממשק מציג היא תמיד של הקוד (body_word_count)."""
+    return max(limit - limit // 8, 1)
+
+
+def word_budget(limit: int) -> dict:
+    """ש14-ב: יעד כולל אינו מספיק - נמדד מקומית (26.9) עם "כוון ל-35":
+    1 מתוך 10 נכנסו, 41-52 מילים; המודל כתב רקע של ~18 מילים ושלוש שאלות.
+    תקציב לכל חלק (רקע, מספר שאלות, מילים לשאלה) קל לו יותר לקיים מספירה.
+    40 -> רקע 14, 2 שאלות × 8 = 32 (כולל "רצוני לשאול:"); 50 -> רקע 15, 3 × 8 = 41."""
+    target = target_words(limit)
+    questions = 2 if limit <= 40 else 3
+    per_question = 8
+    # 2 = "רצוני לשאול:"; 3 - מרווח גם בתוך היעד, כי כל חלק נוטה לחרוג במילה-שתיים
+    background = target - 2 - questions * per_question - 3
+    return {"target": target, "background": max(background, 8),
+            "questions": questions, "per_question": per_question}
+
+
+def _budget_text(limit: int) -> str:
+    b = word_budget(limit)
+    return (f"רקע - משפט אחד, עד {b['background']} מילים; {b['questions']} שאלות לכל "
+            f"היותר, כל אחת עד {b['per_question']} מילים. פרטים שלא נכנסים - מוותרים עליהם.")
+
+
 def _fit_retry_message(count: int, limit: int) -> str:
-    target = max(limit - max(3, limit // 10), 1)
+    target = target_words(limit)
     return _FIT_RETRY.format(count=count, limit=limit, cut=count - target, target=target)
 
 

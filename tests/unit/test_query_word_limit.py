@@ -67,6 +67,30 @@ def test_without_fit_limit_no_retry():
     assert len(calls) == 1 and d["within_limit"] is False
 
 
+def test_instruction_aims_below_the_limit_with_a_margin():
+    """ש14-ב (ברק, 26.9): כוון ל-35 כשהמגבלה 40 - לא "עד 40 בדיוק"."""
+    urgent, regular = _instructions("דחופה"), _instructions("רגילה")
+    assert "כוון ל-35 מילים" in urgent and "40" in urgent, urgent
+    assert "כוון ל-44 מילים" in regular and "50" in regular, regular
+    assert "עד 40 מילים בדיוק" not in urgent
+
+
+def test_fit_retry_targets_the_same_margin():
+    calls = _script(LONG, SHORT)
+    draft_query(turns=TURNS, kind="דחופה", minister="השר", mk_name="x", fit_limit=True)
+    assert "יעד: 35 מילים" in calls[1][-1]["content"], calls[1][-1]
+
+
+def test_instruction_gives_a_budget_per_part():
+    """ש14-ב: יעד כולל לבד - 1 מתוך 10 נכנסו (מקומית, 26.9); תקציב לכל חלק -
+    10 מתוך 10. סכום התקציב אינו עובר את היעד."""
+    for kind, limit in (("דחופה", 40), ("רגילה", 50)):
+        b = query_tool.word_budget(limit)
+        assert b["background"] + 2 + b["questions"] * b["per_question"] <= b["target"] < limit, b
+        text = _instructions(kind)
+        assert f"עד {b['background']} מילים" in text and f"{b['questions']} שאלות לכל היותר" in text, text
+
+
 original = query_tool.draft_conversation
 try:
     for name, fn in sorted(list(globals().items())):
