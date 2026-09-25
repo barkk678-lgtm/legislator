@@ -76,9 +76,10 @@ _INSTRUCTIONS_TEMPLATE = (
     "עניין שאינו בתחום תפקידי השר.\n"
     "4. אסור לכלול פרטים אישיים פרטיים שפגיעתם בפרטיות (שמות פרטיים "
     "של אזרחים, מספרי זהות וכו').\n"
-    "5. גוף השאילתה (בלי שורת הנושא) {word_limit_instruction}\n"
-    "   המגבלה חלה על **הכול יחד** - הרקע, השורה \"רצוני לשאול:\" "
-    "והשאלות. ספור לפני שאתה מחזיר; אם חרגת, קצר את פסקת הרקע "
+    "5. גוף השאילתה {word_limit_instruction}\n"
+    "   המגבלה חלה על **הגוף בלבד** - הרקע, השורה \"רצוני לשאול:\" "
+    "והשאלות יחד. **הכותרת (\"שאילתה רגילה\" וכו') ושורת הנושא אינן "
+    "נספרות.** ספור לפני שאתה מחזיר; אם חרגת, קצר את פסקת הרקע "
     "ואחר כך את מספר השאלות.\n"
     "6. **גוף השאילתה לעולם אינו נוקב בשם השר ואינו פונה אליו.** "
     "הנמען נקבע בשדה נפרד ומוזרק למסמך בקוד, לא על ידך. אל תפתח "
@@ -262,7 +263,38 @@ def _word_count(text: str) -> int:
     return len(text.split())
 
 
-def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: str) -> dict:
+def body_word_count(body: str) -> int:
+    """ש11 (26.9.2026): מה שנספר למגבלה - הגוף בלבד (רקע, "רצוני לשאול:",
+    שאלות). הכותרת והנושא אינם בגוף מלכתחילה; מספור שאלות שהמודל הוסיף
+    בעצמו ("1.") אינו מילה - הממשק והקובץ ממספרים בעצמם."""
+    lines = [ln.strip() for ln in (body or "").split("\n")]
+    return sum(_word_count(_LEADING_NUMBER_RE.sub("", ln)) for ln in lines)
+
+
+_LEADING_NUMBER_RE = re.compile(r"^\s*(?:\d{1,2}|[א-י])\s*[.)\-–]\s+")
+
+_FIT_RETRY = ("הגוף שניסחת כולל {count} מילים, והמגבלה היא {limit}. נסח מחדש כך "
+              "שהגוף יהיה עד {limit} מילים - שלם ותקין, באותו נושא ובאותו פורמט. "
+              "קצר קודם את הרקע.")
+
+
+def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: str,
+                fit_limit: bool = False) -> dict:
+    """fit_limit (ש14): הבקשה באה מ"התכנס למגבלת המילים". אחרי הניסוח
+    סופרים בקוד; אם עדיין חורג - ניסיון נוסף אחד עם הספירה בפועל. אם גם
+    הוא חורג, within_limit=False חוזר והממשק אומר זאת למשתמש."""
+    result = _draft_query_once(turns=turns, kind=kind, minister=minister, mk_name=mk_name)
+    if fit_limit and not result["within_limit"]:
+        retry = list(turns) + [
+            {"role": "assistant", "content": f"{_SUBJECT_MARK} {result['subject']}\n{_BODY_MARK} {result['body']}"},
+            {"role": "user", "content": _FIT_RETRY.format(count=result["word_count"], limit=result["word_limit"])},
+        ]
+        result = _draft_query_once(turns=retry, kind=kind, minister=minister, mk_name=mk_name)
+        result["fit_attempts"] = 2
+    return result
+
+
+def _draft_query_once(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: str) -> dict:
     """turns: השיחה עד כה, [{"role": "user"|"assistant", "content": ...}],
     כשהאחרון הוא ההודעה החדשה של המשתמש. מחזירה dict עם
     subject/body/word_count/within_limit - **לא** חוסמת אם חורג
@@ -334,7 +366,7 @@ def draft_query(*, turns: list[dict], kind: QueryKind, minister: str, mk_name: s
             )
 
     limit = _WORD_LIMITS[kind]
-    wc = _word_count(body)
+    wc = body_word_count(body)
     return {
         "kind": kind,
         "minister": minister,

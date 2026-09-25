@@ -1953,10 +1953,15 @@ function bindComposer(input, send) {
   new MutationObserver(grow).observe(input, { attributes: true, attributeFilter: ["disabled"] });
 }
 
+// ש11 (26.9.2026): נספר גוף השאילתה בלבד - בלי הכותרת ובלי הנושא (כך
+// גם השרת, query_tool.body_word_count, וכך ההנחיה למודל).
+// ש14: בלי סימן קריאה, ולידו "התכנס למגבלת המילים".
 function wordCountHtml(wordCount, wordLimit) {
-  if (wordLimit == null) return `<div class="word-count">${wordCount} מילים (בלי הגבלה)</div>`;
+  const scope = `<span class="word-count-scope"> (בלי הכותרת והנושא)</span>`;
+  if (wordLimit == null) return `<div class="word-count">${wordCount} מילים${scope} - בלי הגבלה</div>`;
   const over = wordCount > wordLimit;
-  return `<div class="word-count${over ? " over" : ""}">${wordCount}/${wordLimit} מילים${over ? " - חורג מהמגבלה!" : ""}</div>`;
+  return `<div class="word-count${over ? " over" : ""}">${wordCount}/${wordLimit} מילים${scope}` +
+    `${over ? ` - חורג מהמגבלה <button type="button" class="fit-limit-btn">התכנס למגבלת המילים</button>` : ""}</div>`;
 }
 
 // --- שאילתות ---
@@ -1968,9 +1973,12 @@ function wordCountHtml(wordCount, wordLimit) {
 let queryTurns = [];
 let currentQueryDraft = null;
 
-async function sendQueryMessage() {
+// preset: הודעה שהממשק שולח בשם המשתמש (ש10 - שינוי סוג, ש14 - התכנס
+// למגבלה). היא מוצגת בצ'אט ונכנסת להיסטוריה בדיוק כמו הודעה שהוקלדה.
+async function sendQueryMessage(preset = null) {
+  if (!preset || preset instanceof Event) preset = null;
   const input = document.getElementById("query-composer-input");
-  const text = input.value.trim();
+  const text = (preset ? preset.text : input.value).trim();
   if (!text) return;
   const minister = document.getElementById("query-minister-input").value.trim();
   const mkName = document.getElementById("query-mk-input").value.trim();
@@ -1984,7 +1992,7 @@ async function sendQueryMessage() {
 
   appendMsg(chat, "u", escapeHtml(text));
   queryTurns.push({ role: "user", content: text });
-  input.value = "";
+  if (!preset) input.value = "";
   input.disabled = true;
 
   const thinking = appendThinking(chat, "מנסח את השאילתה…");
@@ -1997,6 +2005,7 @@ async function sendQueryMessage() {
         kind,
         minister,
         mk_name: mkName,
+        fit_limit: Boolean(preset && preset.fitLimit),
       }),
     });
     if (!resp.ok) {
@@ -2032,6 +2041,12 @@ async function sendQueryMessage() {
       draft: { ...currentQueryDraft },
     });
     renderQueryDraft(chat, currentQueryDraft);
+    // ש14: השרת ספר בקוד וניסה פעם נוספת; אם עדיין חורג - אומרים את זה.
+    if (preset && preset.fitLimit && currentQueryDraft.within_limit === false) {
+      appendMsg(chat, "err", escapeHtml(
+        `גם אחרי ניסיון נוסף הגוף ארוך מהמגבלה: ${currentQueryDraft.word_count}/${currentQueryDraft.word_limit} מילים. ` +
+        "אפשר לבקש לוותר על אחת השאלות או לקצר את הרקע."));
+    }
     // ב5 - **החיפוש רץ מעצמו, ואינו מעכב את הניסוח.** הטיוטה כבר
     // על המסך; זה יוצא לדרך אחריה ומופיע כשהוא מוכן.
     autoSearchPastQueries(currentQueryDraft.subject || text);
@@ -2044,6 +2059,13 @@ async function sendQueryMessage() {
 }
 
 document.getElementById("query-send-btn").addEventListener("click", sendQueryMessage);
+
+// ש10 (26.9.2026): שינוי סוג כשכבר יש שאילתה מנוסחת - נשלחת הודעה כאילו
+// המשתמש כתב אותה. לפני הניסוח הראשון הסוג רק נשמר לבקשה הבאה.
+document.getElementById("query-kind-input").addEventListener("change", (ev) => {
+  if (!currentQueryDraft) return;
+  sendQueryMessage({ text: `נסח לי אותה כשאילתה ${ev.target.value}` });
+});
 bindComposer(document.getElementById("query-composer-input"), sendQueryMessage);
 
 /* צ5 (26.9.2026): המגדר של חבר/ת הכנסת נשלף **כשממלאים את השם**, לא
@@ -2107,9 +2129,17 @@ async function exportQueryDraft(draft, btn) {
 // ומכאן "לפעמים האייקון לא מופיע".
 // ש6: "נושא", "גוף" ו"רצוני לשאול" בבולד - בצ'אט בלבד. קובץ הוורד נבנה
 // מהנתונים (query_doc.py) ולא מה-HTML הזה, ונשאר כמו בדוגמאות.
+// ש8 (26.9.2026): השאלות ממוספרות גם בצ'אט, כמו בקובץ (query_doc - מספור
+// אוטומטי של Word). המספר מוצג ואינו חלק מהגוף: לא נספר במונה המילים,
+// ומספר שהמודל כתב בעצמו מוסר (אותו ביטוי כמו query_doc._LEADING_NUMBER).
+const LEADING_NUMBER = /^\s*(?:\d{1,2}|[א-י])\s*[.)\-–]\s+/;
 function queryBodyHtml(body) {
-  return String(body || "").split("\n").map((ln) =>
-    ln.trim() === "רצוני לשאול:" ? `<b>${escapeHtml(ln)}</b>` : escapeHtml(ln)).join("\n");
+  let n = 0, afterRetsoni = false;
+  return String(body || "").split("\n").map((ln) => {
+    if (ln.trim() === "רצוני לשאול:") { afterRetsoni = true; return `<b>${escapeHtml(ln)}</b>`; }
+    if (afterRetsoni && ln.trim()) return `${++n}. ${escapeHtml(ln.replace(LEADING_NUMBER, ""))}`;
+    return escapeHtml(ln);
+  }).join("\n");
 }
 
 function renderQueryDraft(chat, draft) {
@@ -2118,11 +2148,16 @@ function renderQueryDraft(chat, draft) {
     "a",
     `ניסחתי טיוטה לפי הפורמט המקובל.` +
       `<div class="draft"><div class="to">שאילתה ${escapeHtml(draft.kind || "")} ${escapeHtml(draft.minister || "")}</div>` +
-      `<div class="draft-field"><b>נושא:</b> ${escapeHtml(draft.subject || "")}</div>` +
-      `<div class="draft-field"><b>גוף:</b></div>` +
+      `<div class="draft-field"><b>נושא:</b> ${escapeHtml(draft.subject || "")}</div><br>` +
       `${queryBodyHtml(draft.body)}${draft.word_count != null ? wordCountHtml(draft.word_count, draft.word_limit) : ""}${draft.removed_addressee ? `<div class="word-count">הוסרה פנייה לנמען מתחילת הגוף (${escapeHtml(draft.removed_addressee)}) — הנמען נקבע בשדה ומוזרק למסמך</div>` : ""}</div>`
   );
   attachQueryExport(bubble, { ...draft });
+  bubble.querySelector(".fit-limit-btn")?.addEventListener("click", () => {
+    sendQueryMessage({
+      text: `קצר את השאילתה כך שהגוף יהיה עד ${draft.word_limit} מילים - שלמה ותקינה, באותו נושא.`,
+      fitLimit: true,
+    });
+  });
   return bubble;
 }
 

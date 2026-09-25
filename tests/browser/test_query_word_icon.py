@@ -51,8 +51,9 @@ def main() -> int:
         page.wait_for_selector("#query-chat .msg.a .msg-action", timeout=10000)
         results.append(("טיוטה חיה - אייקון", icons(page) == 1, str(icons(page))))
         bold = page.evaluate("() => [...document.querySelectorAll('#query-chat .draft b')].map(e => e.textContent)")
-        results.append(("ש6: 'נושא', 'גוף', 'רצוני לשאול' בבולד",
-                        bold == ["נושא:", "גוף:", "רצוני לשאול:"], str(bold)))
+        # ש9 (26.9.2026): התווית "גוף" ירדה מהתצוגה (החלטת ברק) - נשארו שתיים.
+        results.append(("ש6+ש9: 'נושא' ו'רצוני לשאול' בבולד, בלי 'גוף'",
+                        bold == ["נושא:", "רצוני לשאול:"], str(bold)))
 
         results.append(("ש5: אחרי הניסוח - שם השיחה ליד הכותרת, והמונה 1",
                         page.inner_text("#qconv-current").strip() == DRAFT["subject"]
@@ -75,7 +76,7 @@ def main() -> int:
         results.append(("שיחה שנפתחה מחדש - האייקון עדיין שם", icons(page) == 1, str(icons(page))))
         results.append(("שיחה שנפתחה מחדש - תיבת הטיוטה, לא 'נושא:' גולמי",
                         page.locator("#query-chat .draft").count() == 1
-                        # הצורה הגולמית: "גוף: <הטקסט>" באותה שורה. "גוף:" כתווית (ש6) - תקין.
+                        # הצורה הגולמית: "גוף: <הטקסט>" באותה שורה.
                         and "גוף: " + DRAFT["body"].split("\n")[0] not in page.inner_text("#query-chat"),
                         page.inner_text("#query-chat")[:200]))
 

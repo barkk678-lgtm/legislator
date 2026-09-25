@@ -1112,7 +1112,8 @@ def api_query_draft(req: QueryDraftRequestIn) -> dict:
         if side:
             return {"chat_reply": side[1], "chat_kind": side[0]}
         return draft_query(turns=turns, kind=req.kind,
-                           minister=req.minister, mk_name=req.mk_name)
+                           minister=req.minister, mk_name=req.mk_name,
+                           fit_limit=req.fit_limit)
     except QueryDraftError as e:
         raise HTTPException(422, str(e))
 

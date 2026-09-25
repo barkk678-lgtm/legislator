@@ -121,6 +121,7 @@ class QueryDraftRequestIn(BaseModel):
     kind: Literal["רגילה", "דחופה", "ישירה"] = "רגילה"
     minister: str
     mk_name: str
+    fit_limit: bool = False   # ש14: "התכנס למגבלת המילים"
 
 
 class QueryExportRequestIn(BaseModel):
