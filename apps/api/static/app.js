@@ -2945,6 +2945,10 @@ function pqKnessetParams(list) {
 // ומה שנמצא מתווסף למטה. [] = כל הכנסות.
 let pqLast = null;      // {q, plan} של החיפוש האחרון שהסתיים
 let pqRunning = false;
+// ש12 (26.9.2026): על אילו כנסות החיפוש האחרון כבר רץ. "ALL" = כולן.
+// הסרת כנסת **מסתירה** את השורות שלה (לא מוחקת), והחזרתה מציגה אותן
+// שוב בלי חיפוש; חיפוש רץ רק על כנסת שעוד לא חופשה.
+let pqSearchedK = new Set();
 
 function pqAllowed(knesset, list) {
   return !list.length || list.includes(Number(knesset));
@@ -2954,21 +2958,37 @@ function onKnessetChange(before, after) {
   const rowsEl = document.getElementById("pq-rows");
   if (!pqLast || !rowsEl) return;              // עוד לא היה חיפוש
   if (pqRunning) { searchPastQueries(); return; }   // באמצע חיפוש - מתחילים מחדש
-  rowsEl.querySelectorAll("[data-qid]").forEach((el) => {
-    if (!pqAllowed(el.dataset.knesset, after)) el.remove();
-  });
-  const added = !after.length ? (before.length ? [] : null)   // [] = הכול
-    : after.filter((n) => before.length && !before.includes(n));
+  pqApplyKnessetFilter(rowsEl, after);
   pqUpdateDoneCount();
-  if (added === null || (added && !added.length && after.length)) return;   // הסרה בלבד
-  searchPastQueries({ append: true, knessets: added });
+  if (pqSearchedK === "ALL") return;           // הכול כבר חופש - רק תצוגה
+  const missing = after.length ? after.filter((n) => !pqSearchedK.has(n)) : [];
+  if (after.length && !missing.length) return;
+  searchPastQueries({ append: true, knessets: missing });   // [] = הכול
+}
+
+function pqApplyKnessetFilter(rowsEl, list) {
+  rowsEl.querySelectorAll("[data-qid]").forEach((el) => {
+    el.style.display = pqAllowed(el.dataset.knesset, list) ? "" : "none";
+  });
+}
+
+function pqVisibleCount(rowsEl) {
+  return [...rowsEl.querySelectorAll("[data-qid]")].filter((el) => el.style.display !== "none").length;
 }
 
 function pqUpdateDoneCount() {
   const rowsEl = document.getElementById("pq-rows");
   const line = document.querySelector("#pq-done .pq-done-count");
-  if (rowsEl && line) line.textContent = `${rowsEl.querySelectorAll("[data-qid]").length} תוצאות.`;
+  if (rowsEl && line) line.textContent = `${pqVisibleCount(rowsEl)} תוצאות.`;
 }
+
+// ש13 (26.9.2026): במאגר הכנסת יש שאילתות רק מהכנסת ה-19 ואילך. נמדד
+// באתר החי על שבע מילים נפוצות ("משטרה", "חינוך", "ישראל", "תקציב"...):
+// הכנסת ה-17 וה-18 - 0 תוצאות; ה-19 - 92, ה-20 - 221. לכן בלי כפתור 18,
+// שתמיד היה מחזיר כלום, ואייקון "?" משמאל לכנסת הוותיקה שיש לה נתונים.
+const PQ_FIRST_KNESSET = 19;
+const PQ_EARLIER_NOTE = `אין חיפוש בכנסות שלפני הכנסת ה-${PQ_FIRST_KNESSET}: ` +
+  "השאילתות שלהן אינן קיימות במאגר המידע של הכנסת.";
 
 function renderKnessetPicker() {
   const el = document.getElementById("pq-knesset");
@@ -2980,12 +3000,13 @@ function renderKnessetPicker() {
       הנוכחית — החיפוש רץ על כל הכנסות.</span>`;
     return;
   }
-  const opts = (pqKnessetInfo.available || []).slice(-8).reverse();
+  const opts = (pqKnessetInfo.available || []).filter((n) => n >= PQ_FIRST_KNESSET).slice(-8).reverse();
   el.innerHTML =
     `<span class="pq-knesset-note">כנסות:</span>` +
     `<button type="button" class="pq-chip${all ? " on" : ""}" data-k="all">הכול</button>` +
     opts.map((n) => `<button type="button" class="pq-chip${
-      active.includes(n) ? " on" : ""}" data-k="${n}">${n}</button>`).join("");
+      active.includes(n) ? " on" : ""}" data-k="${n}">${n}</button>`).join("") +
+    `<span class="pq-knesset-help" tabindex="0" role="img" aria-label="${PQ_EARLIER_NOTE}" title="${PQ_EARLIER_NOTE}">?</span>`;
   el.querySelectorAll(".pq-chip").forEach((b) => b.addEventListener("click", () => {
     const k = b.dataset.k;
     const before = pqActiveKnessets();
@@ -3141,6 +3162,11 @@ async function pqSearch(opts) {
   const knessets = append ? opts.knessets : pqActiveKnessets();
   const token = ++pqToken;
   pqRunning = true;
+  if (!append) pqSearchedK = knessets.length ? new Set(knessets) : "ALL";
+  else if (pqSearchedK !== "ALL") {
+    if (!knessets.length) pqSearchedK = "ALL";
+    else knessets.forEach((n) => pqSearchedK.add(n));
+  }
 
   if (!append) {
     pqLast = null;
@@ -3374,7 +3400,8 @@ async function pqSearch(opts) {
 
   statusEl.remove();
   pqLast = { q, plan };
-  const foundRows = rowsEl.querySelectorAll("[data-qid]").length;
+  pqApplyKnessetFilter(rowsEl, pqActiveKnessets());   // ש12: שורות מוסתרות נשארות מוסתרות
+  const foundRows = pqVisibleCount(rowsEl);
   const parts = [];
   // ש2: בלי הקופסה הצהובה ובלי "מקורות"/"פיד". אם אחרי כל הניסיונות
   // עדיין חסר משהו - שורה שקטה עם "נסה שוב". **לא מוסתר לגמרי:** זה

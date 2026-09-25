@@ -1,4 +1,12 @@
-"""ש7 (25.9.2026) - סינון לפי כנסת בשאילתות קודמות: עדכון מיידי, בלי לבנות מחדש.
+"""ש7 (25.9.2026) + ש12, ש13 (26.9.2026) - סינון לפי כנסת בשאילתות קודמות.
+
+ש12: הסרת כנסת **מסתירה** את השורות שלה, והחזרתה מציגה אותן שוב - בלי
+חיפוש חדש. חיפוש רץ רק על כנסת שעוד לא חופשה. (עד כאן ההסרה מחקה את
+השורות, וההחזרה הריצה את החיפוש שוב.)
+ש13: אין כפתור לכנסת 18 (במאגר הכנסת אין שאילתות לפני ה-19 - נמדד), ויש
+"?" משמאל לכנסת 19 עם הסבר.
+
+ש7: עדכון מיידי, בלי לבנות מחדש.
 
 הוספת כנסת: התוצאות הקיימות נשארות, החיפוש רץ **רק** על הכנסת החדשה (בלי
 קריאה נוספת לפירוק), ומה שנמצא מתווסף. הסרת כנסת: השורות שלה יורדות מיד,
@@ -61,7 +69,8 @@ def main() -> int:
         page.wait_for_selector('#pq-knesset .pq-chip[data-k="24"]')
 
         def titles():
-            return page.evaluate("() => [...document.querySelectorAll('#pq-rows .pq-title')].map(e => e.textContent)")
+            return page.evaluate("""() => [...document.querySelectorAll('#pq-rows [data-qid]')]
+                .filter(r => r.style.display !== 'none').map(r => r.querySelector('.pq-title').textContent)""")
 
         def settle():
             page.wait_for_function("() => !document.getElementById('pq-status')", timeout=15000)
@@ -81,6 +90,17 @@ def main() -> int:
         results.append(("הסרת 24: שורת הספירה התעדכנה",
                         page.inner_text("#pq-done").startswith("1 תוצאות"), page.inner_text("#pq-done")))
 
+        # ש12: החזרת 24 - השורה חוזרת, בלי חיפוש חדש
+        before = len(calls["unit"])
+        page.click('#pq-knesset .pq-chip[data-k="24"]')
+        page.wait_for_timeout(400)
+        results.append(("ש12: החזרת 24 - השורה חזרה", sorted(titles()) == sorted([ROWS[25], ROWS[24]]), str(titles())))
+        results.append(("ש12: החזרת 24 - אפס בקשות חדשות", len(calls["unit"]) == before, str(calls["unit"][before:])))
+        results.append(("ש12: החזרת 24 - שורת הספירה", page.inner_text("#pq-done").startswith("2 תוצאות"),
+                        page.inner_text("#pq-done")))
+        page.click('#pq-knesset .pq-chip[data-k="24"]')   # שוב בלי 24, לשלבים הבאים
+        page.wait_for_timeout(300)
+
         # הוספה - רק הכנסת החדשה, בלי פירוק נוסף
         before, plans = len(calls["unit"]), calls["plan"]
         page.click('#pq-knesset .pq-chip[data-k="23"]')
@@ -98,8 +118,15 @@ def main() -> int:
         page.click('#pq-knesset .pq-chip[data-k="all"]')
         settle()
         t = titles()
-        results.append(("'הכול': כל שלוש, בלי כפילות, הקיימות בראש",
-                        t[:2] == [ROWS[25], ROWS[23]] and sorted(t) == sorted(ROWS.values()), str(t)))
+        results.append(("'הכול': כל שלוש, בלי כפילות", len(t) == 3 and sorted(t) == sorted(ROWS.values()), str(t)))
+
+        # ש13
+        chips = page.eval_on_selector_all("#pq-knesset .pq-chip", "els => els.map(e => e.dataset.k)")
+        results.append(("ש13: בלי כפתור 18, 19 הוא האחרון", "18" not in chips and chips[-1] == "19", str(chips)))
+        help_ok = page.evaluate("""() => { const h = document.querySelector('#pq-knesset .pq-knesset-help');
+            return !!h && h.previousElementSibling.dataset.k === '19' && h.title.includes('הכנסת ה-19')
+                && h.title.includes('מאגר המידע של הכנסת'); }""")
+        results.append(("ש13: '?' משמאל ל-19 עם הסבר", help_ok, str(help_ok)))
         results.append(("אפס שגיאות JS", not errors, str(errors)))
         b.close()
 

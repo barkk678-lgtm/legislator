@@ -750,3 +750,12 @@ button.undo-btn svg {
 a.rules-cite { color: var(--flag); text-decoration: underline; text-decoration-style: dotted;
   text-underline-offset: 3px; cursor: pointer; }
 a.rules-cite:hover { text-decoration-style: solid; }
+
+/* ש13: "?" משמאל לכנסת הוותיקה ביותר - למה אין כנסות קודמות */
+.pq-knesset-help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%; margin-inline-start: 4px;
+  border: 1px solid var(--rule); color: var(--soft); font-size: 12px; font-weight: 700;
+  cursor: help; vertical-align: middle;
+}
+.pq-knesset-help:hover, .pq-knesset-help:focus { color: var(--ink, #222); border-color: var(--soft); }
