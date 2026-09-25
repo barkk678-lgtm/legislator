@@ -262,14 +262,27 @@ def journey_open_and_edit(base, res):
     return law_id, payload
 
 
+# ח17 + צ5 (26.9): הורדת Word לקחה כדקה, כי המודל (דברי ההסבר) ומאגר הכנסת
+# (המגדר) רצו ברגע הלחיצה. עכשיו שניהם מוכנים מראש, והלקוח שולח אותם - כמו
+# כאן. תקרה, כדי שהאטה לא תחזור בשקט.
+DOCX_MAX_SECONDS = 6.0
+QUERY_DOCX_MAX_SECONDS = 3.0
+_READY_EXPLANATORY = ["מוצע לקבוע כי מנהל קייטנה יפעל בכפוף לכל דין."]
+
+
 def journey_docx(base, res, law_id, payload):
     """הלקוח מוריד קובץ Word. אם הקובץ פגום - המוצר לא סיפק כלום."""
     print("\n[2] הורדת קובץ Word")
+    # כמו הלקוח: דברי ההסבר כבר נכתבו ברקע (/explanatory) ונשלחים עם ההורדה
+    payload = {**payload, "bill": {**payload.get("bill", {}), "explanatory": _READY_EXPLANATORY}}
     req = urllib.request.Request(
         base + f"/api/laws/{law_id}/docx", data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
+    started = time.time()
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         raw = r.read()
+    took = time.time() - started
+    res.check(f"ההורדה תוך {DOCX_MAX_SECONDS:.0f} שניות", took < DOCX_MAX_SECONDS, f"{took:.1f} שניות")
     ok_zip = raw[:2] == b"PK"
     res.check("הקובץ הוא docx תקין (ZIP)", ok_zip, f"{len(raw):,} בייטים")
     if not ok_zip:
@@ -287,7 +300,16 @@ def journey_docx(base, res, law_id, payload):
               "; ".join(problems[:3]) or "נקי")
     # **דברי ההסבר נוצרים אף שהשדה הוסר מהממשק** (ברק, 21.9) -
     # זו בדיוק הדרישה שאומתה אז, וכאן היא ננעלת מול האתר החי.
-    res.check("דברי הסבר נוצרו אוטומטית", "דברי הסבר" in text)
+    res.check("דברי ההסבר שנכתבו מראש נכנסו לקובץ", "דברי הסבר" in text and "בכפוף לכל דין" in text)
+
+
+def journey_explanatory(base, res, law_id, payload):
+    """ח17: דברי ההסבר נכתבים ברקע אחרי עריכה - המסלול שבו המודל רץ."""
+    print("\n[2ב] דברי ההסבר ברקע")
+    status, body = _post(base, f"/api/laws/{law_id}/explanatory", payload)
+    paras = json.loads(body).get("explanatory") or []
+    res.check("דברי ההסבר נכתבו", status == 200 and bool(paras) and all(p.startswith("מוצע") for p in paras),
+              (paras[0][:80] if paras else "ריק"))
 
 
 def journey_basic_law_search(base, res):
@@ -324,10 +346,14 @@ def journey_query_docx(base, res):
         base + "/api/query/export",
         data=json.dumps({"kind": "רגילה", "minister": "השר לביטחון לאומי",
                          "mk_name": "ישראל ישראלי", "subject": "בדיקה",
-                         "body": "רקע.\nרצוני לשאול:\n1. שאלה?"}).encode(),
+                         "body": "רקע.\nרצוני לשאול:\n1. שאלה?", "gender": "זכר"}).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
+    started = time.time()
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         raw = r.read()
+    took = time.time() - started
+    res.check(f"ייצוא השאילתה תוך {QUERY_DOCX_MAX_SECONDS:.0f} שניות", took < QUERY_DOCX_MAX_SECONDS,
+              f"{took:.1f} שניות")
     problems = structural_problems(raw)
     res.check("קובץ השאילתה תקין מבנית", raw[:2] == b"PK" and not problems,
               "; ".join(problems[:3]) or f"{len(raw):,} בייטים")
@@ -539,6 +565,8 @@ def main():
     if args.with_llm:
         run("כלי הצ'אט", journey_chat, base, res)
         run("מומחה התקנון - מקורות", journey_rules_citations, base, res)
+        if edited:
+            run("דברי ההסבר ברקע", journey_explanatory, base, res, *edited)
         run("צ'אטבוטים - חולין וקללה", journey_chat_smalltalk, base, res)
     else:
         print("\n(דילוג על כלי ה-LLM - הרץ עם --with-llm)")

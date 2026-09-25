@@ -1058,6 +1058,19 @@ def api_insert_preview(law_id: str, req: InsertPreviewRequestIn) -> dict:
     return dataclasses.asdict(preview)
 
 
+@app.post("/api/laws/{law_id}/explanatory")
+def api_explanatory(law_id: str, req: RenderRequest) -> dict:
+    """ח17 (26.9.2026): דברי ההסבר **ברקע, אחרי עריכה**, ולא ברגע ההורדה.
+    המודל לוקח 11-14 שניות (נמדד על חמש עריכות בחוק-יסוד: הכנסת), והיה
+    רץ בכל לחיצה על "הורדה". הלקוח קורא לכאן אחרי שההקלדה נרגעת, שומר את
+    התוצאה עם הטיוטה, ושולח אותה ב-bill.explanatory עם ההורדה."""
+    before, result, lines, bill, findings = _render(law_id, req)
+    if not lines:
+        return {"explanatory": []}
+    return {"explanatory": draft_explanatory_llm(
+        lines, before, result.after, touched_section_numbers(before, result.after))}
+
+
 @app.post("/api/laws/{law_id}/docx")
 def api_docx(law_id: str, req: RenderRequest):
     before, result, lines, bill, findings = _render(law_id, req)
@@ -1066,6 +1079,8 @@ def api_docx(law_id: str, req: RenderRequest):
     # הקובץ קיבל תמיד את draft_explanatory_notes ("מוצע לתקן את סעיף 5.")
     # - חזרה על הטבלה. כאן, ולא ב-/render: הורדה היא פעולה אחת, והתצוגה
     # החיה לא תחכה למודל בכל הקלדה. כשל -> הדטרמיניסטי (בתוך הפונקציה).
+    # ח17: הלקוח שולח את דברי ההסבר שכבר נכתבו ברקע (/explanatory) - ואז
+    # אין כאן קריאה למודל. המסלול הזה נשאר רק ללקוח שלא שלח אותם.
     if lines and not req.bill.explanatory:
         bill.explanatory = draft_explanatory_llm(
             lines, before, result.after, touched_section_numbers(before, result.after))
@@ -1102,6 +1117,13 @@ def api_query_draft(req: QueryDraftRequestIn) -> dict:
         raise HTTPException(422, str(e))
 
 
+@app.get("/api/queries/mk-gender")
+def api_mk_gender(name: str = "") -> dict:
+    """צ5: המגדר של חבר/ת הכנסת לפי שם מלא, כשהמשתמש ממלא את השדה - כך
+    שהייצוא לא ממתין למאגר. None = לא ידוע (הקובץ כותב את הצורה הכפולה)."""
+    return {"name": name, "gender": mk_gender(name)}
+
+
 @app.post("/api/query/export")
 def api_query_export(req: QueryExportRequestIn):
     query = {
@@ -1112,7 +1134,10 @@ def api_query_export(req: QueryExportRequestIn):
         "body": req.body,
     }
     out_path = Path(tempfile.mkstemp(suffix=".docx")[1])
-    write_query_docx(query, out=out_path, gender=mk_gender(req.mk_name))
+    # צ5: **בלי פנייה למאגר הכנסת ברגע ההורדה.** המגדר מגיע מהלקוח, שנשלף
+    # כשמולא השם (/api/queries/mk-gender). עד כאן mk_gender רץ כאן - ובפיד
+    # איטי או חוסם, כל הורדה חיכתה עד 20 שניות לעמוד.
+    write_query_docx(query, out=out_path, gender=req.gender)
     return FileResponse(
         out_path,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

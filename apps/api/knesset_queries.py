@@ -492,6 +492,8 @@ def _person_names(person_ids: list[int]) -> dict[int, str]:
 
 _gender_cache: tuple[float, dict[str, set[str]]] | None = None
 _GENDER_TTL = 24 * 3600
+_gender_failed_at = 0.0
+_GENDER_FAIL_TTL = 600
 
 
 def mk_gender(full_name: str) -> str | None:
@@ -507,10 +509,16 @@ def mk_gender(full_name: str) -> str | None:
     if not name:
         return None
     if not _gender_cache or time.time() - _gender_cache[0] > _GENDER_TTL:
+        global _gender_failed_at
+        # צ5 (26.9.2026): **כישלון נשמר במטמון 10 דקות.** עד כאן כל קריאה
+        # אחרי כישלון פנתה שוב לפיד - עד 20 שניות לעמוד, בכל הורדה.
+        if time.time() - _gender_failed_at < _GENDER_FAIL_TTL:
+            return None
         try:
             rows = fetch("KNS_Person", filter="IsCurrent eq true",
                          select="FirstName,LastName,GenderDesc")
         except OdataError:
+            _gender_failed_at = time.time()
             return None
         by_name: dict[str, set[str]] = {}
         for r in rows:

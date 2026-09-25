@@ -132,6 +132,10 @@ class QueryExportRequestIn(BaseModel):
     mk_name: str
     subject: str
     body: str
+    # צ5 (26.9.2026): המגדר נשלף **כשהמשתמש ממלא את השם** (/api/queries/
+    # mk-gender) ונשלח עם הייצוא. None = לא ידוע -> הצורה הכפולה. הייצוא
+    # עצמו לא פונה למאגר הכנסת.
+    gender: Literal["זכר", "נקבה"] | None = None
 
 
 class AgendaDraftRequestIn(BaseModel):

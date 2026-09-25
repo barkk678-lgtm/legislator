@@ -1095,6 +1095,7 @@ async function refreshPreview() {
   renderInsertionErrors(data.insertion_errors);
   scheduleDraftSave();
   renderDocxApprox(data.lines);
+  scheduleExplanatory((data.lines || []).length > 0);
   // ח10: כל כשל בשורה משלו, בגוף ראשון ובמונחים של המשתמש - לא "1 הוספות
   // לא בוצעו (ראו כרטיסי השגיאה בעץ)".
   const failures = failureLines(data);
@@ -1277,9 +1278,74 @@ function showInsertForm(menu, node, level, label) {
   menu.querySelector(".insert-cancel-btn").onclick = () => menu.remove();
 }
 
+/* ═══ ח17 - דברי ההסבר ברקע, לא ברגע ההורדה ═══
+ * המודל לוקח 11-14 שניות (נמדד), והיה רץ בכל לחיצה על "הורדה". עכשיו
+ * הוא רץ כשההקלדה נרגעת, והתוצאה נשמרת לפי המצב המדויק של העריכות
+ * (explanatoryKey) - גם בטיוטה. בהורדה נשלח מה שכבר נכתב; אם הניסוח למצב
+ * הזה עוד רץ - מחכים רק ליתרה שלו. */
+const EXPLANATORY_DELAY_MS = 2500;
+let explanatoryCache = { key: null, paragraphs: [] };
+let explanatoryInflight = null;   // {key, promise}
+let explanatoryTimer = null;
+
+function explanatoryKey() {
+  return JSON.stringify({ l: currentLawId, e: editsPayload(), i: insertionsPayload() });
+}
+
+function requestExplanatory(key) {
+  if (explanatoryInflight && explanatoryInflight.key === key) return explanatoryInflight.promise;
+  const req = { edits: editsPayload(), insertions: insertionsPayload(), bill: billMeta() };
+  const lawId = currentLawId;
+  const promise = (async () => {
+    try {
+      const resp = await fetch(`/api/laws/${lawId}/explanatory`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),
+      });
+      const data = resp.ok ? await resp.json() : null;
+      const paragraphs = data && Array.isArray(data.explanatory) ? data.explanatory : null;
+      if (paragraphs && paragraphs.length) {
+        explanatoryCache = { key, paragraphs };
+        scheduleDraftSave();
+      }
+      return paragraphs;
+    } catch {
+      return null;
+    } finally {
+      if (explanatoryInflight && explanatoryInflight.key === key) explanatoryInflight = null;
+    }
+  })();
+  explanatoryInflight = { key, promise };
+  return promise;
+}
+
+function scheduleExplanatory(hasLines) {
+  clearTimeout(explanatoryTimer);
+  if (!hasLines) return;
+  explanatoryTimer = setTimeout(() => {
+    const key = explanatoryKey();
+    if (explanatoryCache.key !== key) requestExplanatory(key);
+  }, EXPLANATORY_DELAY_MS);
+}
+
+async function explanatoryForDownload() {
+  const key = explanatoryKey();
+  if (explanatoryCache.key === key) return explanatoryCache.paragraphs;
+  clearTimeout(explanatoryTimer);
+  return (await requestExplanatory(key)) || [];
+}
+
 document.getElementById("download-btn").addEventListener("click", async () => {
   if (!currentLawId) return;
-  const req = { edits: editsPayload(), insertions: insertionsPayload(), bill: billMeta() };
+  const btn = document.getElementById("download-btn");
+  const label = btn.textContent;
+  const ready = explanatoryCache.key === explanatoryKey();
+  if (!ready) { btn.disabled = true; btn.textContent = "מכין את דברי ההסבר…"; }
+  let explanatory = [];
+  try { explanatory = await explanatoryForDownload(); } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+  const req = { edits: editsPayload(), insertions: insertionsPayload(),
+                bill: { ...billMeta(), explanatory } };
   const resp = await fetch(`/api/laws/${currentLawId}/docx`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1382,6 +1448,8 @@ function saveCurrentDraft() {
     title: document.getElementById("bill-title-input").value || "",
     edits: Object.values(edits),
     insertions: insertionsPayload(),
+    // ח17: דברי ההסבר שכבר נכתבו ברקע - רק אם הם של המצב הנוכחי בדיוק
+    explanatory: explanatoryCache.key === explanatoryKey() ? explanatoryCache.paragraphs : [],
   });
   const stored = writeDrafts(list);
   renderDraftList();
@@ -1527,6 +1595,8 @@ async function openDraft(draftId) {
   insertions = (draft.insertions || []).map((i) => ({ ...i }));
   insertionClientIds = new Set(insertions.map((i) => i.clientId));
   resetUndo();
+  explanatoryCache = (draft.explanatory || []).length
+    ? { key: explanatoryKey(), paragraphs: draft.explanatory } : { key: null, paragraphs: [] };
 
   const data = await refreshPreview();
   const failed = (data && data.edit_statuses || []).filter((s) => !s.ok).length;
@@ -1827,14 +1897,39 @@ async function sendQueryMessage() {
 document.getElementById("query-send-btn").addEventListener("click", sendQueryMessage);
 bindComposer(document.getElementById("query-composer-input"), sendQueryMessage);
 
+/* צ5 (26.9.2026): המגדר של חבר/ת הכנסת נשלף **כשממלאים את השם**, לא
+ * בהורדה. עד כאן הייצוא פנה בעצמו למאגר הכנסת - ובמאגר איטי או חוסם כל
+ * הורדה חיכתה עד 20 שניות לעמוד. בהורדה נשלח מה שכבר ידוע; שם שעוד לא
+ * נבדק - המתנה של שנייה וחצי לכל היותר, ואחריה הצורה הכפולה. */
+const mkGenderCache = new Map();   // שם -> Promise<"זכר"|"נקבה"|null>
+
+function mkGenderLookup(name) {
+  const key = (name || "").trim().split(/\s+/).join(" ");
+  if (!key) return Promise.resolve(null);
+  if (!mkGenderCache.has(key)) {
+    mkGenderCache.set(key, fetch(`/api/queries/mk-gender?name=${encodeURIComponent(key)}`)
+      .then((r) => (r.ok ? r.json() : null)).then((d) => (d && d.gender) || null)
+      .catch(() => { mkGenderCache.delete(key); return null; }));
+  }
+  return mkGenderCache.get(key);
+}
+
+async function mkGenderForExport(name) {
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+  return Promise.race([mkGenderLookup(name), timeout]);
+}
+
+document.getElementById("query-mk-input").addEventListener("change", (ev) => mkGenderLookup(ev.target.value));
+
 async function exportQueryDraft(draft, btn) {
   const original = btn ? btn.getAttribute("title") : "";
   try {
     if (btn) { btn.disabled = true; btn.setAttribute("title", "מייצא…"); }
+    const gender = await mkGenderForExport(draft.mk_name);
     const resp = await fetch("/api/query/export", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(draft),
+      body: JSON.stringify({ ...draft, gender }),
     });
     // **כשל ייצוא לא נבלע.** לחיצה שלא עושה כלום נראית כמו תקלה
     // בכפתור, והמשתמש לוחץ שוב ושוב.
@@ -2165,6 +2260,7 @@ function openConv(id) {
   currentQueryDraft = null;
   document.getElementById("query-minister-input").value = conv.minister || "";
   document.getElementById("query-mk-input").value = conv.mk || "";
+  mkGenderLookup(conv.mk);   // צ5 - לפני ההורדה, לא בזמנה
   if (conv.kind) document.getElementById("query-kind-input").value = conv.kind;
   const chat = document.getElementById("query-chat");
   chat.innerHTML = "";
