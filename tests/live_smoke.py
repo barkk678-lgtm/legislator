@@ -537,7 +537,8 @@ def journey_static(base, res):
     res.check("הדף נטען", status == 200)
     res.check("לשונית הצעות חוק קיימת", 'data-t="bills"' in html)
     res.check("כפתור ההצעות שלי קיים", 'id="drafts-toggle"' in html)
-    for asset in ("/static/app.js", "/static/style.css"):
+    res.check("הלוגו בתפריט הצד (26.9)", 'src="/static/logo.webp"' in html)
+    for asset in ("/static/app.js", "/static/style.css", "/static/logo.webp"):
         try:
             st, b = _get(base, asset)
             res.check(f"{asset} נטען", st == 200 and len(b) > 500, f"{len(b):,} בייטים")

@@ -59,9 +59,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   width: 236px; flex: 0 0 236px; background: var(--navy); color: #fff;
   display: flex; flex-direction: column; height: 100vh;
 }
-.brand { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,.13); }
-.brand b { display: block; font-size: 19px; font-weight: 700; }
-.brand span { display: block; font-size: 12.5px; color: #9FB4D8; margin-top: 2px; }
+/* הלוגו (26.9) - כולל את השם ואת "ארגז הכלים הפרלמנטרי". הרקע שלו #0E2B5A,
+   כמעט זהה ל---navy, ולכן אין מסגרת נראית סביבו. */
+.brand { padding: 10px 8px 8px; border-bottom: 1px solid rgba(255,255,255,.13); }
+.brand img { display: block; width: 100%; height: auto; }
 .nav { padding: 12px 10px; flex: 1; overflow: auto; }
 .nav button {
   display: flex; align-items: center; gap: 10px; width: 100%;
