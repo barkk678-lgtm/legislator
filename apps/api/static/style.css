@@ -195,6 +195,9 @@ select { font-weight: 600; max-width: 420px; }
 .node.status-repealed > .node-header,
 .node.status-merged > .node-header { color: var(--faint); font-style: italic; }
 .node-number { color: var(--faint); font-weight: 400; font-size: 12.5px; }
+/* ח14 (26.9.2026): מספר הסעיף - בגוון, בגודל ובגופן של כותרת השוליים שלידו
+   (יורש מ-.node-header). התוויות "(א)", "(1)" בשורת הטקסט נשארות כמו שהן. */
+.node-header > .node-number { color: inherit; font-weight: inherit; font-size: inherit; font-family: inherit; }
 
 .node-body-row { display: flex; align-items: flex-end; gap: 6px; }
 .node-body-row > .node-text,

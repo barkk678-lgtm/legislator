@@ -39,6 +39,8 @@
         <span class="spinner"></span>טוען את נוסח החוק…
       </div>
       <div class="grow"></div>
+      <!-- ח20 (26.9.2026): "צור הצעה חדשה" מחוץ ל"ההצעות שלי" - כחול וגלוי תמיד -->
+      <button id="draft-new-btn" class="primary new-draft-btn">+ צור הצעה חדשה</button>
       <button id="drafts-toggle" class="subtle">ההצעות שלי <span id="drafts-count"></span></button>
       <button id="download-btn" class="primary">הורדת docx</button>
     </div>
@@ -70,7 +72,6 @@
             <b>ההצעות שלי</b>
             <span class="hint">נשמרות בדפדפן הזה בלבד, אוטומטית בכל עריכה.</span>
             <div class="grow"></div>
-            <button id="draft-new-btn" class="subtle">הצעה חדשה</button>
             <span id="draft-save-status" class="draft-save-status"></span>
           </div>
           <div id="drafts-list"></div>
@@ -89,7 +90,7 @@
 
           <div class="cols">
             <section class="card">
-              <header><h2>נוסח החוק</h2><span>לחצו לעריכה</span>
+              <header><h2>נוסח החוק</h2>
                 <div class="undo-bar">
                   <button id="undo-btn" type="button" class="undo-btn" title="ביטול (Ctrl+Z)" disabled>
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7l5 5-5 5"/><path d="M20 12H9a5 5 0 0 0 0 10h2"/></svg>ביטול</button>
