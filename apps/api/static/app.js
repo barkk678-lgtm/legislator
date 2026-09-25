@@ -258,6 +258,7 @@ async function onLawChange(lawId) {
     insertions = [];
     insertionClientIds = new Set();
     everEditedFieldKeys = new Set();
+    resetUndo();
     fieldElements = {};
     originalTextById = {};
     originalMarginTitleById = {};
@@ -419,6 +420,7 @@ function renderNode(node, depth) {
       removeBtn.textContent = "✕ הסר הוספה";
       removeBtn.addEventListener("click", async (ev) => {
         ev.stopPropagation();
+        pushUndo();
         insertions = insertions.filter((i) => i.clientId !== node.id);
         insertionClientIds.delete(node.id);
         await refreshPreview();
@@ -553,6 +555,7 @@ function hasDeletableText(node) {
 
 // ח4: מרוקן את כל שדות הטקסט של היחידה ושל צאצאיה, ורושם אותם כעריכות.
 function deleteUnit(node) {
+  pushUndo();
   const walk = (n) => {
     const el = fieldElements[`${n.id}:text`];
     if (el) { el.textContent = ""; recordField(el); }
@@ -580,6 +583,8 @@ function recordField(el) {
 
   const key = `${nodeId}:${field}`;
   const original = field === "margin_title" ? originalMarginTitleById[nodeId] : originalTextById[nodeId];
+  // שדה של הוספה שכבר הוסרה (ביטול פעולה, ח7) - אין מקור ואין הוספה.
+  if (!(nodeId in originalTextById)) return;
   if (currentText === original) {
     delete edits[key];
   } else {
@@ -617,6 +622,12 @@ function setPreviewPending(on) {
 
 function onFieldInput(ev) {
   const el = ev.target;
+  if (ev instanceof Event && ev.type === "input") {
+    // הקלדה שהדפדפן ביצע בעצמו (הרכבה, שדה של הוספה חדשה): התמונה
+    // נלקחת לפני recordField, ולכן היא המצב שלפני הקלט הזה.
+    pushUndo({ key: `${el.dataset.nodeId}:${el.dataset.field}`,
+               kind: (ev.inputType || "").startsWith("delete") ? "del" : "ins" });
+  }
   const native = ev instanceof Event &&
     (ev.type === "compositionend" || (ev.type === "input" && !ev.isComposing));
   if (native && tracksChanges(el)) {
@@ -799,6 +810,122 @@ function renderTracked(el, original, current) {
         : `<ins>${escapeHtml(text)}</ins>`).join("");
 }
 
+/* ═══ ח7 - ביטול פעולה ═══
+ * מחסנית אחת של תמונות מצב (edits + insertions) לכל העריכה בחוק. הקלדה
+ * ברצף באותו שדה ובאותו כיוון (הוספה / מחיקה) היא צעד אחד - הפסקה של יותר
+ * משנייה, מעבר שדה או מעבר ממחיקה להקלדה פותחים צעד חדש. מחיקה בפח,
+ * הוספת סעיף והסרת הוספה - צעד אחד כל אחת. Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z
+ * לפי המקש (code), ולכן עובד גם בפריסה עברית ("ז"). בתיבות טקסט רגילות
+ * (שם ההצעה, תפריט ההוספה) - הביטול של הדפדפן עצמו. */
+const UNDO_LIMIT = 200;
+const TYPING_GAP_MS = 1000;
+let undoStack = [];
+let redoStack = [];
+let lastTyping = null;   // {key, kind, at}
+
+function editorSnapshot() {
+  return { edits: JSON.parse(JSON.stringify(edits)), insertions: JSON.parse(JSON.stringify(insertions)) };
+}
+
+function renderUndoButtons() {
+  const u = document.getElementById("undo-btn"), r = document.getElementById("redo-btn");
+  if (u) u.disabled = !undoStack.length;
+  if (r) r.disabled = !redoStack.length;
+}
+
+// נקרא **לפני** השינוי. typing: {key, kind} - הקלדה שאולי ממשיכה צעד קיים.
+function pushUndo(typing = null) {
+  const now = Date.now();
+  if (typing && lastTyping && lastTyping.key === typing.key && lastTyping.kind === typing.kind &&
+      now - lastTyping.at < TYPING_GAP_MS) {
+    lastTyping.at = now;
+    return;
+  }
+  lastTyping = typing ? { ...typing, at: now } : null;
+  undoStack.push(editorSnapshot());
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  redoStack = [];
+  renderUndoButtons();
+}
+
+function resetUndo() {
+  undoStack = [];
+  redoStack = [];
+  lastTyping = null;
+  renderUndoButtons();
+}
+
+function restoreSnapshot(snap) {
+  lastTyping = null;
+  const active = document.activeElement && document.activeElement.isContentEditable
+    && document.activeElement.closest("#law-tree") ? document.activeElement : null;
+  const insChanged = JSON.stringify(snap.insertions) !== JSON.stringify(insertions);
+  // הוספות שהשתנו מחייבות בניית עץ, וזו לא נעשית כששדה בפוקוס - יוצאים
+  // מהשדה **לפני** שהמצב מוחלף, כדי שה-blur ירשום את המצב הנוכחי ולא
+  // שדה של הוספה שכבר לא קיימת.
+  if (insChanged && active) active.blur();
+  const keys = new Set([...Object.keys(edits), ...Object.keys(snap.edits)]);
+  edits = snap.edits;
+  insertions = snap.insertions;
+  insertionClientIds = new Set(insertions.map((i) => i.clientId));
+  let caret = null;
+  for (const key of keys) {
+    everEditedFieldKeys.add(key);
+    const el = fieldElements[key];
+    if (!el || !tracksChanges(el)) continue;
+    const text = key in edits ? edits[key].text : fieldOriginal(el);
+    const prev = fieldPlainText(el);
+    if (prev === text) continue;
+    renderTracked(el, fieldOriginal(el), text);
+    el.classList.remove("edit-unsupported");
+    if (el === active && !insChanged) {
+      // הסמן - בסוף האזור ששוחזר (או במקום שממנו נמחקה ההקלדה)
+      let pre = 0;
+      while (pre < prev.length && pre < text.length && prev[pre] === text[pre]) pre += 1;
+      let suf = 0;
+      while (suf < prev.length - pre && suf < text.length - pre &&
+             prev[prev.length - 1 - suf] === text[text.length - 1 - suf]) suf += 1;
+      caret = [el, text.length - suf];
+    }
+  }
+  if (caret) setPlainSelection(caret[0], caret[1]);
+  setPreviewPending(true);
+  clearTimeout(livePreviewTimer);
+  refreshPreview();
+  renderUndoButtons();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(editorSnapshot());
+  restoreSnapshot(undoStack.pop());
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(editorSnapshot());
+  restoreSnapshot(redoStack.pop());
+}
+
+document.addEventListener("keydown", (ev) => {
+  if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
+  const isZ = ev.code === "KeyZ", isY = ev.code === "KeyY";
+  if (!isZ && !isY) return;
+  const tab = document.getElementById("bills");
+  if (!tab || !tab.classList.contains("on") || !currentLawId) return;
+  const a = document.activeElement;
+  if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT")) return;
+  if (a && a.isContentEditable && !a.closest("#law-tree")) return;
+  ev.preventDefault();
+  if (isY || ev.shiftKey) redo(); else undo();
+});
+for (const [id, fn] of [["undo-btn", undo], ["redo-btn", redo]]) {
+  const btn = document.getElementById(id);
+  // mousedown בלי פוקוס: השדה שבעריכה נשאר בפוקוס והסמן במקומו
+  btn.addEventListener("mousedown", (ev) => ev.preventDefault());
+  btn.addEventListener("click", fn);
+}
+
 function tracksChanges(el) {
   return !insertions.some((i) => i.clientId === el.dataset.nodeId);
 }
@@ -841,6 +968,11 @@ function onFieldBeforeInput(ev) {
     if (s === e) e = text.length;
   } else if (t.startsWith("delete")) {
     // deleteByCut / deleteByDrag / deleteContent - הבחירה עצמה
+  } else if (t === "historyUndo" || t === "historyRedo") {
+    // "בטל" מתפריט העריכה של הדפדפן - אותה מחסנית כמו Ctrl+Z
+    ev.preventDefault();
+    if (t === "historyUndo") undo(); else redo();
+    return;
   } else {
     // שבירת שורה, עיצוב (Ctrl+B) וכו' - לא חלק מנוסח חוק
     ev.preventDefault();
@@ -848,6 +980,7 @@ function onFieldBeforeInput(ev) {
   }
   ev.preventDefault();
   if (s === e && !data) return;
+  pushUndo({ key: `${el.dataset.nodeId}:${el.dataset.field}`, kind: data ? "ins" : "del" });
   const next = text.slice(0, s) + data + text.slice(e);
   renderTracked(el, fieldOriginal(el), next);
   setPlainSelection(el, s + data.length);
@@ -874,6 +1007,7 @@ function renderInsertionErrors(errors) {
     removeBtn.className = "subtle";
     removeBtn.textContent = "הסר";
     removeBtn.addEventListener("click", async () => {
+      pushUndo();
       insertions = insertions.filter((i) => i.clientId !== err.client_id);
       insertionClientIds.delete(err.client_id);
       card.remove();
@@ -1127,6 +1261,7 @@ function showInsertForm(menu, node, level, label) {
       return;
     }
     const clientId = `ins-${++insertionCounter}`;
+    pushUndo();
     insertions.push({
       clientId,
       kind: level,
@@ -1391,6 +1526,7 @@ async function openDraft(draftId) {
   }
   insertions = (draft.insertions || []).map((i) => ({ ...i }));
   insertionClientIds = new Set(insertions.map((i) => i.clientId));
+  resetUndo();
 
   const data = await refreshPreview();
   const failed = (data && data.edit_statuses || []).filter((s) => !s.ok).length;
@@ -1418,6 +1554,7 @@ function newDraft() {
   insertions = [];
   insertionClientIds = new Set();
   everEditedFieldKeys = new Set();
+  resetUndo();
   document.getElementById("bill-title-input").value = "";
   showDraftNotice("", "");
   if (currentLawId) refreshPreview();

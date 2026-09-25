@@ -712,3 +712,16 @@ button.qconv-all[hidden] { display: none; }
 
 /* ח10: כשל בקליטת עריכה/הוספה - שורה לכל כשל, בולטת */
 #download-hint .failure-line { color: var(--del); font-weight: 600; margin-top: 4px; }
+
+/* ח7: ביטול / חזרה בכותרת נוסח החוק */
+.undo-bar { margin-inline-start: auto; display: flex; gap: 6px; align-self: center; }
+button.undo-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; font-weight: 600; padding: 4px 10px;
+  border: 1px solid var(--rule); background: var(--page); color: var(--flag);
+}
+button.undo-btn:hover:not(:disabled) { border-color: var(--flag); background: var(--tint-2); }
+button.undo-btn svg {
+  width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}

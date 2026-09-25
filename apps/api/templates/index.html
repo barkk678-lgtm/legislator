@@ -90,7 +90,14 @@
 
           <div class="cols">
             <section class="card">
-              <header><h2>נוסח החוק</h2><span>לחצו לעריכה</span></header>
+              <header><h2>נוסח החוק</h2><span>לחצו לעריכה</span>
+                <div class="undo-bar">
+                  <button id="undo-btn" type="button" class="undo-btn" title="ביטול (Ctrl+Z)" disabled>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7l5 5-5 5"/><path d="M20 12H9a5 5 0 0 0 0 10h2"/></svg>ביטול</button>
+                  <button id="redo-btn" type="button" class="undo-btn" title="חזרה (Ctrl+Y)" disabled>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7l-5 5 5 5"/><path d="M4 12h11a5 5 0 0 1 0 10h-2"/></svg>חזרה</button>
+                </div>
+              </header>
               <div class="body">
                 <div id="law-tree-empty" class="tree-empty">בחרו חוק בשורת החיפוש שלמעלה, והנוסח שלו יופיע כאן לעריכה.</div>
                 <div id="law-tree"></div>
