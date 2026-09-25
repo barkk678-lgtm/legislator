@@ -467,13 +467,19 @@ def run_unit(words: list[str], *, top: int = 200, knesset_nums: list[int] | None
     return result
 
 
+_PERSON_CHUNK = 150   # מזהים ב-`in (...)` אחד - 200 עובר בפיד, 400 נשבר
+
+
 def _person_names(person_ids: list[int]) -> dict[int, str]:
     """שמות המגישים. בלי זה השאילתה מוצגת בלי מי שאל אותה, וזה
     בדיוק המידע שמעניין מי שמנסח שאילתה חדשה."""
+    # **`in (...)` ולא שרשרת `or`** (132, 26.9.2026): במנות של 30 `Id eq X
+    # or ...` הפיד דחה את כל המנה (מגבלת מורכבות, נמוכה מ-25 תנאים), ושורות
+    # השאילתות הוצגו בלי אף מגיש. שוחזר באתר: 18 מגישים - כל השמות, 30 - אפס.
     names: dict[int, str] = {}
-    unique = sorted({pid for pid in person_ids if pid})
-    for i in range(0, len(unique), 30):
-        clause = " or ".join(f"Id eq {pid}" for pid in unique[i : i + 30])
+    unique = sorted({int(pid) for pid in person_ids if pid})
+    for i in range(0, len(unique), _PERSON_CHUNK):
+        clause = "Id in (" + ",".join(str(pid) for pid in unique[i : i + _PERSON_CHUNK]) + ")"
         for p in fetch("KNS_Person", filter=clause, select="Id,FirstName,LastName"):
             full = f"{p.get('FirstName') or ''} {p.get('LastName') or ''}".strip()
             # **"אין נתונים" הוא אדם במאגר של הכנסת, לא באג אצלנו** -

@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT / "packages" / "knesset"))
 
 import knesset_bills as kb  # noqa: E402
 import knesset_citations as kc  # noqa: E402
+import knesset_queries as kq  # noqa: E402
 from odata import OdataError  # noqa: E402
 
 BILLS = [{"Id": 1000 + i, "Name": f"הצעת חוק הגנת הצרכן (תיקון - עסקה ברוכלות {i})",
@@ -85,6 +86,19 @@ def test_citations_filters_stay_under_both_limits():
     assert feed.filters, "לא נשלחה אף בקשה"
     for entity, f in feed.filters:
         assert f.count("(") < 4, (entity, f)
+        assert f.count(" or ") < 19, (entity, f.count(" or "))
+
+
+def test_past_queries_asker_names_survive_many_askers():
+    """שאילתות קודמות: שמות המגישים נשלפו במנות של 30 `Id eq X or ...`.
+    שוחזר באתר החי (/api/queries/enrich): 5 ו-18 מגישים - כל השמות; 30 -
+    אפס שמות, names_unavailable. חיפוש רחב מחזיר עשרות מגישים שונים."""
+    feed = FakeFeed()
+    kq.fetch = feed
+    kq._name_cache.clear() if hasattr(kq, "_name_cache") else None
+    names = kq._person_names(list(range(30000, 30064)))
+    assert len(names) == 64, (len(names), feed.filters[-1:])
+    for entity, f in feed.filters:
         assert f.count(" or ") < 19, (entity, f.count(" or "))
 
 
