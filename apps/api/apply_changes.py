@@ -134,11 +134,23 @@ def apply_pending_changes(before: LegislativeNode, edits: list, insertions: list
             )
             continue
 
-        for result in results:
-            current, annotations, edit_statuses = _apply_one_operation(
-                current, result, edit, field, is_title, original_node,
-                annotations, edit_statuses,
-            )
+        # ח19 (26.9.2026): **פעולה שלא מתיישבת - כשל של העריכה, לא קריסה.**
+        # החלפת סדר של שתי מילים ("אדם קייטנה" -> "קייטנה אדם") מתורגמת
+        # לשתי פעולות, ואחרי הראשונה המילה מופיעה פעמיים - transform זורק
+        # ValueError, ו-/render החזיר 500 ("השרת לא הצליח לעדכן"). עכשיו כל
+        # הפעולות של הצומת מוחלות יחד או לא בכלל, והמשתמש מקבל סיבה.
+        saved = (current, list(annotations), list(edit_statuses))
+        try:
+            for result in results:
+                current, annotations, edit_statuses = _apply_one_operation(
+                    current, result, edit, field, is_title, original_node,
+                    annotations, edit_statuses,
+                )
+        except ValueError as exc:
+            current, annotations, edit_statuses = saved
+            edit_statuses.append(EditStatus(
+                node_id=edit.node_id, ok=False, field=field,
+                reason=f"הביטוי מופיע יותר מפעם אחת: {exc}"))
         continue
 
     return _finish(before, current, annotations, edit_statuses, insertions)

@@ -360,6 +360,31 @@ def journey_subsection_locator(base, res):
               " | ".join(lines)[:200])
 
 
+def journey_word_swap(base, res):
+    """ח19 (26.9): החלפת סדר של שתי מילים ("אדם קייטנה" -> "קייטנה אדם")
+    הפילה את /render (500, "השרת לא הצליח לעדכן"). עכשיו - עריכה שלא נקלטה,
+    עם סיבה, ושאר העריכות באותה בקשה נקלטות."""
+    print("\n[1ד] החלפת סדר מילים")
+    _, body = _get(base, "/api/laws/kaytanot-1990")
+    tree = json.loads(body)["tree"]
+    p2 = (_find_section(tree, "2") or {}).get("children", [{}])[0]
+    p4 = (_find_section(tree, "4") or {}).get("children", [{}])[0]
+    if "אדם קייטנה" not in p2.get("text", "") or not p4.get("text"):
+        res.check("סעיף 2 בחוק הקייטנות כמו שהיה", False, "הנוסח במאגר השתנה")
+        return
+    payload = {"edits": [
+        {"node_id": p2["id"], "field": "text", "text": p2["text"].replace("אדם קייטנה", "קייטנה אדם", 1)},
+        {"node_id": p4["id"], "field": "text", "text": p4["text"].rstrip(".") + " בלבד."},
+    ], "insertions": [], "bill": {"title": "", "initiator": "", "explanatory": []}}
+    status, body = _post(base, "/api/laws/kaytanot-1990/render", payload)
+    statuses = {s["node_id"]: s for s in json.loads(body).get("edit_statuses", [])}
+    bad, good = statuses.get(p2["id"], {}), statuses.get(p4["id"], {})
+    res.check("200 ולא 500", status == 200, str(status))
+    res.check("העריכה לא נקלטה - עם הסיבה", bad.get("ok") is False and "יותר מפעם אחת" in (bad.get("reason") or ""),
+              str(bad)[:160])
+    res.check("העריכה האחרת נקלטה", good.get("ok") is True, str(good)[:160])
+
+
 def journey_rules_reading(base, res):
     """ת3 (25.9): התקנון פתוח לקריאה לצד הצ'אט. שלושת המקורות, ובתקנון -
     סעיף 52 במזהה שהמודל מצטט (law-tkanon-haknesset/52); אחרת תגית או
@@ -597,6 +622,7 @@ def main():
     run("חיפוש חוק יסוד", journey_basic_law_search, base, res)
     run("התקנון לקריאה", journey_rules_reading, base, res)
     run("תיקון בסעיף קטן", journey_subsection_locator, base, res)
+    run("החלפת סדר מילים", journey_word_swap, base, res)
     run("הורדת שאילתה כ-Word", journey_query_docx, base, res)
     run("נוסח משולב", journey_merged_text, base, res)
     if args.with_llm:

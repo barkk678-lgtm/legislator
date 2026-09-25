@@ -1084,11 +1084,26 @@ async function refreshPreview() {
   // ניתן-לעריכה - אחרת רינדור-מחדש היה מוחק את התו שהוא הרגע הקליד
   // (מרוץ בין תשובת render איטית לבין פוקוס חדש שכבר הוזז).
   const activeIsField = document.activeElement && document.activeElement.isContentEditable;
+  const statusByKey = {};
+  for (const s of data.edit_statuses) statusByKey[`${s.node_id}:${s.field}`] = s;
   if (!activeIsField) {
     rebuildTree(data.tree);
-    const statusByKey = {};
-    for (const s of data.edit_statuses) statusByKey[`${s.node_id}:${s.field}`] = s;
     for (const key of everEditedFieldKeys) applyDecoration(key, statusByKey[key]);
+  } else {
+    // ח18 (26.9.2026): **גם כשעובדים בשדה אחר, הסימון של כל השאר מתעדכן.**
+    // עד כאן כל רענון בזמן פוקוס בשדה דילג על הסימון כולו - ושדה שנכשל
+    // קודם נשאר אדום אחרי שהשינוי בו כבר נקלט. רק השדה שבפוקוס עצמו לא
+    // נבנה מחדש (הסמן); הסימון האדום שלו יורד כשהשינוי נקלט.
+    const active = document.activeElement;
+    for (const key of everEditedFieldKeys) {
+      const el = fieldElements[key];
+      if (!el) continue;
+      if (el !== active) applyDecoration(key, statusByKey[key]);
+      else if (!statusByKey[key] || statusByKey[key].ok) {
+        el.classList.remove("edit-unsupported");
+        el.removeAttribute("title");
+      }
+    }
   }
 
   setPreviewPending(false);
@@ -1122,14 +1137,52 @@ const FAILURE_KIND = {
   subsection: "סעיף קטן", paragraph: "פסקה", subparagraph: "פסקת משנה", definition: "הגדרה",
 };
 
+// ח19 (26.9.2026): המיקום ההיררכי המדויק - "6(א)(8)", ולא רק "6". בסעיף
+// עם הרבה סעיפים קטנים "בסעיף 6" לא אומר מה נכשל - ובזמן שהשינוי האחר
+// בסעיף 6 כן נקלט, זה נראה כמו הודעה שלא ירדה (ח18).
+function unitLocatorOf(tree, nodeId) {
+  const walk = (node, chain) => {
+    const here = node.node_type === "section" ? [node.number]
+      : (chain.length && node.number ? [...chain, node.number] : chain);
+    if (node.id === nodeId) return { chain: here, node };
+    for (const c of node.children || []) {
+      const found = walk(c, here);
+      if (found) return found;
+    }
+    return null;
+  };
+  const found = tree ? walk(tree, []) : null;
+  if (!found || !found.chain.length) return "";
+  let loc = found.chain.join("");
+  if (found.node.node_type === "definition") {
+    const term = ((found.node.text || "").match(/^["“״]([^"”״]+)["”״]/) || [])[1];
+    if (term) loc += `, בהגדרה "${term}"`;
+  }
+  return loc;
+}
+
+// הסיבה במילים של משתמש - רק כשהיא ידועה. סיבה פנימית אחרת לא מוצגת.
+function userFailureReason(reason) {
+  const r = reason || "";
+  if (/אינו ייחודי|ביטוי ייחודי|עוגן ייחודי|מופיע יותר מפעם/.test(r))
+    return "הביטוי שערכת מופיע שם יותר מפעם אחת, ולכן אי אפשר להפנות אליו בדיוק. נסו לערוך ביטוי ארוך יותר, שמופיע פעם אחת בלבד.";
+  if (/לא משחזרת|לא הצליחה לשחזר/.test(r))
+    return "השינוי חיבר, פיצל או שינה חלק ממילה. הוראת תיקון מחליפה מילים שלמות - נסו לשנות את המילה כולה.";
+  if (/כותרת שוליים קיימת רק/.test(r)) return "כותרת שוליים יש רק לסעיף ראשי.";
+  if (/צומת לא נמצא/.test(r)) return "היחידה הזו כבר לא קיימת בנוסח החוק הנוכחי.";
+  return "";
+}
+
 function failureLines(data) {
   const lines = [];
   for (const st of data.edit_statuses || []) {
     if (st.ok) continue;
-    const sec = sectionNumberOf(data.tree, st.node_id);
-    lines.push(st.field === "margin_title"
-      ? `לא הצלחתי לקלוט את התיקון שביקשת בכותרת השוליים${sec ? ` של סעיף ${sec}` : ""}`
-      : `לא הצלחתי לקלוט את התיקון שביקשת לעשות${sec ? ` בסעיף ${sec}` : ""}`);
+    const loc = unitLocatorOf(data.tree, st.node_id);
+    const why = userFailureReason(st.reason);
+    const head = st.field === "margin_title"
+      ? `לא הצלחתי לקלוט את התיקון שביקשת בכותרת השוליים${loc ? ` של סעיף ${loc}` : ""}`
+      : `לא הצלחתי לקלוט את התיקון שביקשת לעשות${loc ? ` בסעיף ${loc}` : ""}`;
+    lines.push(why ? `${head}: ${why}` : head);
   }
   for (const err of data.insertion_errors || []) {
     const ins = insertions.find((i) => i.clientId === err.client_id) || {};
