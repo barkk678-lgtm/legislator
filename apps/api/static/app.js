@@ -1997,8 +1997,39 @@ function pqActiveKnessets() {
   return pqKnessetChoice !== null ? pqKnessetChoice : (pqKnessetInfo.default || []);
 }
 
-function pqKnessetParams() {
-  return pqActiveKnessets().map((n) => `&knesset=${n}`).join("");
+function pqKnessetParams(list) {
+  return (list || pqActiveKnessets()).map((n) => `&knesset=${n}`).join("");
+}
+
+// ש7 - **שינוי בכנסות מעדכן את התוצאות מיד, בלי לבנות אותן מחדש.**
+// הסרה: השורות של הכנסת שהוסרה יורדות, בלי בקשה. הוספה: החיפוש רץ רק
+// על הכנסות החדשות (עם הפירוק ששמור מהחיפוש הקודם - בלי קריאה למודל),
+// ומה שנמצא מתווסף למטה. [] = כל הכנסות.
+let pqLast = null;      // {q, plan} של החיפוש האחרון שהסתיים
+let pqRunning = false;
+
+function pqAllowed(knesset, list) {
+  return !list.length || list.includes(Number(knesset));
+}
+
+function onKnessetChange(before, after) {
+  const rowsEl = document.getElementById("pq-rows");
+  if (!pqLast || !rowsEl) return;              // עוד לא היה חיפוש
+  if (pqRunning) { searchPastQueries(); return; }   // באמצע חיפוש - מתחילים מחדש
+  rowsEl.querySelectorAll("[data-qid]").forEach((el) => {
+    if (!pqAllowed(el.dataset.knesset, after)) el.remove();
+  });
+  const added = !after.length ? (before.length ? [] : null)   // [] = הכול
+    : after.filter((n) => before.length && !before.includes(n));
+  pqUpdateDoneCount();
+  if (added === null || (added && !added.length && after.length)) return;   // הסרה בלבד
+  searchPastQueries({ append: true, knessets: added });
+}
+
+function pqUpdateDoneCount() {
+  const rowsEl = document.getElementById("pq-rows");
+  const line = document.querySelector("#pq-done .pq-done-count");
+  if (rowsEl && line) line.textContent = `${rowsEl.querySelectorAll("[data-qid]").length} תוצאות.`;
 }
 
 function renderKnessetPicker() {
@@ -2019,6 +2050,7 @@ function renderKnessetPicker() {
       active.includes(n) ? " on" : ""}" data-k="${n}">${n}</button>`).join("");
   el.querySelectorAll(".pq-chip").forEach((b) => b.addEventListener("click", () => {
     const k = b.dataset.k;
+    const before = pqActiveKnessets();
     if (k === "all") { pqKnessetChoice = []; }
     else {
       const n = Number(k);
@@ -2027,6 +2059,7 @@ function renderKnessetPicker() {
       pqKnessetChoice = [...cur].sort((a, z) => z - a);
     }
     renderKnessetPicker();
+    onKnessetChange(before, pqActiveKnessets());
   }));
 }
 loadKnessetInfo();
@@ -2125,7 +2158,7 @@ function pqRowHtml(row) {
   const titleHtml = row.page_url
     ? `<a href="${escapeHtml(row.page_url)}" target="_blank" rel="noopener">${title}</a>`
     : title;
-  return `<div class="citation-row" data-qid="${row.query_id}" data-person="${row.person_id || ""}">
+  return `<div class="citation-row" data-qid="${row.query_id}" data-person="${row.person_id || ""}" data-knesset="${row.knesset || ""}">
       <div class="citation-title"><span class="pq-title">${titleHtml}</span>${rank}</div>
       <span class="citation-date">${meta}${meta ? " · " : ""}<span class="pq-asked">…</span></span>
     </div>`;
@@ -2152,22 +2185,42 @@ function autoSearchPastQueries(topic) {
   searchPastQueries();
 }
 
-async function searchPastQueries() {
+async function searchPastQueries(opts = {}) {
+  const mine = pqToken + 1;   // הטוקן שהחיפוש הזה יקבל
+  try {
+    await pqSearch(opts && opts.append ? opts : {});
+  } finally {
+    if (pqToken === mine) pqRunning = false;
+  }
+}
+
+async function pqSearch(opts) {
   const input = document.getElementById("past-queries-input");
   const out = document.getElementById("past-queries-results");
-  const q = input.value.trim();
+  const append = !!opts.append && pqLast && document.getElementById("pq-rows");
+  const q = append ? pqLast.q : input.value.trim();
   if (!q) return;
+  const knessets = append ? opts.knessets : pqActiveKnessets();
   const token = ++pqToken;
+  pqRunning = true;
 
-  out.innerHTML = `<div class="pq-status" id="pq-status">
-      <span class="spinner"></span><span>מחפש…</span></div>
-    <div id="pq-rows"></div><div id="pq-done"></div>`;
+  if (!append) {
+    pqLast = null;
+    out.innerHTML = `<div class="pq-status" id="pq-status">
+        <span class="spinner"></span><span>מחפש…</span></div>
+      <div id="pq-rows"></div><div id="pq-done"></div>`;
+  } else {
+    // ש7: התוצאות הקיימות נשארות; רק שורת הסיום מתחלפת בחיווי.
+    document.getElementById("pq-done").innerHTML = `<div class="pq-status" id="pq-status">
+        <span class="spinner"></span><span>מחפש…</span></div>`;
+  }
   const statusEl = document.getElementById("pq-status");
   const rowsEl = document.getElementById("pq-rows");
   const doneEl = document.getElementById("pq-done");
 
   const rank = new Map();    // query_id -> כמה יחידות התאימו
   const shown = new Set();   // query_id שכבר על המסך
+  const newIds = new Set();  // מה שנוסף בחיפוש הזה - רק הן עוברות השלמה
   const held = new Map();    // query_id -> שורה שנדחתה במכסה, מועמדת לשלב ההצלבה
   let strongRows = 0, done = 0, failed = 0, total = 0, planReady = false;
   let domain = [], blocked = false;
@@ -2185,9 +2238,13 @@ async function searchPastQueries() {
     statusEl.querySelector("span:last-child").textContent = "מחפש…";
   };
   const appendRow = (row) => {
+    if (shown.has(row.query_id)) return;
     shown.add(row.query_id);
+    newIds.add(row.query_id);
     rowsEl.insertAdjacentHTML("beforeend", pqRowHtml(row));
   };
+  // בהוספה (ש7) - מה שכבר על המסך נחשב "הוצג", כדי שלא יוכפל.
+  if (append) rowsEl.querySelectorAll("[data-qid]").forEach((el) => shown.add(Number(el.dataset.qid)));
   const bumpBadge = (qid, n) => {
     const b = rowsEl.querySelector(`[data-qid="${qid}"] .pq-rank`);
     if (!b) return;
@@ -2247,7 +2304,7 @@ async function searchPastQueries() {
   const failedUnits = [];
   const runUnit = async (unit) => {
     const qs = unit.words.map((w) => `w=${encodeURIComponent(w)}`).join("&")
-      + pqKnessetParams();
+      + pqKnessetParams(knessets);
     try {
       let data = pqCacheGet(qs);
       if (!data) {
@@ -2313,7 +2370,7 @@ async function searchPastQueries() {
   // ניסיון חוזר אחד (ש4): באתר החי נמדד פירוק שנכשל פעם אחת מתוך
   // שמונה, ובלעדיו אין תחום - והרעש חוזר ("זיהום אוויר בתל אביב" לנושא
   // על מפרץ חיפה). מקומית, אותו פירוק: 8/8.
-  let plan = null;
+  let plan = append ? pqLast.plan : null;
   for (let attempt = 0; attempt < 2 && !plan; attempt += 1) {
     try {
       const r = await fetch(`/api/queries/plan?q=${encodeURIComponent(q)}`);
@@ -2378,7 +2435,8 @@ async function searchPastQueries() {
     .forEach(appendRow);
 
   statusEl.remove();
-  const foundRows = shown.size;
+  pqLast = { q, plan };
+  const foundRows = rowsEl.querySelectorAll("[data-qid]").length;
   const parts = [];
   // ש2: בלי הקופסה הצהובה ובלי "מקורות"/"פיד". אם אחרי כל הניסיונות
   // עדיין חסר משהו - שורה שקטה עם "נסה שוב". **לא מוסתר לגמרי:** זה
@@ -2410,12 +2468,13 @@ async function searchPastQueries() {
     bindPqRetry(q);
     return;
   }
-  doneEl.innerHTML = `<div class="pq-done">${foundRows} תוצאות. ${parts.join(" ")}${retryLink}</div>`;
+  doneEl.innerHTML = `<div class="pq-done"><span class="pq-done-count">${foundRows} תוצאות.</span> ${parts.join(" ")}${retryLink}</div>`;
   bindPqRetry(q);
 
   // שלב ה' - מי שאל וקישור לקובץ. רץ אחרי התצוגה וממלא שדות במקום:
   // לא מוסיף שורה, לא מזיז שורה, ולכן אינו יכול לגרום לקפיצה.
-  const ids = [...shown];
+  const ids = [...newIds];
+  if (!ids.length) return;
   const persons = ids.map((id) => pqPersonOf(rowsEl, id)).filter(Boolean);
   try {
     const r = await fetch(`/api/queries/enrich?ids=${ids.join(",")}&persons=${persons.join(",")}`);
@@ -2433,7 +2492,10 @@ async function searchPastQueries() {
   } catch {
     if (token !== pqToken) return;
     // כשל בהשלמה אינו "אין מגיש" - נאמר שלא נשלף.
-    rowsEl.querySelectorAll(".pq-asked").forEach((el) => { el.textContent = "שם המגיש לא נשלף"; });
+    ids.forEach((id) => {
+      const el = rowsEl.querySelector(`[data-qid="${id}"] .pq-asked`);
+      if (el) el.textContent = "שם המגיש לא נשלף";
+    });
   }
 }
 
@@ -2442,7 +2504,7 @@ function pqPersonOf(rowsEl, id) {
   return el ? el.dataset.person : null;
 }
 
-document.getElementById("past-queries-btn").addEventListener("click", searchPastQueries);
+document.getElementById("past-queries-btn").addEventListener("click", () => searchPastQueries());
 document.getElementById("past-queries-input").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter") searchPastQueries();
 });
