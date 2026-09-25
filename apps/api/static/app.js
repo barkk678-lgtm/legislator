@@ -2078,16 +2078,21 @@ function pqNorm(text) {
   return String(text || "").replace(/[״”“]/g, '"').replace(/[׳’]/g, "'")
     .replace(/[-־]/g, " ").split(/\s+/).filter(Boolean).join(" ");
 }
-// מונח מופיע בכותרת - ברמת המילה (knesset_queries.term_in): "בתי ספר"
-// נמצא ב"בבתי הספר"; מונח של עד 3 אותיות הוא מילה שלמה אחרי עד שלוש
-// אותיות שימוש - "תקן" נמצא ב"בתקן" ולא ב"התקנת", "מור" לא ב"חמור".
+// מונח מופיע בכותרת - בתחילת מילה, אחרי עד 3 אותיות שימוש, ומילה-מילה
+// (knesset_queries.term_in): "מורה" לא ב"החמורה"; "תקן" (עד 3 אותיות -
+// מילה שלמה) ב"בתקן" ולא ב"התקנת"; "בתי ספר" ב"בבתי הספר".
+function pqWordMatches(word, token) {
+  for (let cut = 0; cut <= Math.min(3, token.length - 1); cut += 1) {
+    if (cut && !"והבלמשכ".includes(token[cut - 1])) break;
+    const rest = token.slice(cut);
+    if (word.length <= 3 ? rest === word : rest.startsWith(word)) return true;
+  }
+  return false;
+}
 function pqTermIn(term, title) {
-  const t = pqNorm(title);
-  return pqNorm(term).split(" ").filter(Boolean).every((w) => {
-    if (w.length > 3) return t.includes(w);
-    const esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(?:^|[^א-ת])[והבלמשכ]{0,3}${esc}(?![א-ת])`).test(t);
-  });
+  const words = (x) => pqNorm(x).match(/[א-ת]+|[^\sא-ת]+/g) || [];
+  const tokens = words(title);
+  return words(term).every((w) => tokens.some((tok) => pqWordMatches(w, tok)));
 }
 // domain = היבטים (הגוף/התחום, ומקום אם נקבו בו): מונח אחד לפחות מכל היבט.
 function pqDomainMatch(title, domain) {
