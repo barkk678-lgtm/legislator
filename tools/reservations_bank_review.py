@@ -33,22 +33,33 @@ import guards  # noqa: E402
 SAMPLE_COMMITTEE = "ועדת הפנים והגנת הסביבה"
 REVIEW = ROOT / "docs" / "reservations-bank-review.md"
 FAMILY_HE = {"actor_swap": "החלפת גורם", "approval": "הוספת אישור או התייעצות", "duty": "חובה ורשות",
-             "conditions": "תנאים", "after_last": "סעיפים אחרי הסעיף האחרון"}
+             "conditions": "תנאים", "after_last": "סעיפים אחרי הסעיף האחרון", "verb_modifier": "תוספת לפועל"}
 FAMILY_EXAMPLE = {
     "actor_swap": 'במקום "שר הפנים" יבוא "{text}".',
     "approval": 'אחרי "שר הפנים" יבוא "{text}".',
     "duty": 'במקום "{src}" יבוא "{dst}".',
     "conditions": 'בפסקה (2), בסופה יבוא "{text}".',
     "after_last": 'אחרי הסעיף יבוא: "{margin} 4. {body}"',
+    "verb_modifier": 'במקום "יתקן" יבוא "יתקן {text}".',
 }
+SAMPLE_MINISTER, SAMPLE_MINISTRY = "שר הפנים", "משרד הפנים"
+
+
+def _sample(text: str) -> str:
+    """המשתנים כפי שייראו בטבריה: {השר}/{שר} - שר הפנים, {משרד} - משרד הפנים."""
+    return (text.replace("{השר}", SAMPLE_MINISTER).replace("{שר}", SAMPLE_MINISTER)
+            .replace("{משרד}", SAMPLE_MINISTRY))
 
 
 def _example(r: bank.Record) -> str:
     text = r.text(SAMPLE_COMMITTEE)
+    if r.value_list == "ministers":
+        text = text.replace(bank.MINISTER_PLACEHOLDER, "{כל שר מרשימת השרים במאגר}")
+    text = _sample(text)
     if r.family == "duty":
         src, _, dst = r.value.partition("=>")
         return FAMILY_EXAMPLE["duty"].format(src=src, dst=dst)
-    if r.family == "actor_swap" and agreement.gender(text) == "f":
+    if r.family == "actor_swap" and (r.gender or agreement.gender(text)) == "f":
         # הכרעה ג: גורם בלשון נקבה - גם הפועל שאחריו מותאם (טבריה, סעיף 3: "שר הפנים יתקן")
         return f'במקום "שר הפנים יתקן" יבוא "{text} {agreement.inflect("יתקן", "f")}".'
     if r.family == "after_last":
@@ -57,32 +68,50 @@ def _example(r: bank.Record) -> str:
     return FAMILY_EXAMPLE[r.family].format(text=text)
 
 
-def screen(records: list[bank.Record]) -> dict:
-    data = json.loads(bank.SCREEN_PATH.read_text(encoding="utf-8")) if bank.SCREEN_PATH.exists() else {}
-    verdicts = data.get("verdicts", {})
-    for r in records:
-        if verdicts.get(r.id, {}).get("key") == r.screen_key:
-            continue
-        v = guards.screen_text(r.text(SAMPLE_COMMITTEE).replace("|", " "))
-        verdicts[r.id] = {"key": r.screen_key, "allowed": v.allowed, "reason": v.reason}
-        print(f"  {r.id}: {'עבר' if v.allowed else 'נחסם - ' + v.reason}", flush=True)
+def _save(verdicts: dict) -> None:
     bank.SCREEN_PATH.write_text(json.dumps(
         {"_doc": "פסקי שומר 86(ד)(2) על רשומות הבנק - tools/reservations_bank_review.py. "
                  "key = גיבוב התבנית והערך; רשומה ששונתה נחסמת עד סינון חוזר.",
-         "verdicts": verdicts}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+         "verdicts": dict(sorted(verdicts.items()))}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+
+def screen(records: list[bank.Record], workers: int = 8) -> dict:
+    """**כל רשומה חדשה או ששונתה** (אין לה פסק לגיבוב הנוכחי) - דרך השומר. פסקים של
+    רשומות שלא השתנו - נשמרים. נשמר כל 100 פסקים (ריצה ארוכה)."""
+    from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
+    data = json.loads(bank.SCREEN_PATH.read_text(encoding="utf-8")) if bank.SCREEN_PATH.exists() else {}
+    verdicts = data.get("verdicts", {})
+    todo = [r for r in records if verdicts.get(r.id, {}).get("key") != r.screen_key]
+    print(f"לסינון: {len(todo)} מתוך {len(records)}", flush=True)
+
+    def one(r):
+        text = _sample(r.text(SAMPLE_COMMITTEE).replace(bank.MINISTER_PLACEHOLDER, SAMPLE_MINISTER))
+        return r, guards.screen_text(text.replace("|", " "))
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for n, (r, v) in enumerate(pool.map(one, todo), 1):
+            verdicts[r.id] = {"key": r.screen_key, "allowed": v.allowed, "reason": v.reason}
+            if not v.allowed:
+                print(f"  {r.id}: נחסם - {v.reason}", flush=True)
+            if n % 100 == 0:
+                _save(verdicts)
+                print(f"  ... {n}/{len(todo)}", flush=True)
+    live = {r.id for r in records}
+    verdicts = {k: v for k, v in verdicts.items() if k in live}    # רשומות שנמחקו - בלי פסק
+    _save(verdicts)
     return verdicts
 
 
 def write_review(records: list[bank.Record], verdicts: dict) -> None:
     lines = ["# בנק ההסתייגויות - קובץ סקירה", "",
              "נוצר אוטומטית: `python3 tools/reservations_bank_review.py`. **הקובץ הזה אינו",
-             "מקור האמת** - הבנק עצמו ב-`data/reservations_bank.json`.", "",
-             "**רק רשומה מאושרת מגיעה לפלט.** כל הרשומות מתחילות \"ממתינה\". לאישור: לסמן",
-             "כאן (או לכתוב לי את המזהים), וה-status ברשומה הופך ל-`approved`. \"מקור\" -",
-             "מאיפה הרשומה: ההסתייגויות בטבריה, הטבלה שלך, או הצעה שלי (\"מוצע\").", "",
-             "\"דוגמה\" - איך הרשומה נראית בהסתייגות, על ההצעה של טבריה (הוועדה - מעמוד",
-             "השער). **חסימה** - קו אדום או שומר 86(ד)(2); רשומה חסומה לא תגיע לפלט",
-             "גם אם תאושר.", ""]
+             "מקור האמת** - הבנק עצמו ב-`data/reservations_bank.json`, שנבנה מאישורי ברק",
+             "(`docs/bank-approvals-2026-09-26.md`) ב-`tools/build_reservations_bank.py`.", "",
+             "**רק רשומה מאושרת ושעברה את הסינון מגיעה לפלט.** \"דוגמה\" - איך הרשומה נראית",
+             "בהסתייגות, על ההצעה של טבריה (הוועדה - מעמוד השער; {השר} - שר הפנים). **חסימה** -",
+             "קו אדום או שומר 86(ד)(2): רשומה חסומה **נשארת חסומה** ומופיעה ברשימה למטה, עם",
+             "הסיבה. החריג היחיד - אישור אנושי מפורש של ברק ברשומה עצמה (§0.4, ועד הדולפינים",
+             "של הים התיכון).", ""]
     counts = {}
     for r in records:
         counts.setdefault((r.family, r.level), 0)
@@ -90,6 +119,40 @@ def write_review(records: list[bank.Record], verdicts: dict) -> None:
     lines += ["| משפחה | " + " | ".join(bank.LEVELS.values()) + " |", "|---|---|---|---|"]
     for fam, fam_he in FAMILY_HE.items():
         lines.append(f"| {fam_he} | " + " | ".join(str(counts.get((fam, lv), 0)) for lv in bank.LEVELS) + " |")
+    lines.append("")
+
+    def block_of(r):
+        red = bank.redline_violation(r.text(SAMPLE_COMMITTEE))
+        v = verdicts.get(r.id, {})
+        screen_note = "" if v.get("key") == r.screen_key and v.get("allowed") else (
+            f"86(ד)(2): {v.get('reason') or 'לא סונן'}")
+        return red or screen_note
+
+    blocked = [(r, block_of(r)) for r in records if block_of(r)]
+    # רשימת השרים (מהמאגר) - התארים נבדקים בקווים האדומים בזמן הייצור; אלה שנחסמים היום:
+    import ministers  # noqa: PLC0415
+    for r in [r for r in records if r.value_list == "ministers"]:
+        for t in ministers.titles():
+            red = bank.redline_violation(r.text(SAMPLE_COMMITTEE).replace(bank.MINISTER_PLACEHOLDER, t))
+            if red:
+                blocked.append((bank.Record(**{**r.__dict__, "id": f"{r.id}/{t}", "value": t,
+                                               "value_list": ""}), red))
+    overridden = [(r, b) for r, b in blocked if not b.startswith("קו אדום") and bank.human_approved(r)]
+    stays = [(r, b) for r, b in blocked if (r, b) not in overridden]
+    lines += [f"## רשומות חסומות - {len(stays)} (נשארות חסומות)", ""]
+    if stays:
+        lines += ["| מזהה | דוגמה | הסיבה |", "|---|---|---|"]
+        lines += [f"| `{r.id}` | {_example(r).replace('|', chr(92) + '|')} | {b} |" for r, b in stays]
+    else:
+        lines.append("אין.")
+    lines += ["", f"## חסומות בשומר, ויוצאות לפלט באישור אנושי מפורש (§0.4) - {len(overridden)}", ""]
+    if overridden:
+        lines += ["| מזהה | דוגמה | פסק השומר | האישור |", "|---|---|---|---|"]
+        for r, b in overridden:
+            a = r.human_approval
+            lines.append(f"| `{r.id}` | {_example(r).replace('|', chr(92) + '|')} | {b} | {a['by']}, {a['at']} |")
+    else:
+        lines.append("אין.")
     lines.append("")
     for fam, fam_he in FAMILY_HE.items():
         lines += [f"## {fam_he}", ""]
@@ -99,11 +162,9 @@ def write_review(records: list[bank.Record], verdicts: dict) -> None:
                 continue
             lines += [f"### {level_he}", "", "| אשר | מזהה | דוגמה | סטטוס | מקור | חסימה |", "|---|---|---|---|---|---|"]
             for r in rows:
-                red = bank.redline_violation(r.text(SAMPLE_COMMITTEE))
-                v = verdicts.get(r.id, {})
-                screen_note = "" if v.get("key") == r.screen_key and v.get("allowed") else (
-                    f"86(ד)(2): {v.get('reason') or 'לא סונן'}")
-                block = red or screen_note
+                block = block_of(r)
+                if block and not block.startswith("קו אדום") and bank.human_approved(r):
+                    block += " - **יוצאת באישור אנושי (§0.4)**"
                 status = {"pending": "ממתינה", "approved": "מאושרת", "rejected": "נדחתה"}.get(r.status, r.status)
                 box = "[x]" if r.status == "approved" else "[ ]"
                 example = _example(r).replace("|", "\\|")

@@ -37,12 +37,16 @@ def main() -> int:
         results.append(("שם ההצעה ומקסימום לכל רמה", "הרשויות המקומיות" in head and "רציני" in head
                         and "הזוי" in head, head[:200]))
         fams = page.eval_on_selector_all("#res-families input", "els => els.map(e => e.checked)")
-        results.append(("כל המשפחות מסומנות כברירת מחדל", len(fams) == 7 and all(fams), str(fams)))
+        results.append(("כל המשפחות מסומנות כברירת מחדל", len(fams) == 8 and all(fams), str(fams)))
+        # אישורי הבנק §6 (ברק 26.9.2026): "תוספת לפועל" - בממשק, מסומנת כברירת מחדל
+        mod = page.eval_on_selector_all('#res-families input[value="verb_modifier"]',
+                                        "els => els.map(e => [e.checked, e.parentElement.innerText])")
+        results.append(("'תוספת לפועל' בממשק ומסומנת", len(mod) == 1 and mod[0][0] and "תוספת לפועל" in mod[0][1], str(mod)))
         quote = page.inner_text("#res-quote")
         results.append(("50 - כלול, ו'לפחות X' ייספרו בנפרד", "כלול" in quote and "לפחות" in quote, quote[:200]))
-        page.fill("#res-count", "120")
+        page.fill("#res-count", "400")   # טבריה ברציני: 241 לכל היותר (אחרי אישורי הבנק)
         quote = page.inner_text("#res-quote")
-        results.append(("120 - יותר ממה שההצעה מאפשרת: נאמר, בלי השלמה", "לא נשלים בחזרות" in quote, quote[:240]))
+        results.append(("400 - יותר ממה שההצעה מאפשרת: נאמר, בלי השלמה", "לא נשלים בחזרות" in quote, quote[:240]))
         results.append(("מצב הדגמה - סימון גלוי", page.is_visible("#res-demo") and "הדגמה" in page.inner_text("#res-demo"), ""))
         fields = page.eval_on_selector_all(
             "input, select, textarea",
@@ -50,7 +54,7 @@ def main() -> int:
             "(e.labels && e.labels[0] ? e.labels[0].innerText : '')].join(' ').toLowerCase())")
         bad = [f for f in fields if any(w in f for w in _PAYMENT_WORDS) or "cc-" in f]
         results.append(("אין בדף אף שדה של פרטי תשלום", not bad, str(bad)))
-        page.fill("#res-count", "8")   # טבריה: 9 לכל היותר ברמה הרצינית (הכרעה א)
+        page.fill("#res-count", "8")
         page.click("#res-pay-btn")
         page.wait_for_selector("#res-preview", timeout=60000)
         preview = page.inner_text("#res-preview")

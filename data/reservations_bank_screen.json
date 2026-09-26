@@ -1,16 +1,6 @@
 {
  "_doc": "פסקי שומר 86(ד)(2) על רשומות הבנק - tools/reservations_bank_review.py. key = גיבוב התבנית והערך; רשומה ששונתה נחסמת עד סינון חוזר.",
  "verdicts": {
-  "actor_swap-001": {
-   "key": "ee805c45777b1661",
-   "allowed": true,
-   "reason": ""
-  },
-  "actor_swap-002": {
-   "key": "00f2cef82775342a",
-   "allowed": true,
-   "reason": ""
-  },
   "actor_swap-003": {
    "key": "820fc0ca94a3444b",
    "allowed": true,
@@ -31,43 +21,1413 @@
    "allowed": true,
    "reason": ""
   },
-  "actor_swap-007": {
-   "key": "2dcc76722d98f3bb",
+  "actor_swap-015": {
+   "key": "c47b45f6aed619ea",
    "allowed": true,
    "reason": ""
   },
-  "actor_swap-008": {
-   "key": "82e29c2e3d79426f",
+  "actor_swap-016": {
+   "key": "ef705ef0174c94a8",
    "allowed": true,
    "reason": ""
   },
-  "actor_swap-009": {
-   "key": "5dbc20aad8e1dba4",
+  "actor_swap-017": {
+   "key": "96bb4a85e372016a",
    "allowed": true,
    "reason": ""
   },
-  "actor_swap-010": {
-   "key": "4a7f11c68f39aa0f",
+  "actor_swap-018": {
+   "key": "9a37eeb654f6ddab",
    "allowed": true,
    "reason": ""
   },
-  "actor_swap-011": {
+  "actor_swap-019": {
+   "key": "db5c0f0df00d06bd",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-020": {
+   "key": "883c9a3f2872cd47",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-001": {
+   "key": "00f8f3f55800961b",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-002": {
+   "key": "ec2fa303bc219a60",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-003": {
+   "key": "f9a3c8a979bd9665",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-004": {
+   "key": "5b8c890b377bebc9",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-005": {
+   "key": "ab7bb0c739bb153f",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-006": {
+   "key": "ce2d2a926019bec2",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-007": {
+   "key": "0466c4ab14d76ee5",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-008": {
+   "key": "ba4f610d628030b3",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-009": {
+   "key": "221bd1b1d6c0df92",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-010": {
+   "key": "944e7b2a4e4713a1",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-011": {
+   "key": "7317703be5871a2b",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-012": {
+   "key": "30f7152dee8dcc82",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-013": {
+   "key": "4e363140cbe0b304",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-014": {
+   "key": "363687ea174b7561",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-015": {
+   "key": "ff28203e43a3a5bc",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-016": {
+   "key": "16e357499ab3b28b",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-017": {
+   "key": "86bcd8c876392a33",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-018": {
+   "key": "f894e4d47371903c",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-019": {
+   "key": "5929289b13467054",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-020": {
+   "key": "7b1795c7142af2f9",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-021": {
+   "key": "c8e40eea02041426",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-022": {
+   "key": "aab884e924d1ab4a",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-023": {
+   "key": "e304046046a4812b",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-024": {
+   "key": "dc6f0258db409f8d",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-025": {
+   "key": "283b1096bc41552f",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-026": {
    "key": "a60aa830cb56d114",
    "allowed": true,
    "reason": ""
   },
-  "actor_swap-012": {
-   "key": "e213de85370abe6f",
-   "allowed": true,
-   "reason": ""
-  },
-  "actor_swap-013": {
+  "actor_swap-021/actor-027": {
    "key": "39b3b83834ca59ff",
    "allowed": true,
    "reason": ""
   },
-  "actor_swap-014": {
+  "actor_swap-021/actor-028": {
    "key": "f620d63816bd2bd5",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-029": {
+   "key": "773a9412a9be603f",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-030": {
+   "key": "73b5aef467861f5c",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-031": {
+   "key": "1831ab59dca98cee",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-032": {
+   "key": "9a9c34e5c60238a7",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-033": {
+   "key": "b2c1c414ddbcf8b8",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-034": {
+   "key": "1bf9eb82ebd684b4",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-035": {
+   "key": "7f4be904f4f427e3",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-036": {
+   "key": "b0dd14f0b386774d",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-037": {
+   "key": "3d0ec3177de13fa1",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-038": {
+   "key": "2b63ff11cf682fc1",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-039": {
+   "key": "b2a7432e3d541a19",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-040": {
+   "key": "148525615960fae7",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-041": {
+   "key": "1e1407a2a5ee3451",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-042": {
+   "key": "c779e0657462c91e",
+   "allowed": false,
+   "reason": "הסינון החזיר '# שומר המגדל'"
+  },
+  "actor_swap-021/actor-043": {
+   "key": "a91661dd45af99bd",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-044": {
+   "key": "01810a1390b51d20",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-045": {
+   "key": "d332c0daf7d8ab20",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-046": {
+   "key": "744afda43753ac4f",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-047": {
+   "key": "1aa4f04cb77ffe1e",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-048": {
+   "key": "6cb213d07d31219f",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-049": {
+   "key": "c9c8250c0ff1b182",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-050": {
+   "key": "b7c6a75051539678",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-051": {
+   "key": "5d2f3fa388d044e0",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-052": {
+   "key": "afc68e826f5fe4ef",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-053": {
+   "key": "33c0cec7ee7d7a1d",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-054": {
+   "key": "5e6614af9cac839e",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-055": {
+   "key": "7f64d86981ea4ea8",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-056": {
+   "key": "170a5d8bcd30a6b9",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-057": {
+   "key": "171fc3902fb3d219",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-058": {
+   "key": "38a91caba48ddae3",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-059": {
+   "key": "3c9c11cda44c15f0",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-060": {
+   "key": "48e887b6297f5c56",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-061": {
+   "key": "8446d1ec5b33b036",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-062": {
+   "key": "2d01fd24aa22dc86",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-063": {
+   "key": "c2a94e050beeea59",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-064": {
+   "key": "32627d218afb5d95",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-065": {
+   "key": "8a658d440ab28a9c",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-066": {
+   "key": "b8e7fd81ef110b06",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-067": {
+   "key": "8896f844f703e421",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-068": {
+   "key": "dd30b5218abc6fb8",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-069": {
+   "key": "7ba16524072bd277",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-070": {
+   "key": "d18e0e7c0f66227b",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-071": {
+   "key": "2a4ac3f529ad7f83",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-072": {
+   "key": "17e9b3a087f5c4a8",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-073": {
+   "key": "06626adae82508e1",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-074": {
+   "key": "edb01abc14c23b89",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-075": {
+   "key": "95f0ed23a55d0fad",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-076": {
+   "key": "e8543f980177e737",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-077": {
+   "key": "9aca1286373e990c",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-078": {
+   "key": "c797193a98708987",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-079": {
+   "key": "0e082c65d81732df",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-080": {
+   "key": "6bdadd95cd973a9d",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-081": {
+   "key": "0a07cd969d31b65d",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-082": {
+   "key": "d6b82069ae011c75",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-083": {
+   "key": "1c171554ffedf8ad",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-084": {
+   "key": "db859ae2e12a0c0b",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-085": {
+   "key": "726400d5e32fbfef",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-086": {
+   "key": "dd115a9990df2dae",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-087": {
+   "key": "d1add134c807a763",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-088": {
+   "key": "3bb6cc42088ce96d",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-089": {
+   "key": "6aabe32da026f438",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-090": {
+   "key": "2aac86758259fed9",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-091": {
+   "key": "12800c7c54805024",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-092": {
+   "key": "b26c057c9aed42d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-093": {
+   "key": "44f252e2fb63d905",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-094": {
+   "key": "e7a545af4b221187",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-095": {
+   "key": "4b892bf3f4807923",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-096": {
+   "key": "3f5fb010f7754462",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-097": {
+   "key": "07734899a8131f07",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-098": {
+   "key": "c22506f1972939c5",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-099": {
+   "key": "1bc7d7435dfad9ab",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-100": {
+   "key": "db64832489c20632",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-101": {
+   "key": "7f75fc4010e455cd",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-102": {
+   "key": "f43e1151dc8389ab",
+   "allowed": false,
+   "reason": "הסינון החזיר 'נראה שכתבת'"
+  },
+  "actor_swap-021/actor-103": {
+   "key": "4832ec6be5f065df",
+   "allowed": false,
+   "reason": "הסינון החזיר 'שלום! נראה ש'"
+  },
+  "actor_swap-021/actor-104": {
+   "key": "17a14a5e96f89956",
+   "allowed": false,
+   "reason": "הסינון החזיר 'היי! 🎅'"
+  },
+  "actor_swap-021/actor-105": {
+   "key": "dd559f6c3c2cbe4a",
+   "allowed": true,
+   "reason": ""
+  },
+  "actor_swap-021/actor-106": {
+   "key": "280a32d22dfd1585",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-001": {
+   "key": "3ddf0c2f985ae3a3",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-002": {
+   "key": "a93cc3f52e303f34",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-003": {
+   "key": "f85abaa43a9cd3a0",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-004": {
+   "key": "889d9872058ce2e8",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-005": {
+   "key": "d18891cdef83a1a0",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-006": {
+   "key": "4deca9de4ed72a3f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-007": {
+   "key": "e702d7521159da7e",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-008": {
+   "key": "e0c71cf61fe7cf90",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-009": {
+   "key": "21f59d33975dcabb",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-010": {
+   "key": "7574949ad8019926",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-011": {
+   "key": "d5af497afa4dd46a",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-012": {
+   "key": "7d1096b97cd119d2",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-013": {
+   "key": "ae7c6b8212805bb4",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-014": {
+   "key": "aabd03572e0b6a35",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-015": {
+   "key": "ee840fdf68551235",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-016": {
+   "key": "89c2b35cfb11b8f5",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-017": {
+   "key": "f45d03cc1c5783a2",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-018": {
+   "key": "210e971c53e848ab",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-019": {
+   "key": "80ddd4b98e4c43fe",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-020": {
+   "key": "7989d0ef6ad0baa0",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-021": {
+   "key": "406c664300f3fb21",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-022": {
+   "key": "ac1b0f1bc4c59b8e",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-023": {
+   "key": "5156d77195046066",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-024": {
+   "key": "5c9dc6a1e957a2b9",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-025": {
+   "key": "2ad9bd6868e9170a",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-026": {
+   "key": "453eff3de2fb3c5e",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-027": {
+   "key": "970501749afb726e",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-028": {
+   "key": "39d7eabf969a7442",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-029": {
+   "key": "5b473b6412fc083b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-030": {
+   "key": "543595122e6c9c14",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-031": {
+   "key": "bb4ac2bbd7e07e02",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-032": {
+   "key": "60a4bfcba019da05",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-033": {
+   "key": "d9bfa8fd2e3d73d4",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-034": {
+   "key": "01d08350737bb7d7",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-035": {
+   "key": "306a4922a45bb3ce",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-036": {
+   "key": "101e164b1c11a5c7",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-037": {
+   "key": "fb71976721df07b2",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-038": {
+   "key": "d63135914aae34d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-039": {
+   "key": "a2a1facc80150723",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-040": {
+   "key": "6622697725a059b2",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-041": {
+   "key": "777053c431f19f2c",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-042": {
+   "key": "6f81307424e1f133",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-043": {
+   "key": "d0932439cb39dc92",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-044": {
+   "key": "058b19b718664b6f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-045": {
+   "key": "7f78c3b066c851cf",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-046": {
+   "key": "62766f578c0d859f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-047": {
+   "key": "adffa308a1b22ba2",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-048": {
+   "key": "cce223e53c70279d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-049": {
+   "key": "7fc4769e12273c3b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-050": {
+   "key": "0b45ad5660763d0f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-051": {
+   "key": "0f9aa7240dbc333d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-052": {
+   "key": "599aad8e29bdab3d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-053": {
+   "key": "c40e43f83c090aa2",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-054": {
+   "key": "b3f94e4c15cf3c9a",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-055": {
+   "key": "3916a8a89ddbd5c9",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-056": {
+   "key": "332bb8fe4ad4c30f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-057": {
+   "key": "cf0a16d75ae9d117",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-058": {
+   "key": "b67b47748745195c",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-059": {
+   "key": "64ae5bde968f701c",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-060": {
+   "key": "863e0cea48d5364b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-061": {
+   "key": "a94c29b23eaafbbc",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-062": {
+   "key": "5783d5efbe26ef6e",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-063": {
+   "key": "9038dd8880af8b72",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-064": {
+   "key": "f9dff843bf0f2ce0",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-065": {
+   "key": "f7797876368c2e72",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-066": {
+   "key": "e0be25dd9098143d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-067": {
+   "key": "d3d99edfb1c6bb3e",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-068": {
+   "key": "13a1e4ab472f00e1",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-069": {
+   "key": "01c71d376d96689b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-070": {
+   "key": "858fad28b03d8c47",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-071": {
+   "key": "49df8757172bd06c",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-072": {
+   "key": "fb5982d1a94d93be",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-073": {
+   "key": "05af947a149d71cc",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-074": {
+   "key": "6131540d2302be9f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-075": {
+   "key": "325e413b34f0c749",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-076": {
+   "key": "bc6b7b12f66e2598",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-077": {
+   "key": "7fc5c5cdd1391af9",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-078": {
+   "key": "045f17527351f24a",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-079": {
+   "key": "237419a0dd20befd",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-080": {
+   "key": "e8cc43f0e66d51d6",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-081": {
+   "key": "cb69dbdebb628a2d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-082": {
+   "key": "f063343d5f50a897",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-083": {
+   "key": "bc467702890feb2d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-084": {
+   "key": "5381af812eebe6ec",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-085": {
+   "key": "5966fdf38563ca37",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-086": {
+   "key": "d8ad8836c647b2c4",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-087": {
+   "key": "f810054bded49c3d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-088": {
+   "key": "3bd03ad21f0bb101",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-089": {
+   "key": "b936a106ec900541",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-090": {
+   "key": "fcccf71c46529a6b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-091": {
+   "key": "c02a91ff3e9eef10",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-092": {
+   "key": "55c456c889d328b8",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-093": {
+   "key": "58a70bf8ee779e79",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-094": {
+   "key": "8eec2c60fb02e802",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-095": {
+   "key": "b42b292acd317c24",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-096": {
+   "key": "ac2b4daa604b4e5c",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-097": {
+   "key": "3fa4da86ae9e1e9f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-098": {
+   "key": "227f89f216a05fe8",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-099": {
+   "key": "b71f961e4215b311",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-100": {
+   "key": "62186f6045f9d39e",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-101": {
+   "key": "7d479ef3fb24b779",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-102": {
+   "key": "cf0cb9ebb99293e2",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-103": {
+   "key": "82256a328080bc6a",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-104": {
+   "key": "d9dde82b68b70152",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-105": {
+   "key": "0bed208228b4cd31",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-106": {
+   "key": "44bddd7e8aa16c0f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-107": {
+   "key": "99efa0a3efbfdb91",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-108": {
+   "key": "26605fe21f0f0197",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-109": {
+   "key": "e628178f1fcba7ba",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-110": {
+   "key": "5930045c643b0441",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-111": {
+   "key": "37a08d077a12ae11",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-112": {
+   "key": "09a6afef6feb2829",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-113": {
+   "key": "d7310874fe678d9b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-114": {
+   "key": "39a06d858897e642",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-115": {
+   "key": "7525d3baff2153fa",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-116": {
+   "key": "857999f12af3b5b0",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-117": {
+   "key": "7a9e7c2300703426",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-118": {
+   "key": "c05fbc2596b5beae",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-119": {
+   "key": "b0b0e470bef69171",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-120": {
+   "key": "1476c9c7ee06d1d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-121": {
+   "key": "b8c3f16c0e824f5d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-122": {
+   "key": "d05344eb91ad7263",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-123": {
+   "key": "c0ed34f7d1c1b73d",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-124": {
+   "key": "f7cb946aa9a7c230",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-125": {
+   "key": "4678bdc11334683f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-126": {
+   "key": "a9c51a6c0df9516b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-127": {
+   "key": "2d5dfb688bc94fdc",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-128": {
+   "key": "458d20b5295e1392",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-129": {
+   "key": "aad62ada312a38c1",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-130": {
+   "key": "1b0af47fe1b4ac2f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-131": {
+   "key": "58ede9715714dd3f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-132": {
+   "key": "b17d03eb904a54fc",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-133": {
+   "key": "a1c7eaa5ee2b2cd8",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-134": {
+   "key": "c34c54b08d49becb",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-135": {
+   "key": "965f7ad8a5822a07",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-136": {
+   "key": "6a9bc40a18011488",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-137": {
+   "key": "4b409ef74f73a7b8",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-138": {
+   "key": "38f254fb01bd10d2",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-139": {
+   "key": "bef4e6575d223744",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-140": {
+   "key": "fecc9bb09f52bcbf",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-141": {
+   "key": "475ad20a6ca31198",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-142": {
+   "key": "149f7a66dd7dcb1b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-143": {
+   "key": "384e879c7e20a53c",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-144": {
+   "key": "51a51a17d605a3e7",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-145": {
+   "key": "7f8a606cad0ecc77",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-146": {
+   "key": "60ad6948eeed3509",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-147": {
+   "key": "adf610e6b721426c",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-148": {
+   "key": "d3da6781662acb7a",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-149": {
+   "key": "4d944e1dcf18d5dc",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-150": {
+   "key": "9233625d43103a4f",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-151": {
+   "key": "20a7c07a9c9beb63",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-152": {
+   "key": "1ed17c0a9214c8d8",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-153": {
+   "key": "5714ceaeece6bdb1",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-154": {
+   "key": "78e6d56716433ea7",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-155": {
+   "key": "f877c60257af70d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-156": {
+   "key": "82fc638ce6b07c36",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-157": {
+   "key": "8f59a8bad6595271",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-158": {
+   "key": "3b79fda7774429fe",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-159": {
+   "key": "8771b8291d76fdd4",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-160": {
+   "key": "93b1a6ac5e6a41b1",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-161": {
+   "key": "1383b656a8617121",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-162": {
+   "key": "b2e1447da09a69d8",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-163": {
+   "key": "05a2fa5349fce667",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-164": {
+   "key": "a152b4c31dbd00e4",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-165": {
+   "key": "fe1aa36d068093e5",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-166": {
+   "key": "8aa6edd07b962c6b",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-167": {
+   "key": "01849aa7248fc201",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-168": {
+   "key": "9ed4ceec92a8c9cc",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-169": {
+   "key": "e69b733014fa7322",
+   "allowed": true,
+   "reason": ""
+  },
+  "after_last-170": {
+   "key": "d9da261e7d34ec55",
    "allowed": true,
    "reason": ""
   },
@@ -83,11 +1443,6 @@
   },
   "approval-003": {
    "key": "fe0cc372958ef504",
-   "allowed": true,
-   "reason": ""
-  },
-  "approval-004": {
-   "key": "1859d61f53c6354e",
    "allowed": true,
    "reason": ""
   },
@@ -116,16 +1471,6 @@
    "allowed": true,
    "reason": ""
   },
-  "approval-010": {
-   "key": "375cf81e757504c5",
-   "allowed": true,
-   "reason": ""
-  },
-  "approval-011": {
-   "key": "57b8243f84a9f35e",
-   "allowed": true,
-   "reason": ""
-  },
   "approval-012": {
    "key": "2321703b53dfccb5",
    "allowed": true,
@@ -143,11 +1488,6 @@
   },
   "approval-015": {
    "key": "1e29b1167d073290",
-   "allowed": true,
-   "reason": ""
-  },
-  "approval-016": {
-   "key": "bed5febb4a79aea4",
    "allowed": true,
    "reason": ""
   },
@@ -176,16 +1516,6 @@
    "allowed": true,
    "reason": ""
   },
-  "approval-022": {
-   "key": "f5f2d338bbb9d9e7",
-   "allowed": true,
-   "reason": ""
-  },
-  "approval-023": {
-   "key": "4e422248537ed737",
-   "allowed": true,
-   "reason": ""
-  },
   "approval-024": {
    "key": "ac3af81ce08bcf27",
    "allowed": true,
@@ -203,11 +1533,6 @@
   },
   "approval-027": {
    "key": "629e178c439c11f6",
-   "allowed": true,
-   "reason": ""
-  },
-  "approval-028": {
-   "key": "07b65678b0c2bab6",
    "allowed": true,
    "reason": ""
   },
@@ -236,16 +1561,6 @@
    "allowed": true,
    "reason": ""
   },
-  "approval-034": {
-   "key": "f9f3b56f11491931",
-   "allowed": true,
-   "reason": ""
-  },
-  "approval-035": {
-   "key": "0143ddc39b164082",
-   "allowed": true,
-   "reason": ""
-  },
   "approval-036": {
    "key": "0a82b942b756377e",
    "allowed": true,
@@ -263,11 +1578,6 @@
   },
   "approval-039": {
    "key": "518884d0f6a3b5e1",
-   "allowed": true,
-   "reason": ""
-  },
-  "approval-040": {
-   "key": "1a863bc41e6b5ae3",
    "allowed": true,
    "reason": ""
   },
@@ -296,18 +1606,3958 @@
    "allowed": true,
    "reason": ""
   },
-  "approval-046": {
-   "key": "797d2375cfd33e88",
+  "approval-048": {
+   "key": "7b6c933b74b4b6b5",
    "allowed": true,
    "reason": ""
   },
-  "approval-047": {
+  "approval-049": {
+   "key": "8c3bab86f9b310c0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-050": {
+   "key": "f0a384e8dc452295",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-051": {
+   "key": "7ea3bc4d5bd2803e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-052": {
+   "key": "a281b7593faebf58",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-053": {
+   "key": "d7e28f853e4d3acd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-054": {
+   "key": "cdf7975bdfca0658",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-055": {
+   "key": "56b3953466720dec",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-056": {
+   "key": "c43451b45bcc262e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-057": {
+   "key": "0f7272185b7c8cfd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-058": {
+   "key": "a73376eedd158c82",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-059": {
+   "key": "c458d3db1ac52106",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-060": {
+   "key": "68b23cb57a0994ee",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-061": {
+   "key": "dfbeaa8e8b11340c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-062": {
+   "key": "f9678ffbdd802dfb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-063": {
+   "key": "0434a9b050d7d901",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-064": {
+   "key": "fdaa859d58f37ad6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-065": {
+   "key": "509009ff8a2cce02",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-066": {
+   "key": "f8bcd0c56fd023fd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-067": {
+   "key": "82e35be47a9c917d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-068": {
+   "key": "b14f3752290ea5ed",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-069": {
+   "key": "529fbd1ed97a7334",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-070": {
+   "key": "00ccf5c79c70dd8c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-071": {
+   "key": "7ed63225f75b5dab",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-072": {
+   "key": "2fca0097155da269",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-073": {
+   "key": "50d319fe337004f5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-074": {
+   "key": "993094393bd27948",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-075": {
+   "key": "940b1120fe1f9d07",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-076": {
+   "key": "5f2dd1a5d3c93b5c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-077": {
+   "key": "8a9705f39cfd8b2a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-078": {
+   "key": "70278847dff133f0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-079": {
+   "key": "8fccf9bbb68c191b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-080": {
+   "key": "ecf4431b698a37c4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-081": {
+   "key": "5a5b963fe361c227",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-082": {
+   "key": "04459c2bb6e6853c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-083": {
+   "key": "c4f0a8ef0b8fe865",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-084": {
+   "key": "da54e8dd366b8d70",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-085": {
+   "key": "8d3b5b4800a9948a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-086": {
+   "key": "09bf90c7bdf343f7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-087": {
+   "key": "cd9825340b401df6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-088": {
+   "key": "0e7c10cd03021086",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-089": {
+   "key": "b9b9727ec19c3981",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-090": {
+   "key": "9abdb6a35fd1dc50",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-091": {
+   "key": "51cd15aea00e6fc7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-092": {
+   "key": "1d61ffabda05475f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-093": {
+   "key": "adf272eafe3a6b74",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-094": {
+   "key": "a1d0aa8a62ab41c6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-095": {
+   "key": "a83ebeba2c833d14",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-096": {
+   "key": "dca309821cf22178",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-097": {
+   "key": "b7a78abf11847a47",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-098": {
+   "key": "c934543b5117a347",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-099": {
+   "key": "2cfd0f8f0f6e55c8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-100": {
+   "key": "8b9c2760bbece705",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-101": {
+   "key": "74d0e829dd61fff9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-102": {
+   "key": "b067c58be0390fc7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-103": {
+   "key": "0972f863a242b542",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-104": {
+   "key": "6c94eedb4eb193d8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-105": {
+   "key": "84ce3e1d14c4f1c6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-106": {
+   "key": "a3bbc97a867c7282",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-107": {
+   "key": "d712bdfa46e1884a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-108": {
+   "key": "13c7dfd1c5edacf0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-109": {
+   "key": "29f2d5baebb22f7b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-110": {
+   "key": "eb789506e283fead",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-111": {
+   "key": "cc4cf6fd92a777b8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-112": {
+   "key": "730e22578c1c5da5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-113": {
+   "key": "c5f44c898c8d7365",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-114": {
+   "key": "c8d29e63b6dfc089",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-115": {
+   "key": "28e32166ce48fa5c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-116": {
+   "key": "c99454d0e50473b7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-117": {
+   "key": "721da5caa4fe958c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-118": {
+   "key": "aad1e06671c334e0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-119": {
+   "key": "4e5fdd94a00aedb4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-120": {
+   "key": "e26f76b67c7251a4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-121": {
+   "key": "7868187b664dc936",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-122": {
+   "key": "bede6535f3a21d1d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-123": {
+   "key": "73f255c0e88c8b86",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-124": {
+   "key": "c4fcb29b19b41f61",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-125": {
+   "key": "fc6d6d656a7d3a79",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-126": {
+   "key": "98bd6683a25d37d4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-127": {
+   "key": "6db11fdca5527d1e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-128": {
+   "key": "cec907c9745681c0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-129": {
+   "key": "83b5ca5b7e15f15c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-130": {
+   "key": "89a482d050691a7d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-131": {
+   "key": "35073cfe0c9ba9f6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-132": {
+   "key": "78a0a2184ec3b71b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-133": {
+   "key": "579e6885885dd077",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-134": {
+   "key": "12a427c351f28dac",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-135": {
+   "key": "cf469a6c298a75e7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-136": {
+   "key": "3af21a66bad1adb2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-137": {
+   "key": "11ed65c12f56aff9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-138": {
+   "key": "239b05749f181334",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-139": {
+   "key": "29f238f1e45a8f32",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-140": {
+   "key": "4973500301e7ed3f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-141": {
+   "key": "84d5a9c8ec962c19",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-142": {
+   "key": "1499fdb83c0961cd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-143": {
+   "key": "bb786e7ef21776ae",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-144": {
+   "key": "1eb022efb398fa20",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-145": {
+   "key": "31afac2aeec89ca9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-146": {
+   "key": "fecd3d75f65adcaf",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-147": {
+   "key": "cc0b06fe52b4a8cd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-148": {
+   "key": "59b6b3141279ccaf",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-149": {
+   "key": "cd66667f3940d8c3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-150": {
+   "key": "367ad60ffedcaa22",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-151": {
+   "key": "a12c6fb3492e599f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-152": {
+   "key": "15338ab052cf2ce5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-153": {
+   "key": "209c635b5dea990d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-154": {
+   "key": "21bd36bd3a4c3d33",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-155": {
+   "key": "b7714ea8979dbd21",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-156": {
+   "key": "b6e45380bc467b40",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-157": {
+   "key": "9da4475a2d2e3e7d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-158": {
+   "key": "88f87ba0a92b47e0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-159": {
+   "key": "f1e0c399f5b1d550",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-160": {
+   "key": "d06828fed29acbda",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-001": {
+   "key": "57b8243f84a9f35e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-002": {
+   "key": "7af9f2784f9e8e31",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-003": {
+   "key": "f23b31859bb76821",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-004": {
+   "key": "9d7aebd272e6aa4a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-005": {
+   "key": "91928416d5132ba3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-006": {
+   "key": "67b1a26c8d5df349",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-007": {
+   "key": "a45a3646c2918f44",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-008": {
+   "key": "800e204c13008c37",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-009": {
+   "key": "d7b3223c593033fb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-010": {
+   "key": "bfd6c932520d3ba8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-011": {
+   "key": "852fd36d7c84e2d3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-012": {
+   "key": "1e9d8b7367a350a1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-013": {
+   "key": "c32299b639e0cdab",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-014": {
+   "key": "b791c5b2a179aa40",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-015": {
+   "key": "e88b91733024ad67",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-016": {
+   "key": "18703bef8bf45840",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-017": {
+   "key": "9e57d65aa3c6c252",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-018": {
+   "key": "14182a099774a0f9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-019": {
+   "key": "a92cd9ced1fe3c59",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-020": {
+   "key": "405e2141008a88d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-021": {
+   "key": "37e3e7a2e6f9b667",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-022": {
+   "key": "f7e141851743b260",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-023": {
+   "key": "0db319f441792d88",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-024": {
+   "key": "ac3be7a5864ed778",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-025": {
+   "key": "91fdb793914c7256",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-026": {
+   "key": "31a81a58d4e06da4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-027": {
+   "key": "e57bd41a31d31d19",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-028": {
+   "key": "b486e354ace3961c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-029": {
+   "key": "a645cabfe2afc8f4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-030": {
+   "key": "1f7012f8b2f67e38",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-031": {
+   "key": "7d345faf850b7af2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-032": {
+   "key": "6e236ab3d128e8f8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-033": {
+   "key": "b082bcce04ff7c09",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-034": {
+   "key": "8ce56969af1159ad",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-035": {
+   "key": "a924090d91b5c2c6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-036": {
+   "key": "0a7cb080936b9cd7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-037": {
+   "key": "21893b51ae3376ec",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-038": {
+   "key": "b9a08103962328b7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-039": {
+   "key": "aef3b03cab96279c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-040": {
+   "key": "b388fb937e8a37c7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-041": {
+   "key": "4473121b4712dfc5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-042": {
+   "key": "bfc38ff96c8576d2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-043": {
+   "key": "7acc8b8e96861904",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-044": {
+   "key": "1ceae6568b99f2cf",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-045": {
+   "key": "555af45666b46660",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-046": {
+   "key": "b8f400925fcb4bc5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-047": {
+   "key": "163899ff4e164d40",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-048": {
+   "key": "4ee09bde871870d2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-049": {
+   "key": "dbb65bba98f1d70b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-050": {
+   "key": "4f983384abbdc7d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-051": {
+   "key": "a74a281387ed507d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-052": {
+   "key": "984e36c1675d047b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-053": {
+   "key": "7b7425df7376d5bd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-054": {
+   "key": "972121c8338805af",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-055": {
+   "key": "d39f10aac3a9c998",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-056": {
+   "key": "4c9fff6565120ba5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-057": {
+   "key": "eb56b0a61a67ede7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-058": {
+   "key": "89b7a57dbc8b9d80",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-059": {
+   "key": "4d54a267eff78bc1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-060": {
+   "key": "6ee25f74ef448acd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-061": {
+   "key": "a11d8f3afcadcc9b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-062": {
+   "key": "9303c31685d3e361",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-063": {
+   "key": "67e3084b605fd8e9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-064": {
+   "key": "89e7bbc3339f959a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-065": {
+   "key": "c9f46755ce0c7b56",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-066": {
+   "key": "0e25b2e3e2c0c501",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-067": {
+   "key": "bb9fa6cb7aec73fa",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-068": {
+   "key": "15da805e5d71baff",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-069": {
+   "key": "12f36a3d44b3d826",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-070": {
+   "key": "013302f2a2e6f4a4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-071": {
+   "key": "06007cc430d820fa",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-072": {
+   "key": "1b701e34402c6854",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-073": {
+   "key": "796dfa0615dcfeb8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-074": {
+   "key": "4eb9090f1b225514",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-075": {
+   "key": "bd80324c4abef25c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-076": {
+   "key": "2fa5c3a85972d6c2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-077": {
+   "key": "122f1bd554150578",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-078": {
+   "key": "2763875c74f49a69",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-079": {
+   "key": "6482043e8f6a1adb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-080": {
+   "key": "49d0b55ac6c1e184",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-081": {
+   "key": "097f9c721e317c51",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-082": {
+   "key": "011f6102df190c7f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-083": {
+   "key": "6aeba003cb5d5d6f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-084": {
+   "key": "4f7d10b09b190ae1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-085": {
+   "key": "bcd368816fb39a0e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-086": {
+   "key": "68bce846017e95eb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-087": {
+   "key": "33ed2680ffce5b9a",
+   "allowed": false,
+   "reason": "הסינון החזיר 'כן'"
+  },
+  "approval-161/actor-088": {
+   "key": "29f712014713b3b3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-089": {
+   "key": "72123fe4f129d7df",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-090": {
+   "key": "3ae2ed57afbf19e9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-091": {
+   "key": "7d986cb086ff24c3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-092": {
+   "key": "3e4f33fedd2f4ec5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-093": {
+   "key": "00d36021de65e99e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-094": {
+   "key": "c2eadccaa71c532a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-095": {
+   "key": "d6d27b85ef703271",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-096": {
+   "key": "840bfd40f4f0be23",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-097": {
+   "key": "7b392b4fc1b6fb52",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-098": {
+   "key": "e17d9da534f0617e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-099": {
+   "key": "c6458bda6e8107bf",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-100": {
+   "key": "cfc67e7af318cfc5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-101": {
+   "key": "60adc897c24a70fd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-102": {
+   "key": "43176f17e0edd7ad",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-103": {
+   "key": "d5c1928208818de1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-104": {
+   "key": "8efd468705f88b02",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-105": {
+   "key": "63d1a7a77b9f7448",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-161/actor-106": {
+   "key": "264c9606416f4470",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-001": {
+   "key": "4e422248537ed737",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-002": {
+   "key": "a5ce99ce3578915a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-003": {
+   "key": "722fb04e94e28629",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-004": {
+   "key": "f3231648e8152012",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-005": {
+   "key": "ab3ddae654d87128",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-006": {
+   "key": "0f72f38945821b2a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-007": {
+   "key": "d560f8b79c95ba71",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-008": {
+   "key": "a7808e3383ca92e2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-009": {
+   "key": "bf78e8369c779ec3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-010": {
+   "key": "f609c411dd6d425c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-011": {
+   "key": "10fcfede0ca98739",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-012": {
+   "key": "1f26101b44093b77",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-013": {
+   "key": "9deede9f891eba86",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-014": {
+   "key": "2475932195ad1c84",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-015": {
+   "key": "e08d5e42edbca366",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-016": {
+   "key": "6bef429fe248af09",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-017": {
+   "key": "b405046487ff7580",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-018": {
+   "key": "4bde6861e78d1005",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-019": {
+   "key": "a5dbe55bd3f882dc",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-020": {
+   "key": "7b49e043cedf41f8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-021": {
+   "key": "d3163ac268dbdfb4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-022": {
+   "key": "527018a380813c9d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-023": {
+   "key": "cc94c0815391b6f7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-024": {
+   "key": "a37fb9220a1e5dd7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-025": {
+   "key": "ccd72887e32b21be",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-026": {
+   "key": "01326855a01f5f58",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-027": {
+   "key": "864bc4aad26e1f86",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-028": {
+   "key": "e8da0dfb1be8d3c2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-029": {
+   "key": "169fdf1e1d71832e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-030": {
+   "key": "155fbf83ab9b77a2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-031": {
+   "key": "d6a4aa59efc5001a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-032": {
+   "key": "e233bd7fcf36b2f5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-033": {
+   "key": "9b31dc4f8d425225",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-034": {
+   "key": "9345bd3e73f2dfc6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-035": {
+   "key": "590eb7a0a26cc89d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-036": {
+   "key": "b0e915f9ce771ff2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-037": {
+   "key": "af2029d290476647",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-038": {
+   "key": "cbd7dba5bf34eb38",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-039": {
+   "key": "7412a6140d2ad5b8",
+   "allowed": false,
+   "reason": "הסינון החזיר 'כן'"
+  },
+  "approval-162/actor-040": {
+   "key": "9d2432d37f59d7ac",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-041": {
+   "key": "520e3056e2340608",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-042": {
+   "key": "1325d3ebcb432627",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-043": {
+   "key": "8fceef6ee1e100ff",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-044": {
+   "key": "5c0e45b82fcdc8d3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-045": {
+   "key": "cfea7e5362f174b6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-046": {
+   "key": "5ab9282f2cf10e59",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-047": {
+   "key": "85a0a16a441f4b07",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-048": {
+   "key": "c99f7ad638a15e6e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-049": {
+   "key": "1e12779b091d3e30",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-050": {
+   "key": "9314f14c2dc144b8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-051": {
+   "key": "bf15f11fa061bf3f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-052": {
+   "key": "ec84f2d49514b44e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-053": {
+   "key": "660a4d0cc224a9ef",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-054": {
+   "key": "11c5cbfdd871bbdc",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-055": {
+   "key": "dc9e9b2d29842eeb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-056": {
+   "key": "671a679980af4d04",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-057": {
+   "key": "6f05f89de3cd05a5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-058": {
+   "key": "e76da029217d8a21",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-059": {
+   "key": "3e3c4c0b99287730",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-060": {
+   "key": "cb216de52a4bc7fd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-061": {
+   "key": "52d7277103b0445f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-062": {
+   "key": "aef670f4516538ef",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-063": {
+   "key": "bbf73a2b25efb06a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-064": {
+   "key": "746604a5a061dda0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-065": {
+   "key": "c2e6202ca41c2147",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-066": {
+   "key": "df9a2b34dada6d13",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-067": {
+   "key": "9648fc88e180d230",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-068": {
+   "key": "0376876b22702ca6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-069": {
+   "key": "9ba8cd9cafc49dbd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-070": {
+   "key": "6f8f645851556af9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-071": {
+   "key": "dd13b4895de006e9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-072": {
+   "key": "f8b3e4e754846b08",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-073": {
+   "key": "0b006c0cb5399283",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-074": {
+   "key": "8c0bc58b306b7f0e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-075": {
+   "key": "a6396f27cc39cc8d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-076": {
+   "key": "84732b9060b55e38",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-077": {
+   "key": "dee38d3a43e6a13a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-078": {
+   "key": "a494dc35f39679b7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-079": {
+   "key": "b557eef4117c6620",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-080": {
+   "key": "71e672576187dad8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-081": {
+   "key": "b787bb572eb54276",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-082": {
+   "key": "e79bbe13a2216dd2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-083": {
+   "key": "eb969d6d217dce33",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-084": {
+   "key": "9343024937ad691c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-085": {
+   "key": "1727f1ed7320b2fd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-086": {
+   "key": "7c22fd8ecd33cb7c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-087": {
+   "key": "23b1d64117d259a2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-088": {
+   "key": "3385187780b3f36f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-089": {
+   "key": "f4e730feee7f8dc1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-090": {
+   "key": "e7af7324cc1ed607",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-091": {
+   "key": "112d85b3fe2a61af",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-092": {
+   "key": "26eb78d185b7b6c3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-093": {
+   "key": "fa3ee84ef00ce79e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-094": {
+   "key": "ba10cd5d75616b80",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-095": {
+   "key": "c96113d16bc46f83",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-096": {
+   "key": "ace8c0e1ded09984",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-097": {
+   "key": "ed67d3172e117263",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-098": {
+   "key": "c96421c5e8ded12a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-099": {
+   "key": "c38e11b3a35700db",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-100": {
+   "key": "9f532b4af24c8b11",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-101": {
+   "key": "3d50be4177f2df00",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-102": {
+   "key": "2134b78283e24321",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-103": {
+   "key": "ef41cab3f74a6031",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-104": {
+   "key": "3a4498f1f9eddf6f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-105": {
+   "key": "23dcb8f9085b4b57",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-162/actor-106": {
+   "key": "3ab518ca3a45d41f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-001": {
+   "key": "0143ddc39b164082",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-002": {
+   "key": "4394a814d4987ba9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-003": {
+   "key": "ecd2815dc148b95a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-004": {
+   "key": "ee195ea6b37712d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-005": {
+   "key": "83474b9aa0d57d7d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-006": {
+   "key": "a22f094fd7754d89",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-007": {
+   "key": "0a474e3f4ca2be5b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-008": {
+   "key": "e6c7165aed46fa84",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-009": {
+   "key": "aab0738dfda8a6ba",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-010": {
+   "key": "c780c7e214e24e87",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-011": {
+   "key": "89fb43c707dc8eb7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-012": {
+   "key": "1da2487a7800512d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-013": {
+   "key": "afa7d97e98bc222c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-014": {
+   "key": "ae2f5b402d353d6e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-015": {
+   "key": "86604ffd1b2364c1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-016": {
+   "key": "95790e53431a1fec",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-017": {
+   "key": "abd9b1e62a870f09",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-018": {
+   "key": "bc6e6194f23d4c44",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-019": {
+   "key": "03dc801c34a3ab64",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-020": {
+   "key": "355af9501f1f7e4c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-021": {
+   "key": "0ee0d697d894b08f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-022": {
+   "key": "6b58de0dad165a58",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-023": {
+   "key": "63b28fe481a714ac",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-024": {
+   "key": "ea24867a24ec0d73",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-025": {
+   "key": "5f58add014e722ce",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-026": {
+   "key": "b95704f58dee4c55",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-027": {
+   "key": "f8c3f38f7db6fbfa",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-028": {
+   "key": "5b6b507412f216bb",
+   "allowed": false,
+   "reason": "הסינון החזיר 'כן'"
+  },
+  "approval-163/actor-029": {
+   "key": "e7f3c6cd3a66710a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-030": {
+   "key": "ffbd41a803009d61",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-031": {
+   "key": "4c71e272fa078e44",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-032": {
+   "key": "98c900d0cee4a361",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-033": {
+   "key": "4594041647c01bb5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-034": {
+   "key": "7f1d70a8eb9bcf75",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-035": {
+   "key": "22c8d0adffb9c7b8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-036": {
+   "key": "42bfb353cec4af4a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-037": {
+   "key": "a06740167f716b6d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-038": {
+   "key": "475c7d6ca1e40630",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-039": {
+   "key": "f3dfc1973a78b17a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-040": {
+   "key": "cfdba9be2c3a189a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-041": {
+   "key": "35f91fa42880191a",
+   "allowed": false,
+   "reason": "הסינון החזיר 'כן'"
+  },
+  "approval-163/actor-042": {
+   "key": "23f9785518921224",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-043": {
+   "key": "d5767c2312971e3e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-044": {
+   "key": "e3d06f8654008fe9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-045": {
+   "key": "16c0b9de83731ce6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-046": {
+   "key": "895522cab6edbd64",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-047": {
+   "key": "2ce37affed82fe29",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-048": {
+   "key": "aab0fb7e0b3b0945",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-049": {
+   "key": "19db3e53ba83c248",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-050": {
+   "key": "416b8ea70619af5a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-051": {
+   "key": "b52468252889bc78",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-052": {
+   "key": "1b48df1cf9990621",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-053": {
+   "key": "cab268fdb6eaf48a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-054": {
+   "key": "2e15409f7fbf179a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-055": {
+   "key": "dffbed37b71b4666",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-056": {
+   "key": "0a05046794e19d4a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-057": {
+   "key": "75ef4f239c1a0768",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-058": {
+   "key": "3e4c7c7af919c309",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-059": {
+   "key": "c6e1c57757b04597",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-060": {
+   "key": "a68da0e3fa72f489",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-061": {
+   "key": "8a5f01dba3a47b8e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-062": {
+   "key": "d8455249f3c2b03b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-063": {
+   "key": "5a12a93b4832eda1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-064": {
+   "key": "7827c25225470489",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-065": {
+   "key": "6ead579f1f32801b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-066": {
+   "key": "acb89b0e1cb1e325",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-067": {
+   "key": "ac444218348087a1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-068": {
+   "key": "10c9566e5d809b67",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-069": {
+   "key": "4a9126e211f82fc4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-070": {
+   "key": "0599ff5d3dea0b7b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-071": {
+   "key": "887c4c3145f3b994",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-072": {
+   "key": "13609ff314abd6a2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-073": {
+   "key": "c4f65fe30eca8307",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-074": {
+   "key": "a476f9e48a20923b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-075": {
+   "key": "abbd4617bf6abea5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-076": {
+   "key": "c67884b744069294",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-077": {
+   "key": "8f42e836c99ddd5e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-078": {
+   "key": "6c6e48c49b5eaf04",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-079": {
+   "key": "26731cdb56eeeef2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-080": {
+   "key": "feebd433df864620",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-081": {
+   "key": "db50177b9206bf83",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-082": {
+   "key": "1049a363adb8e4b5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-083": {
+   "key": "67811d82aa8514d8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-084": {
+   "key": "ae69668bf600cb78",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-085": {
+   "key": "a224f38a1d85a228",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-086": {
+   "key": "5452d6bc29dc8ee4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-087": {
+   "key": "7dbcc62bf1bdd502",
+   "allowed": false,
+   "reason": "הסינון החזיר 'כן'"
+  },
+  "approval-163/actor-088": {
+   "key": "8a89e7d3d68fb2bc",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-089": {
+   "key": "08d82fbff9a0933e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-090": {
+   "key": "718c1dbe281c5f24",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-091": {
+   "key": "6d8b4bdb20f33e22",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-092": {
+   "key": "067b97e17eec872f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-093": {
+   "key": "1b081411a143db7a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-094": {
+   "key": "7fb54d7938b6a9b1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-095": {
+   "key": "53a472ffa3f06dd8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-096": {
+   "key": "834b778de143c09a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-097": {
+   "key": "b86b47e831db360e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-098": {
+   "key": "9d2de5570d438edb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-099": {
+   "key": "ee7327e6d4ababe7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-100": {
+   "key": "a68b94380549a9f1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-101": {
+   "key": "bbd5fb7d88ac9bcb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-102": {
+   "key": "861b2088c903c65a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-103": {
+   "key": "7ae4b570ef16efb9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-104": {
+   "key": "4a857d85e37350da",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-105": {
+   "key": "fef19f285462cfde",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-163/actor-106": {
+   "key": "68d6eb933cd4fbbe",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-001": {
    "key": "f5673aa5cd09f484",
    "allowed": false,
    "reason": "הסינון החזיר 'כן'"
   },
-  "approval-048": {
-   "key": "7b6c933b74b4b6b5",
+  "approval-164/actor-002": {
+   "key": "838569198836efcc",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-003": {
+   "key": "94e3bffd7cc596af",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-004": {
+   "key": "2040c81488d18e60",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-005": {
+   "key": "de78203dcf0e404a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-006": {
+   "key": "4a913917227b61ef",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-007": {
+   "key": "74a34fddcf23518b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-008": {
+   "key": "567f045bcc3c914c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-009": {
+   "key": "b737d793b4b1e10f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-010": {
+   "key": "c193794dbc32868f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-011": {
+   "key": "ffcdca18e89c4fd2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-012": {
+   "key": "8320655c3ba0c525",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-013": {
+   "key": "3cda0cad63c02217",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-014": {
+   "key": "23c89ad908da058f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-015": {
+   "key": "9845d6070aab5102",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-016": {
+   "key": "d4a87ad339eac9a6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-017": {
+   "key": "45f4c22f8f04af66",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-018": {
+   "key": "07f46a0919daf05b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-019": {
+   "key": "a7211df10ec8a415",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-020": {
+   "key": "b5e95e91ac4af55f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-021": {
+   "key": "0dadd0079ae7c01f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-022": {
+   "key": "53526dbcac284426",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-023": {
+   "key": "59fc2886f317d151",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-024": {
+   "key": "d3219385ceab54b0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-025": {
+   "key": "c5b8d02139053956",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-026": {
+   "key": "69ee5114cab0fc14",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-027": {
+   "key": "02b2388511b0088d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-028": {
+   "key": "e6d44cf7cdbd7796",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-029": {
+   "key": "28b728a8f4b7f3ff",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-030": {
+   "key": "21adfca52d2bd401",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-031": {
+   "key": "0d658641e6f5d0eb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-032": {
+   "key": "53ddf40fe20daf28",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-033": {
+   "key": "f9f1aa751b78c595",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-034": {
+   "key": "cfc5eb79183e124e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-035": {
+   "key": "5a7e7836641ce5ee",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-036": {
+   "key": "0e45f05c65aff9c3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-037": {
+   "key": "5d0089976a49fe3a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-038": {
+   "key": "f96c4dc4e12bf303",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-039": {
+   "key": "785fa6b1c044349c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-040": {
+   "key": "30ef4173683a4d31",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-041": {
+   "key": "a795b557dccf64a4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-042": {
+   "key": "fa79a0fb9ed3d510",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-043": {
+   "key": "65c09398d0a7aab1",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-044": {
+   "key": "b966155dbdb0c011",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-045": {
+   "key": "2942aa0cba6a6da6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-046": {
+   "key": "fda0f1786a08ef9b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-047": {
+   "key": "88bb9cd929a4ee38",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-048": {
+   "key": "48e4da5f2a8077a9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-049": {
+   "key": "3c368ede5e96403c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-050": {
+   "key": "0643c82476410f24",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-051": {
+   "key": "a5267ae2db4a9d81",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-052": {
+   "key": "7a24d03f1495e9a8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-053": {
+   "key": "65a92296d4097cf6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-054": {
+   "key": "fd9af38d3c11a5f5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-055": {
+   "key": "eaf3d9479fae392b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-056": {
+   "key": "893c93e6a2563331",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-057": {
+   "key": "8c9fcae226831b31",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-058": {
+   "key": "16a0c8979c3d4add",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-059": {
+   "key": "06baad5353a633da",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-060": {
+   "key": "31b23a80dc1cb5c5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-061": {
+   "key": "b39166219704612f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-062": {
+   "key": "38d020fc1850e1e6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-063": {
+   "key": "41fe6c434df5bd54",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-064": {
+   "key": "a1c621bbc0ffe4be",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-065": {
+   "key": "65e8b46df7f37ba5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-066": {
+   "key": "66965f78e628588a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-067": {
+   "key": "90965683e1edf94f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-068": {
+   "key": "67eb18807676a035",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-069": {
+   "key": "480df497c930b363",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-070": {
+   "key": "69ff101e0f96f260",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-071": {
+   "key": "aeb48785794a1800",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-072": {
+   "key": "38e7e6842028664c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-073": {
+   "key": "f13cd45e7ec76c34",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-074": {
+   "key": "a9951fdb19cf954c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-075": {
+   "key": "f49988f986973ffc",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-076": {
+   "key": "4bf9605da44712d9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-077": {
+   "key": "a9bcd2fabcd7b056",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-078": {
+   "key": "a4940e1d4a8c8bde",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-079": {
+   "key": "d61c0382a1e03866",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-080": {
+   "key": "2f60a68553f5ebc0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-081": {
+   "key": "a6995c76ead63212",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-082": {
+   "key": "6f39e5f74b417802",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-083": {
+   "key": "5e973669f32d8bf9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-084": {
+   "key": "30ee9f477a8cc7c2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-085": {
+   "key": "e25507764a4f0a5f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-086": {
+   "key": "af44fc1436def13c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-087": {
+   "key": "dae47ffc57741138",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-088": {
+   "key": "6cba1a500360008f",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-089": {
+   "key": "95928558e18d7af7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-090": {
+   "key": "fe93baf4e0521f68",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-091": {
+   "key": "c7763515285fd33d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-092": {
+   "key": "1a4c4f400d6e79cf",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-093": {
+   "key": "3a3cda2c76e1d39a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-094": {
+   "key": "50909127d2615372",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-095": {
+   "key": "086c3b152bf0f4f2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-096": {
+   "key": "f4a44361a8b52033",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-097": {
+   "key": "e03a206c733eb0f9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-098": {
+   "key": "b69ed4bd9329f309",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-099": {
+   "key": "3a43e24cb2aa61aa",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-100": {
+   "key": "d33ccc3c00f41121",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-101": {
+   "key": "1c6d5e8f6e236668",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-102": {
+   "key": "6fab9ea9877df433",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-103": {
+   "key": "6644a0d334943d4e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-104": {
+   "key": "c3a42ba4ab3ef571",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-105": {
+   "key": "d1c6fa35240e94cd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-164/actor-106": {
+   "key": "206e19034b2ef41e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-165": {
+   "key": "ccab23ed3d246b6a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-166": {
+   "key": "bcb824cf81d9b1f8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-001": {
+   "key": "78967f730cdd74f2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-002": {
+   "key": "83d380ca471591e8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-003": {
+   "key": "56f3530396c66ece",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-004": {
+   "key": "edd9896bc98a531d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-005": {
+   "key": "12738a566c973051",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-006": {
+   "key": "3376ea12c9059dff",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-007": {
+   "key": "2db845f35a35eca3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-008": {
+   "key": "e5366268fb127dfa",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-009": {
+   "key": "d364289e843625ba",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-010": {
+   "key": "c9df80335225e99b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-011": {
+   "key": "b964662fd786489a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-012": {
+   "key": "1c92cb2eb44cdddd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-013": {
+   "key": "a271993ddebdf60a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-014": {
+   "key": "b346ddbb80fbecc4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-015": {
+   "key": "09d849c57c110add",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-016": {
+   "key": "835a8ef7b4806119",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-017": {
+   "key": "72e42369dece0635",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-018": {
+   "key": "fafdefa0816b2b18",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-019": {
+   "key": "09a9d672c07b92d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-020": {
+   "key": "33454bc2d0ae7bf8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-021": {
+   "key": "770bef5a3a8a1c9e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-022": {
+   "key": "4aabbca25d6f5d89",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-023": {
+   "key": "ce565648af09b97d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-024": {
+   "key": "7caac3b86bd77e7c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-025": {
+   "key": "0f3d1857b1a92de2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-026": {
+   "key": "51cfd6e6398d18e6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-027": {
+   "key": "5aa46164319607cc",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-028": {
+   "key": "deff87d94be65829",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-029": {
+   "key": "7e289b0cce8fccea",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-030": {
+   "key": "795a8f77f3af5a30",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-031": {
+   "key": "41dc0c145ac65cb9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-032": {
+   "key": "a8de5c0b4c947d18",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-033": {
+   "key": "cce95f5977470665",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-034": {
+   "key": "96c1828bbae7a06a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-035": {
+   "key": "92745f49e5cf9cd2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-036": {
+   "key": "b34e3effe9aae5d2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-037": {
+   "key": "a9f35f9901027c4c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-038": {
+   "key": "a0c11e7ed3a5c6ab",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-039": {
+   "key": "8a2e61a78c0e9dba",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-040": {
+   "key": "03d9dace21369083",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-041": {
+   "key": "1b3e79f94ee58540",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-042": {
+   "key": "090ac31d5d446554",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-043": {
+   "key": "e78f1f80b0abae9c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-044": {
+   "key": "8f2c8d77e9a93ecc",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-045": {
+   "key": "d681a563b2268f82",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-046": {
+   "key": "2c21f8d3fe70b736",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-047": {
+   "key": "df99aa2be3b354d8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-048": {
+   "key": "e3e3e4c8843de5ef",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-049": {
+   "key": "607b8d7b90c222a0",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-050": {
+   "key": "8b2be7e8db43a357",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-051": {
+   "key": "aefb2eda24e566e3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-052": {
+   "key": "9ae17a204ee272d4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-053": {
+   "key": "fa2db999ab480d07",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-054": {
+   "key": "c3707db4b0ae3f86",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-055": {
+   "key": "0b2396630d1b0624",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-056": {
+   "key": "87a828bd46c66ac8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-057": {
+   "key": "0f0a7627ac2b65ce",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-058": {
+   "key": "49652865154e9dc3",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-059": {
+   "key": "b1e0f40731a48753",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-060": {
+   "key": "da9a80613cec6315",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-061": {
+   "key": "160fdfe8799c2eb6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-062": {
+   "key": "b1eabd9f48b4f9c8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-063": {
+   "key": "0468f5ba2ae16fdd",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-064": {
+   "key": "ad0b5a175095b21a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-065": {
+   "key": "186f7fdae7cb43ea",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-066": {
+   "key": "a64f12e9b52c8f19",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-067": {
+   "key": "bf3e75dbc1d7997d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-068": {
+   "key": "b73f3ed3c5c434c7",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-069": {
+   "key": "96b9b807af126a55",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-070": {
+   "key": "a9ce1c45e8cf1a35",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-071": {
+   "key": "175cdf907e35fd83",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-072": {
+   "key": "9cedadc09c4ec867",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-073": {
+   "key": "47ce1b197ea1a193",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-074": {
+   "key": "d4c247ddce1b62d6",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-075": {
+   "key": "563c6acdcaf4ac0d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-076": {
+   "key": "0934e4c4a7b90985",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-077": {
+   "key": "0e298553ec50f7f4",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-078": {
+   "key": "6df0880a5ec24cc9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-079": {
+   "key": "1d64fc1e52868526",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-080": {
+   "key": "fe9eb6bd29a951fc",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-081": {
+   "key": "e8adf3aa3e4746be",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-082": {
+   "key": "e4f89a0438e0ffbb",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-083": {
+   "key": "54dce5f51ccb8cb9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-084": {
+   "key": "ff1d0f26e876c846",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-085": {
+   "key": "3a272421fcf5a499",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-086": {
+   "key": "2b9dee52569e6d2a",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-087": {
+   "key": "4d7ee2c2c28fa7ab",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-088": {
+   "key": "5b0d061f4cd92d5b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-089": {
+   "key": "b46a0c308151c07e",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-090": {
+   "key": "6ffb711398b5474c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-091": {
+   "key": "4b517cb99a0dce50",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-092": {
+   "key": "92fe5d7622883192",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-093": {
+   "key": "0aa7bff74dfa27f9",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-094": {
+   "key": "3f692a651917cb09",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-095": {
+   "key": "6a8dc3ca8a1b646c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-096": {
+   "key": "6e248b1d36d80f9c",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-097": {
+   "key": "09a5020face91fc8",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-098": {
+   "key": "91bfb7280273d38d",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-099": {
+   "key": "b5193c0d3688f130",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-100": {
+   "key": "d9bf58eaffdeb2f2",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-101": {
+   "key": "1fd0629d7010bb72",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-102": {
+   "key": "89d81fc5d19a5652",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-103": {
+   "key": "b919aad24ab34dab",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-104": {
+   "key": "82bc957d3f4a054b",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-105": {
+   "key": "94287d566ecbb9de",
+   "allowed": true,
+   "reason": ""
+  },
+  "approval-167/actor-106": {
+   "key": "82bb7fda8a657b6d",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-005": {
+   "key": "093f6c444f161502",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-006": {
+   "key": "8c657b1dea5f456f",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-007": {
+   "key": "963f32eac716b1d0",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-008": {
+   "key": "236c8b6eb30e49c3",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-009": {
+   "key": "d04af5dc150d751c",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-010": {
+   "key": "5dbe1226050b9071",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-011": {
+   "key": "375cff0c2903bb09",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-012": {
+   "key": "920a8379cb5b46b5",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-016": {
+   "key": "9e63b7f2461af0af",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-017": {
+   "key": "f54388471946a954",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-018": {
+   "key": "57705ce91593a830",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-019": {
+   "key": "36a3968af4d9434b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-020": {
+   "key": "544b3a0a7aa29631",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-021": {
+   "key": "abc4d6f98ebec60b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-022": {
+   "key": "485d6ac24544bcc9",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-023": {
+   "key": "17094d65fc20668c",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-024": {
+   "key": "d32f484e48e165ac",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-025": {
+   "key": "210599343288b892",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-026": {
+   "key": "6017e658d94dcf32",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-027": {
+   "key": "45897e63a9670914",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-028": {
+   "key": "8d62d46c9dad43dd",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-029": {
+   "key": "e4d025bfd07ac2fd",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-030": {
+   "key": "9be06d4bc0b2d0b1",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-031": {
+   "key": "8a2da6aa14fb9c2b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-032": {
+   "key": "b7dd31560fdbb128",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-033": {
+   "key": "b8cbb84f6dc2a6f3",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-034": {
+   "key": "b86144e9e3ccb1e7",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-035": {
+   "key": "8bfe2b22ff78b98b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-036": {
+   "key": "acf82e7f7c91c585",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-037": {
+   "key": "83087625d70a0e0f",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-038": {
+   "key": "7fbfb1c026e25f64",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-039": {
+   "key": "04a91f4804e24729",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-040": {
+   "key": "3914962883825dd5",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-041": {
+   "key": "6a04c1b471512f0e",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-042": {
+   "key": "1df5c2863dc39edb",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-043": {
+   "key": "4c0881c6b489a0f1",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-044": {
+   "key": "e5ffc42493c67540",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-045": {
+   "key": "3375df83f20baa6b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-046": {
+   "key": "b9a076969c297ebd",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-047": {
+   "key": "cb54b59a59ba383e",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-048": {
+   "key": "c9832b4c250ec985",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-049": {
+   "key": "0599c36c240d6c10",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-050": {
+   "key": "41a92d8c6df0ea70",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-051": {
+   "key": "88009f4d40f0478f",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-052": {
+   "key": "3d5e9b6b689bc5e3",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-053": {
+   "key": "f6a0c09aea834f43",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-054": {
+   "key": "fb4f87f46cea875f",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-055": {
+   "key": "c8961b12752378bd",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-056": {
+   "key": "90fd429cf1a29fa5",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-057": {
+   "key": "98c8bb830e8d4fec",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-058": {
+   "key": "b4f3a16810a7876a",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-059": {
+   "key": "8ed2479bf749bcf6",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-060": {
+   "key": "f10a91ef6bb21820",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-061": {
+   "key": "1ba9b4cf783712a1",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-062": {
+   "key": "c44273cb7bb2b023",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-063": {
+   "key": "a6f257ea032ff6e7",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-064": {
+   "key": "33e1c870d9d217c6",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-065": {
+   "key": "21ff76c1d776e920",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-066": {
+   "key": "b161a0da7880549e",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-067": {
+   "key": "02cd59e99ff5e223",
+   "allowed": false,
+   "reason": "הסינון החזיר 'כן'"
+  },
+  "conditions-068": {
+   "key": "96756618131049bf",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-069": {
+   "key": "247c97541be741a1",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-070": {
+   "key": "2afe3f8c63a7ce5b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-071": {
+   "key": "8be2fcafd757e7d6",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-072": {
+   "key": "2055cd74cf44c27b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-073": {
+   "key": "a02ca3314ed21e7e",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-074": {
+   "key": "ae2b1f3bcf380360",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-075": {
+   "key": "577e8183391ad07e",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-076": {
+   "key": "8e5b8138a286bc73",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-077": {
+   "key": "a79cf3acf25314c5",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-078": {
+   "key": "9cc196c9bd7a7a80",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-079": {
+   "key": "6b9eae1b830a30f4",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-080": {
+   "key": "67d50caa1a6abdb9",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-081": {
+   "key": "546c79a6a4bd0ed8",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-082": {
+   "key": "89bb15aa48217589",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-083": {
+   "key": "ae68e3766a2d2be6",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-084": {
+   "key": "6b694662da27a80c",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-085": {
+   "key": "86f44ba743f2e485",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-086": {
+   "key": "693d890894f7845a",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-087": {
+   "key": "08fae865a01f666b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-088": {
+   "key": "aa0ac711e14d0300",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-089": {
+   "key": "c53ff1f003651114",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-090": {
+   "key": "f65d3e38f5b7a67c",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-091": {
+   "key": "5044ece2ad889085",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-092": {
+   "key": "c6f1c186da3894d7",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-093": {
+   "key": "97d5049aeca5476a",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-094": {
+   "key": "39e4dda6070a49f9",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-095": {
+   "key": "6fd797238ff8038b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-096": {
+   "key": "233842cbcfa0fa69",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-097": {
+   "key": "4bdc3e2206d42030",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-098": {
+   "key": "6169d11b4cf3eb2d",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-099": {
+   "key": "56295152d0567cfb",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-100": {
+   "key": "264945bf34020317",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-101": {
+   "key": "32ac22e7db546363",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-102": {
+   "key": "c5ce08f297e976cb",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-103": {
+   "key": "641d36a572548bf7",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-104": {
+   "key": "5beebe77b46edc90",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-105": {
+   "key": "e934815426a314d5",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-106": {
+   "key": "d5c60683a5d02e4f",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-107": {
+   "key": "790d4851de9c65f5",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-108": {
+   "key": "73dc4d3496c758df",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-109": {
+   "key": "368b3eb8bb2a4dc8",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-110": {
+   "key": "327ebbc56bbf0d75",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-111": {
+   "key": "0e84f9664a916277",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-112": {
+   "key": "716a10dbd60d682e",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-113": {
+   "key": "d90996087dea555f",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-114": {
+   "key": "1ab62db49f3945f2",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-115": {
+   "key": "33ae77153954871f",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-116": {
+   "key": "2a4d42e9e3d0abd4",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-117": {
+   "key": "476b283c6f52d64f",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-118": {
+   "key": "e70bbc46631733a7",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-119": {
+   "key": "3461b291cbf34080",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-120": {
+   "key": "0e8b4a3fe0ed8849",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-121": {
+   "key": "89c8ca29bb821edf",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-122": {
+   "key": "b862e8964f8a7090",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-123": {
+   "key": "cee3779e2fdfea34",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-124": {
+   "key": "8de805f2f62fd04a",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-125": {
+   "key": "ae2c223270627987",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-126": {
+   "key": "c38a5eef7bda25bb",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-127": {
+   "key": "7d3d874c3c2f250d",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-128": {
+   "key": "8c8bd7b8d1c85cdc",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-129": {
+   "key": "29f24d574dadcd27",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-130": {
+   "key": "8fb93e608f99550d",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-131": {
+   "key": "32faf5fa9f607b17",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-132": {
+   "key": "83f8af9d95b9ee3c",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-133": {
+   "key": "3eba5979ae6a5678",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-134": {
+   "key": "fd8bd957a2cc5ebc",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-135": {
+   "key": "d13afc863e2dc07b",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-136": {
+   "key": "0e49180207738017",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-137": {
+   "key": "5d69a849514ece29",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-138": {
+   "key": "8cfb1c2b03bb7bf5",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-139": {
+   "key": "abe8f1f2ab4955ed",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-140": {
+   "key": "5761f18210db2157",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-141": {
+   "key": "51d6249c687fcd9d",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-142": {
+   "key": "4cf1168f716113f0",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-143": {
+   "key": "fb142b21449881c6",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-144": {
+   "key": "9998be8f2920dc11",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-145": {
+   "key": "731819458d928dd0",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-146": {
+   "key": "0b562c3bff715ba7",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-147": {
+   "key": "4f149d23be721348",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-148": {
+   "key": "7ac075a4c615c165",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-149": {
+   "key": "1f4368744074f854",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-150": {
+   "key": "e7b86c6e75f073a2",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-151": {
+   "key": "8d48b99b04268032",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-152": {
+   "key": "83bd29a6e0f77856",
+   "allowed": true,
+   "reason": ""
+  },
+  "conditions-153": {
+   "key": "20add057d241d69c",
    "allowed": true,
    "reason": ""
   },
@@ -431,148 +5681,1253 @@
    "allowed": true,
    "reason": ""
   },
-  "conditions-001": {
-   "key": "153f331f7d865c70",
+  "duty-025": {
+   "key": "0ac11b6b2f02d258",
    "allowed": true,
    "reason": ""
   },
-  "conditions-002": {
-   "key": "042cf92add77ca8c",
+  "duty-026": {
+   "key": "444747100116565a",
    "allowed": true,
    "reason": ""
   },
-  "conditions-003": {
-   "key": "5a645ada2e6d27bb",
+  "duty-027": {
+   "key": "996a66a008fb8559",
    "allowed": true,
    "reason": ""
   },
-  "conditions-004": {
-   "key": "19a62187b9980b90",
+  "duty-028": {
+   "key": "1d648f6fa84b8b15",
    "allowed": true,
    "reason": ""
   },
-  "conditions-005": {
-   "key": "093f6c444f161502",
+  "duty-029": {
+   "key": "de183a4ccbdd7bef",
    "allowed": true,
    "reason": ""
   },
-  "conditions-006": {
-   "key": "8c657b1dea5f456f",
+  "duty-030": {
+   "key": "a5a079227a598552",
    "allowed": true,
    "reason": ""
   },
-  "conditions-007": {
-   "key": "963f32eac716b1d0",
+  "duty-031": {
+   "key": "d6d3205f08b83b91",
    "allowed": true,
    "reason": ""
   },
-  "conditions-008": {
-   "key": "236c8b6eb30e49c3",
+  "duty-032": {
+   "key": "7d23ff746483fb6e",
    "allowed": true,
    "reason": ""
   },
-  "conditions-009": {
-   "key": "d04af5dc150d751c",
+  "duty-033": {
+   "key": "1139e1059c681957",
    "allowed": true,
    "reason": ""
   },
-  "conditions-010": {
-   "key": "5dbe1226050b9071",
+  "duty-034": {
+   "key": "7350e6e18406778f",
    "allowed": true,
    "reason": ""
   },
-  "conditions-011": {
-   "key": "375cff0c2903bb09",
+  "duty-035": {
+   "key": "351c942940f7e586",
    "allowed": true,
    "reason": ""
   },
-  "conditions-012": {
-   "key": "920a8379cb5b46b5",
+  "duty-036": {
+   "key": "131bb6263c7306dd",
    "allowed": true,
    "reason": ""
   },
-  "conditions-013": {
-   "key": "99e0f7ef2ca0689f",
+  "duty-037": {
+   "key": "597673fea372d4b8",
    "allowed": true,
    "reason": ""
   },
-  "conditions-014": {
-   "key": "f162094d41a42d6a",
+  "duty-038": {
+   "key": "4a697fee30e62ead",
    "allowed": true,
    "reason": ""
   },
-  "conditions-015": {
-   "key": "f641d36352f9527b",
+  "duty-039": {
+   "key": "23b5ca393dae8439",
    "allowed": true,
    "reason": ""
   },
-  "after_last-001": {
-   "key": "4436c47f98bb8db1",
+  "duty-040": {
+   "key": "7fa1cba1f537993e",
    "allowed": true,
    "reason": ""
   },
-  "after_last-002": {
-   "key": "a93cc3f52e303f34",
+  "duty-041": {
+   "key": "440bb0178ba6eed5",
    "allowed": true,
    "reason": ""
   },
-  "after_last-003": {
-   "key": "f85abaa43a9cd3a0",
+  "duty-042": {
+   "key": "7993b34d9756d177",
    "allowed": true,
    "reason": ""
   },
-  "after_last-004": {
-   "key": "889d9872058ce2e8",
+  "duty-043": {
+   "key": "f37e0d51a92f5baa",
    "allowed": true,
    "reason": ""
   },
-  "after_last-005": {
-   "key": "d18891cdef83a1a0",
+  "duty-044": {
+   "key": "1c594807056a8253",
    "allowed": true,
    "reason": ""
   },
-  "after_last-006": {
-   "key": "4deca9de4ed72a3f",
+  "duty-045": {
+   "key": "0941df3742b97f37",
    "allowed": true,
    "reason": ""
   },
-  "after_last-007": {
-   "key": "e702d7521159da7e",
+  "duty-046": {
+   "key": "04f0437509902684",
    "allowed": true,
    "reason": ""
   },
-  "after_last-008": {
-   "key": "e0c71cf61fe7cf90",
+  "duty-047": {
+   "key": "131216abc13b1b02",
    "allowed": true,
    "reason": ""
   },
-  "after_last-009": {
-   "key": "21f59d33975dcabb",
+  "duty-048": {
+   "key": "eb895340e49613cf",
    "allowed": true,
    "reason": ""
   },
-  "after_last-010": {
-   "key": "7574949ad8019926",
+  "duty-049": {
+   "key": "b0682d22c78e85e0",
    "allowed": true,
    "reason": ""
   },
-  "after_last-011": {
-   "key": "d5af497afa4dd46a",
+  "duty-050": {
+   "key": "5afd24324492f3f2",
    "allowed": true,
    "reason": ""
   },
-  "after_last-012": {
-   "key": "7d1096b97cd119d2",
+  "duty-051": {
+   "key": "34ce6b66994fd017",
    "allowed": true,
    "reason": ""
   },
-  "after_last-013": {
-   "key": "ae7c6b8212805bb4",
+  "duty-052": {
+   "key": "2002b2a583419cd7",
    "allowed": true,
    "reason": ""
   },
-  "after_last-014": {
-   "key": "aabd03572e0b6a35",
+  "duty-053": {
+   "key": "2984d4a3fe11b7db",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-054": {
+   "key": "8e903cb166d652ab",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-055": {
+   "key": "ad80773a3ecdd10d",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-056": {
+   "key": "479dff3b7369c83a",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-057": {
+   "key": "e0c2973cc6b4e9a2",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-058": {
+   "key": "aa5038db4825cdb0",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-059": {
+   "key": "96d2d9b45571ab61",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-060": {
+   "key": "4666dca535cc9a38",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-061": {
+   "key": "498c816d99ad1511",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-062": {
+   "key": "56abfaf1d8a3a5e8",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-063": {
+   "key": "fce1ee20cbeb8a1f",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-064": {
+   "key": "9192417a16cfe2e1",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-065": {
+   "key": "2b379e33c4b7532e",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-066": {
+   "key": "e071791241067c3a",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-067": {
+   "key": "4e5bb3654c23dee9",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-068": {
+   "key": "5abef6aa3e0bcc02",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-069": {
+   "key": "a075154672609a79",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-070": {
+   "key": "8695112f00e9df08",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-071": {
+   "key": "2903a3b66ebcd8b1",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-072": {
+   "key": "3efe60e4a68b48c4",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-073": {
+   "key": "2f2adb8858e855d3",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-074": {
+   "key": "a036ab5f4d9f7348",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-075": {
+   "key": "fd85a770145ec163",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-076": {
+   "key": "fb42aa22eb39126b",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-077": {
+   "key": "4c3666b891beb076",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-078": {
+   "key": "4923bccb824a535f",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-079": {
+   "key": "57e251e74780c4a6",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-080": {
+   "key": "c66b7ebde3dc59fe",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-081": {
+   "key": "eb08c4b173c0ca5a",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-082": {
+   "key": "50ff5385927d06dc",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-083": {
+   "key": "ef55b4fbb95bd03a",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-084": {
+   "key": "82e1bd47fb548f1a",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-085": {
+   "key": "27f0b0d091f2634d",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-086": {
+   "key": "f6862edb024d68ba",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-087": {
+   "key": "7aa843aeec8cccfc",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-088": {
+   "key": "647a7623ad0a8622",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-089": {
+   "key": "36146544c381e536",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-090": {
+   "key": "0ee0f471b840c2db",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-091": {
+   "key": "ca1a3e312cf7f142",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-092": {
+   "key": "05952139d384931c",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-093": {
+   "key": "adf5cb1572ddda22",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-094": {
+   "key": "1dfab16dc680cce3",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-095": {
+   "key": "fffbb4550f77b154",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-096": {
+   "key": "42eb84115295c0f9",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-097": {
+   "key": "c688f621834395b7",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-098": {
+   "key": "04bd01fb3bf7ae68",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-099": {
+   "key": "c3f4d1c225f450f0",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-100": {
+   "key": "af5d99d8d4e7aab3",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-101": {
+   "key": "719af7ced2e8c025",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-102": {
+   "key": "45a5f35c098801ae",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-103": {
+   "key": "6c1f2268b800f612",
+   "allowed": true,
+   "reason": ""
+  },
+  "duty-104": {
+   "key": "f7524823759073cc",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-001": {
+   "key": "88bba1efa0aee6d6",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-002": {
+   "key": "26cfe6c04b8d9272",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-003": {
+   "key": "d3561743db8adaa1",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-004": {
+   "key": "7d7ebd650b518168",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-005": {
+   "key": "432c1003760b6b6f",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-006": {
+   "key": "50132e339e89f19d",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-007": {
+   "key": "b3b615ae953184f5",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-008": {
+   "key": "993bb990855416a2",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-009": {
+   "key": "5b1cc665a8ffa9c4",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-010": {
+   "key": "0d910395b8c377d7",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-011": {
+   "key": "7813723b180db548",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-012": {
+   "key": "e3563d7bb1c82c69",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-013": {
+   "key": "c18a73472b0946d2",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-014": {
+   "key": "309dfdf99214591b",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-015": {
+   "key": "8f08d640d1f4c5e7",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-016": {
+   "key": "bbdbe976e2145bba",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-017": {
+   "key": "59f8fec14e7afecf",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-018": {
+   "key": "7ec1b757a9feac6e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-019": {
+   "key": "075cd199e4110c77",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-020": {
+   "key": "b66f3f79eba6a206",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-021": {
+   "key": "1684ee67376fc178",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-022": {
+   "key": "4874dbe0953d1ec0",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-023": {
+   "key": "a50f29813025f7ae",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-024": {
+   "key": "23f03ff7bfa8c393",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-025": {
+   "key": "a7641edf41237aeb",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-026": {
+   "key": "20ef546a164a3fdb",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-027": {
+   "key": "0788f500aa6899c8",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-028": {
+   "key": "405d444f91df15ea",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-029": {
+   "key": "c50b5b20c21f489f",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-030": {
+   "key": "487af8f41ab73b9d",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-031": {
+   "key": "fe61b256d786c5ab",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-032": {
+   "key": "e0d96c091dee326c",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-033": {
+   "key": "5a175e2678c0fb2a",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-034": {
+   "key": "5dd4b52a6972a045",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-035": {
+   "key": "019037d498c44654",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-036": {
+   "key": "ca5c214bec189266",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-037": {
+   "key": "714da3c11a3cd96e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-038": {
+   "key": "e78e4bc85e99410d",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-039": {
+   "key": "7ff0e6805747b2b4",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-040": {
+   "key": "69a6817461607c55",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-041": {
+   "key": "87fe4a932baf6f29",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-042": {
+   "key": "31a3f661fda400d7",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-043": {
+   "key": "75e43a533b3b3748",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-044": {
+   "key": "1a2a48a06616bd88",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-045": {
+   "key": "95383329eb422045",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-046": {
+   "key": "92cbd4eeef4e308e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-047": {
+   "key": "96e89538a483b751",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-048": {
+   "key": "d4ed049aa9f1fee2",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-049": {
+   "key": "ace55db111ceee5e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-050": {
+   "key": "5c9337d44d303dfa",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-051": {
+   "key": "e319ceb7ec2f32f3",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-052": {
+   "key": "332ca1d450ccce3f",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-053": {
+   "key": "210197e941c007b1",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-054": {
+   "key": "4505bea8532fcb2b",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-055": {
+   "key": "6d1f925943b15232",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-056": {
+   "key": "18413fb392887f26",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-057": {
+   "key": "c450464f96839410",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-058": {
+   "key": "9625ec91681fe664",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-059": {
+   "key": "6875478a478d159d",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-060": {
+   "key": "f9628ee7cdb6b2ee",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-061": {
+   "key": "e32457280271738a",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-062": {
+   "key": "4aa785a3aab89508",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-063": {
+   "key": "e1a4371cd42cc8e4",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-064": {
+   "key": "1d707ea1aaae7656",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-065": {
+   "key": "d78af762b7af7aa6",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-066": {
+   "key": "f93401b5a7b7fde3",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-067": {
+   "key": "e692fa938a8acd32",
+   "allowed": false,
+   "reason": "הסינון החזיר 'אני מבין שאת'"
+  },
+  "verb_modifier-068": {
+   "key": "7707c279b3d4e1d9",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-069": {
+   "key": "4635c25d1d3a70b5",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-070": {
+   "key": "79d8dd756460d66b",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-071": {
+   "key": "02442dc1a20378df",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-072": {
+   "key": "e543efd9177b728f",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-073": {
+   "key": "c96635ccd19f53a8",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-074": {
+   "key": "21f4424a2572b089",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-075": {
+   "key": "90a63c223817d1ea",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-076": {
+   "key": "40be7657b62347de",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-077": {
+   "key": "ca6c50b4e68a8511",
+   "allowed": false,
+   "reason": "הסינון החזיר 'כן'"
+  },
+  "verb_modifier-078": {
+   "key": "148558a7e8f0eaad",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-079": {
+   "key": "de64e3bbd1a66598",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-080": {
+   "key": "0cff76be69a5f076",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-081": {
+   "key": "eb94c62cbf356fa8",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-082": {
+   "key": "2b055021e0a91c1a",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-083": {
+   "key": "647d9673157e5328",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-084": {
+   "key": "506788cd1eac2a0d",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-085": {
+   "key": "053600cefeae43f8",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-086": {
+   "key": "c07ccb684bbd44af",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-087": {
+   "key": "e03c55d8c2fa468d",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-088": {
+   "key": "b1e7f641684881a3",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-089": {
+   "key": "100d689e24caf406",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-090": {
+   "key": "850d988ceb81b5f0",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-091": {
+   "key": "317ece21f3a00c3a",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-092": {
+   "key": "4154ca6ee642bbb9",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-093": {
+   "key": "184e46f69c418f75",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-094": {
+   "key": "d4695fc4a32702c0",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-095": {
+   "key": "ac4eb314cb64d946",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-096": {
+   "key": "eb4814ab546e1275",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-097": {
+   "key": "c28af1561cb95fe1",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-098": {
+   "key": "33f7335e43cd6fe3",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-099": {
+   "key": "4a8354df95a3187c",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-100": {
+   "key": "02306d22322a77f8",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-101": {
+   "key": "4953ab6ddf9b113e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-102": {
+   "key": "0e4a2724b9c4f2ad",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-103": {
+   "key": "2b0197f5d8b5e039",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-104": {
+   "key": "9615185798a61597",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-105": {
+   "key": "44a771838a738043",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-106": {
+   "key": "6ae0c94a426ebb9d",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-107": {
+   "key": "d49ea82601f90e2e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-108": {
+   "key": "0530b67d1a2be495",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-109": {
+   "key": "a809ed070fb931cd",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-110": {
+   "key": "25876e4a9116c681",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-111": {
+   "key": "0c3097b6abd82310",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-112": {
+   "key": "ee0169ccbe820f3b",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-113": {
+   "key": "fae81c200a51ba4c",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-114": {
+   "key": "67e9b15afd78a3e7",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-115": {
+   "key": "c22de999f218f398",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-116": {
+   "key": "0c5ee4fbd3ecb3da",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-117": {
+   "key": "1107181ca58d9e22",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-118": {
+   "key": "2ee2305f7faf93b4",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-119": {
+   "key": "1d9f1e0b4adf6ed5",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-120": {
+   "key": "55983d3ac3501c43",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-121": {
+   "key": "9bdd4967aaee5b29",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-122": {
+   "key": "2a9884fc6f8557ed",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-123": {
+   "key": "2fc5467a7eab43e7",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-124": {
+   "key": "18e646d5eab81278",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-125": {
+   "key": "4296c571138d13a9",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-126": {
+   "key": "f9dde30a95361194",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-127": {
+   "key": "a79d292674218bf0",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-128": {
+   "key": "33ce6f4b00dc4e8e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-129": {
+   "key": "f495f33468da5b6a",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-130": {
+   "key": "6b89bcae00bb34eb",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-131": {
+   "key": "172a0b9d3ba7da6c",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-132": {
+   "key": "ca907bf43ab3c51c",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-133": {
+   "key": "d528f325a7ce1d88",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-134": {
+   "key": "3deb33a2c2918bf1",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-135": {
+   "key": "a96b73b813552484",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-136": {
+   "key": "7a0973379694a930",
+   "allowed": false,
+   "reason": "הסינון החזיר 'כן\\n\\n**הערה:'"
+  },
+  "verb_modifier-137": {
+   "key": "50bf058e660a4e01",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-138": {
+   "key": "483824fc1ea62b99",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-139": {
+   "key": "5ad8fcc4a31e6d5f",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-140": {
+   "key": "9327be754f1c4627",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-141": {
+   "key": "021706b08682107e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-142": {
+   "key": "011255e1fddaf626",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-143": {
+   "key": "fcbbfb89803a718e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-144": {
+   "key": "96f118a8655820f7",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-145": {
+   "key": "c1b13d46c6ba6da7",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-146": {
+   "key": "553fb4225e623dac",
+   "allowed": false,
+   "reason": "הסינון החזיר 'אני מבין שציינ'"
+  },
+  "verb_modifier-147": {
+   "key": "b943638b084bc58f",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-148": {
+   "key": "b16facf3a127c602",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-149": {
+   "key": "f25f9cfbf4b3e96b",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-150": {
+   "key": "8f13790e20514df7",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-151": {
+   "key": "bfa4cd3a7831b294",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-152": {
+   "key": "8385da6c0410c468",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-153": {
+   "key": "cfb1eeb1703b5bb8",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-154": {
+   "key": "ac6954657db7c2da",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-155": {
+   "key": "cd76e176f63daec5",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-156": {
+   "key": "ac9367dc7627ce15",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-157": {
+   "key": "c39c877440976d9a",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-158": {
+   "key": "7f4a9848afe6442e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-159": {
+   "key": "5adae086683ccf4d",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-160": {
+   "key": "09f6d60c409d7133",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-161": {
+   "key": "5a183a293c17efea",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-162": {
+   "key": "21fdb214b2281c71",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-163": {
+   "key": "7439dfa8dfbe6d83",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-164": {
+   "key": "3d8c5b44aa6c1ea4",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-165": {
+   "key": "ef43a3ed48b3e8f3",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-166": {
+   "key": "17894fcb9db8b215",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-167": {
+   "key": "0ac3e71f79303020",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-168": {
+   "key": "1db412a61e696b96",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-169": {
+   "key": "3410f1133f9b790e",
+   "allowed": true,
+   "reason": ""
+  },
+  "verb_modifier-170": {
+   "key": "1e397ebf9c6ab186",
    "allowed": true,
    "reason": ""
   }

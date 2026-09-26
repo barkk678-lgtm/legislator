@@ -18,16 +18,26 @@ import families  # noqa: E402
 from pdf_bill import BillSection, BillUnit, ParsedBill, parse_bill_pdf  # noqa: E402
 
 TIBERIAS = parse_bill_pdf(ROOT / "reference" / "הצעת חוק טבריה.pdf")
-IDS = ("conditions-001", "conditions-002", "actor_swap-007", "actor_swap-009")
+# הרשומות של ד (conditions-001/002, actor_swap-007/009) נמחקו באישורי הבנק (26.9) והוחלפו:
+# תנאי "{השר}" - בתבניות לאחרי הסעיף האחרון ובתנאים מתחכמים; "סגן השר" - "סגן {שר}".
+# הכלל של ד לא השתנה, ולכן הבדיקה עליו - על רשומות בנוסח המקורי, בזיכרון בלבד.
+def _rec(rid, family, level, template, value):
+    return bank.Record(id=rid, level=level, family=family, template=template, value=value, status="approved")
+
+
+RECORDS = [
+    _rec("t-c1", "conditions", "serious", "ובלבד ש{value}", "השר ידווח ל{committee} של הכנסת בתוך שישה חודשים"),
+    _rec("t-c2", "conditions", "serious", "ובלבד ש{value}", "השר יפרסם את החלטתו ברשומות"),
+    _rec("t-a1", "actor_swap", "clever", "{value}", "סגן {שר}"),
+    bank.Record(id="t-a2", level="clever", family="actor_swap", template="{value}",
+                value="ועדה ציבורית שימנה {שר}", status="approved", gender="f"),
+]
 
 
 def _run(bill, level, fams):
-    """הרשומות האמיתיות מהבנק, מאושרות **בזיכרון בלבד** (הבנק לא משתנה)."""
-    real = [r for r in bank.load_all() if r.id in IDS]
-    records = [dataclasses.replace(r, status="approved") for r in real]
-    verdicts = {r.id: {"key": r.screen_key, "allowed": True} for r in records}
+    verdicts = {r.id: {"key": r.screen_key, "allowed": True} for r in RECORDS}
     orig_all, orig_v = bank.load_all, bank._screen_verdicts
-    bank.load_all, bank._screen_verdicts = (lambda: records), (lambda: verdicts)
+    bank.load_all, bank._screen_verdicts = (lambda: RECORDS), (lambda: verdicts)
     try:
         return [it.text for it in families.candidates(bill, level, fams)[0]]
     finally:
@@ -39,11 +49,11 @@ def _bill(*texts):
         BillSection(str(i + 1), "תיקון", BillUnit("lead", "", t), []) for i, t in enumerate(texts)])
 
 
-def test_bank_untouched():
-    for r in bank.load_all():
-        if r.id in IDS:
-            assert r.status == "pending", r      # ההחלפה לא נוגעת ברשומה
-            assert "השר" in r.value, r
+def test_bank_uses_the_minister_placeholder():
+    """הרשומות החדשות כותבות {השר} (אישורי הבנק) - ומגיעות לפלט עם השר מההצעה."""
+    texts = [r.template + r.value for r in bank.load_all()]
+    assert any("{השר} ידווח ל{הוועדה} של הכנסת על יישום חוק זה אחת לשנה." in t for t in texts)
+    assert not any(" השר " in f" {t} " and "{השר}" not in t for t in texts if "השר ל" not in t)
 
 
 def test_tiberias_conditions_name_the_minister():

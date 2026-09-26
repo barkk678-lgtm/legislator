@@ -63,20 +63,18 @@ def test_screen_guard_blocks():
     assert bank.check(r, screened(r, allowed=False)).startswith("נחסם בשומר 86(ד)(2)")
 
 
-def test_real_bank_is_all_pending_and_screened_record_blocked():
+def test_real_bank_is_approved_and_every_record_screened():
+    """אישורי הבנק (26.9): כל הרשומות מאושרות, ולכל אחת פסק שומר על הנוסח הנוכחי."""
     records = bank.load_all()
-    assert records and all(r.status == "pending" for r in records), "כל הרשומות מתחילות ממתינות"
-    for level in bank.LEVELS:
-        allowed, blocked = bank.load(level)
-        assert allowed == [] and blocked, level
-    # approval-047 נחסם בסינון (26.9) - חסום גם אם יאושר
-    r = next(r for r in records if r.id == "approval-047")
-    approved = bank.Record(**{**r.__dict__, "status": "approved"})
-    assert bank.check(approved).startswith("נחסם בשומר 86(ד)(2)"), bank.check(approved)
-    # וכל רשומה שאינה חסומה בקו אדום - יש לה פסק על הנוסח הנוכחי
+    assert records and all(r.status == "approved" for r in records)
     verdicts = bank._screen_verdicts()
     missing = [r.id for r in records if verdicts.get(r.id, {}).get("key") != r.screen_key]
     assert not missing, f"רשומות בלי סינון על הנוסח הנוכחי: {missing[:5]}"
+    for level in bank.LEVELS:
+        allowed, blocked = bank.load(level)
+        assert allowed, level
+        # חסומה נשארת חסומה - בקו אדום, או בשומר בלי אישור אנושי
+        assert all(b.reason.startswith(("קו אדום", "נחסם בשומר")) for b in blocked), blocked[:3]
 
 
 BILL = ParsedBill(title="חוק הבדיקה (תיקון), התשפ\"ו–2026", committee="ועדת הפנים והגנת הסביבה", sections=[
@@ -88,8 +86,15 @@ BILL = ParsedBill(title="חוק הבדיקה (תיקון), התשפ\"ו–2026",
 
 
 def test_pending_bank_families_reported_waiting():
-    items, waiting = families.candidates(BILL, "serious", list(families.FAMILIES))
-    assert set(waiting) == set(bank.BANK_FAMILIES), waiting
+    """משפחה שיש לה ברמה רק רשומות ממתינות - "ממתינה"; המתכנן לא משתמש בהן."""
+    pending = [bank.Record(**{**r.__dict__, "status": "pending"}) for r in bank.load_all()]
+    orig = bank.load_all
+    bank.load_all = lambda: pending
+    try:
+        items, waiting = families.candidates(BILL, "serious", list(families.FAMILIES))
+    finally:
+        bank.load_all = orig
+    assert set(waiting) == {"actor_swap", "approval", "duty", "after_last", "verb_modifier"}, waiting
     assert all(it.family in ("value_change", "deletion") for it in items), {it.family for it in items}
     assert not any(it.record_id for it in items)
 

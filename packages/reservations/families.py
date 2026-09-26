@@ -35,11 +35,12 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import agreement
 import bank as bank_mod
 import forms
+import ministers as ministers_mod
 from anchors import find_anchors, law_citation_spans
 from numbers_he import MONEY_UNITS, find_quantities, quantity
 from pdf_bill import BillSection, BillUnit, ParsedBill
@@ -52,6 +53,7 @@ FAMILIES = {
     "deletion": "מחיקה",
     "after_last": "סעיפים אחרי הסעיף האחרון",
     "conditions": "תנאים",
+    "verb_modifier": "תוספת לפועל",
 }
 _FAMILY_ORDER = list(FAMILIES)
 
@@ -334,18 +336,52 @@ def _actors(sc: _Scope) -> list[str]:
     return [a for a, _ in _actors_with_next(sc)]
 
 
+def _resolve(text: str, bill: ParsedBill, section: BillSection | None) -> str | None:
+    """משתני הבנק בנוסח שכבר רונדר: {השר} - לפי הכרעה ד (שר בסעיף / שר יחיד / "השר" /
+    אחרת לא מופעל); ועדה שלא נפתרה ({committee}/{הוועדה} בלי עמוד שער) - לא מופעל."""
+    if text is None or "{committee}" in text or "{הוועדה}" in text:
+        return None
+    return _with_minister(text.replace("{השר}", "השר"), bill, section)
+
+
+def _minister_actor(actor: str, bill: ParsedBill, section: BillSection | None) -> str | None:
+    """התבניות הנגזרות (אישורי הבנק §1, מתחכם) - **רק כשהגורם בהצעה הוא שר בשמו, או
+    "השר" שהוכרע לפי הכרעה ד**; אחרת - None."""
+    if actor.startswith(("שר ", "השר ל")):
+        return actor
+    if actor == "השר":
+        return _minister(bill, section)
+    return None
+
+
+def _actor_value(r, actor: str, bill: ParsedBill, section: BillSection | None) -> str | None:
+    text = r.text()
+    if "{שר}" in text or "{משרד}" in text:
+        minister = _minister_actor(actor, bill, section)
+        if minister is None:
+            return None
+        if "{משרד}" in text:
+            ministry = ministers_mod.ministry_of(minister)       # "השר" לבדו - אין משרד
+            if ministry is None:
+                return None
+            text = text.replace("{משרד}", ministry)
+        text = text.replace("{שר}", minister)
+    return _resolve(text, bill, section)
+
+
 def _actor_swap(scopes, records, bill, **_):
     """הכרעה ג (ברק, 26.9): גורם מאותו מין - מחליפים רק אותו. מין אחר - מחליפים את
     הגורם **ואת המילה שצמודה אחריו**, בצורה המותאמת מהטבלה הסגורה (agreement.py):
     `במקום "שר הפנים יתקן" יבוא "הממשלה תתקן"`. מילה שאינה בטבלה, או מין לא ידוע -
-    הרשומה לא מופעלת על הגורם הזה. הנקודה (לפיזור ולהערכה) - הגורם."""
+    הרשומה לא מופעלת על הגורם הזה. המין - מהבנק (לכל גורם, אישורי הבנק §1), ואחרת
+    מהטבלה. גורם לעולם אינו מוחלף בעצמו. הנקודה (לפיזור ולהערכה) - הגורם."""
     for sc in scopes:
         for actor, next_word in _actors_with_next(sc):
             old_g = agreement.gender(actor)
             for r in records.get("actor_swap", []):
-                new = _with_minister(r.text(), bill, sc.section)
-                new_g = agreement.gender(new) if new else None
-                if new == actor or old_g is None or new_g is None:
+                new = _actor_value(r, actor, bill, sc.section)
+                new_g = (r.gender or agreement.gender(new)) if new else None
+                if not new or new == actor or old_g is None or new_g is None:
                     continue
                 if new_g == old_g:
                     line = forms.replace(sc.addr, actor, new)
@@ -359,24 +395,69 @@ def _actor_swap(scopes, records, bill, **_):
 
 
 def _approval(scopes, records, committee, bill, **_):
+    """אישורי הבנק §4: כל גוף × חמש הצורות. **לא מוסיפים את אישורו של הגורם עצמו**
+    ("שר הפנים באישור שר הפנים" - לא)."""
     for sc in scopes:
         for actor in _actors(sc):
             for r in records.get("approval", []):
-                if "{committee}" in r.value and not committee:
-                    continue
-                text = _with_minister(r.text(committee), bill, sc.section)
-                if text is None:
+                text = _resolve(r.text(committee), bill, sc.section)
+                if text is None or text.endswith(" " + actor) or r.value == actor:
                     continue
                 yield sc, ("after", actor), forms.after(sc.addr, actor, text), False, r.id
 
 
+# ── חובה ורשות, ותוספת לפועל - אותם שומרים (אישורי הבנק §5, §6) ──────────
+
+def _verb_ok(phrase: str, sc: _Scope) -> bool:
+    """הפועל כעוגן: יחיד ביחידה, לא בציטוט, **לא בשלילה** ("אינו רשאי לתקן", "לא יתקן"),
+    ו**לא "יביא בחשבון"** / "רשאי להביא בחשבון"."""
+    if not _ok_anchor(phrase, sc):
+        return False
+    m = _occurrences(phrase, sc.text)[0]
+    before = sc.text[:m.start()].split()
+    if before and before[-1].strip("\"'(,") in agreement.NEGATIONS:
+        return False
+    form = agreement.verb_form(phrase)
+    if form and form[1] == "להביא" and sc.text[m.end():].lstrip().startswith("בחשבון"):
+        return False
+    return True
+
+
 def _duty(scopes, records, bill, **_):
+    """"יתקן" <-> "רשאי לתקן", "חייב לתקן" <-> "רשאי לתקן" - **בכל מין ומספר מאותה טבלה
+    סגורה** (תתקן <-> רשאית לתקן, יתקנו <-> רשאים לתקן; רבות - רק מצורה שמסמנת רבות,
+    "רשאיות לתקן" <-> "יתקנו"). צורה שאינה בטבלה - לא מופעלת."""
     for sc in scopes:
         for r in records.get("duty", []):
             src, _, dst = r.value.partition("=>")
-            dst = _with_minister(dst, bill, sc.section) if dst else dst
-            if src and dst and _ok_anchor(src, sc):
-                yield sc, ("replace", src), forms.replace(sc.addr, src, dst), False, r.id
+            s_form, d_form = agreement.verb_form(src), agreement.verb_form(dst)
+            if not s_form or not d_form:
+                continue
+            for number in agreement.NUMBERS:
+                if number == "fpl" and not s_form[0]:
+                    continue          # "יתקנו" -> "רשאיות" רק כשהנושא ידוע כנקבה ברבים - לא ידוע
+                s_phrase = agreement.conjugate(s_form[0], s_form[1], number)
+                d_phrase = agreement.conjugate(d_form[0], d_form[1], number)
+                if not s_phrase or not d_phrase or s_phrase == d_phrase or not _verb_ok(s_phrase, sc):
+                    continue
+                yield sc, ("replace", s_phrase), forms.replace(sc.addr, s_phrase, d_phrase), False, r.id
+
+
+_VERB_FORMS = agreement.all_verb_forms()
+
+
+def _verb_modifier(scopes, records, **_):
+    """אישורי הבנק §6: `במקום "{פועל}" יבוא "{פועל} {תוספת}"` - התוספת **מיד אחרי הפועל**.
+    הפועל - מטבלת חובה ורשות (כל המינים והמספרים), באותם שומרים."""
+    mods = records.get("verb_modifier", [])
+    if not mods:
+        return
+    for sc in scopes:
+        for verb in _VERB_FORMS:
+            if verb not in sc.text or not _verb_ok(verb, sc):
+                continue
+            for r in mods:
+                yield sc, ("modify", verb), forms.replace(sc.addr, verb, f"{verb} {r.text()}"), False, r.id
 
 
 def _conditions(scopes, records, committee, bill, **_):
@@ -384,27 +465,32 @@ def _conditions(scopes, records, committee, bill, **_):
         if not sc.leaf or not sc.certain:
             continue
         for r in records.get("conditions", []):
-            if "{committee}" in r.value and not committee:
-                continue
-            text = _with_minister(r.text(committee), bill, sc.section)
+            text = _resolve(r.text(committee), bill, sc.section)
             if text is None:
                 continue
             yield sc, ("append", ""), forms.append(sc.addr, sc.kind, text), False, r.id
 
 
+def _margin(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
 def _after_last(bill, records, committee, **_):
+    """אישורי הבנק §3: **לא סעיף מתנגש** - כותרת שוליים שכבר יש לסעיף בהצעה (תחילה, תחולה,
+    הוראת שעה, הוראת מעבר...) לא מתווספת שוב."""
     last = bill.sections[-1]
     m = re.match(r"\d+", last.number)
     if not m or not last.certain:     # מספר לא קריא - "סעיף N+1" יהיה ניחוש
         return
     new_number = str(int(m.group(0)) + 1)
+    taken = {_margin(s.margin_title) for s in bill.sections if s.margin_title}
     for r in records.get("after_last", []):
-        if "{committee}" in r.value and not committee:
-            continue
-        text = _with_minister(r.text(committee), bill, None)
+        text = _resolve(r.text(committee), bill, None)
         if text is None:
             continue
         margin, _, body = text.partition("|")
+        if _margin(margin) in taken:
+            continue
         yield margin, forms.new_section_after(margin, new_number, body), r.id
 
 
@@ -425,15 +511,36 @@ class Plan:
         return self.requested > self.available
 
 
+def _expand_ministers(records: list) -> list:
+    """רשומה עם רשימת השרים (אישורי הבנק §0.1) - רשומה לכל תואר, מהמאגר, בזמן הייצור.
+    הסינון (קו אדום, שומר) - על התבנית עם {שר}; התארים - מהמאגר הרשמי."""
+    out = []
+    for r in records:
+        if r.value_list == "ministers":
+            for t in ministers_mod.titles():
+                rec = replace(r, id=f"{r.id}/{t}", value=t, value_list="")
+                # קווים אדומים - על כל רשומה (§0.3), גם על התואר שבא מהמאגר: "שר העבודה"
+                # נחסם כמו "העבודה" בכל מקום אחר, ומדווח לברק (קובץ הסקירה)
+                if not bank_mod.redline_violation(rec.text("ועדה")):
+                    out.append(rec)
+        else:
+            out.append(r)
+    return out
+
+
 def candidates(bill: ParsedBill, level: str, families: list[str]) -> tuple[list[Item], list[str]]:
     """כל ההסתייגויות האפשריות, לפי סדר המסמך."""
     if level not in bank_mod.LEVELS:
         raise ValueError(f"רמה לא מוכרת: {level}")
     allowed, _blocked = bank_mod.load(level)
     records: dict[str, list] = {}
-    for r in allowed:
+    for r in _expand_ministers(allowed):
         records.setdefault(r.family, []).append(r)
-    waiting = [f for f in families if f in bank_mod.BANK_FAMILIES and not records.get(f)]
+    # "ממתינה לאישור" - רק משפחה שיש לה רשומות בבנק ברמה הזו ואף אחת לא מותרת. משפחה
+    # שאין לה רשומות ברמה בכלל (תנאים ברציני, חובה ורשות מחוץ לרציני - אישורי הבנק §2,
+    # §5) אינה ממתינה: היא לא פועלת ברמה הזו.
+    in_bank = {r.family for r in bank_mod.load_all() if r.level == level}
+    waiting = [f for f in families if f in bank_mod.BANK_FAMILIES and f in in_bank and not records.get(f)]
     scopes = _scopes(bill)
     ctx = dict(scopes=scopes, level=level, bill=bill, records=records, committee=bill.committee)
     items: list[Item] = []
@@ -445,7 +552,8 @@ def candidates(bill: ParsedBill, level: str, families: list[str]) -> tuple[list[
             items.append(item)
 
     generators = {"value_change": _value_change, "deletion": _deletion, "actor_swap": _actor_swap,
-                  "approval": _approval, "duty": _duty, "conditions": _conditions}
+                  "approval": _approval, "duty": _duty, "conditions": _conditions,
+                  "verb_modifier": _verb_modifier}
     for family in families:
         gen = generators.get(family)
         if gen is None:

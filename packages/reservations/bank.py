@@ -23,7 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from functools import lru_cache
@@ -51,7 +51,7 @@ def _years(text: str) -> str:
         return text
     year = _now().astimezone(JERUSALEM).year
     return text.replace("{השנה שאחרי הבאה}", str(year + 2)).replace("{השנה הבאה}", str(year + 1))
-BANK_FAMILIES = ("actor_swap", "approval", "duty", "conditions", "after_last")
+BANK_FAMILIES = ("actor_swap", "approval", "duty", "conditions", "after_last", "verb_modifier")
 
 
 @dataclass(frozen=True)
@@ -63,11 +63,15 @@ class Record:
     value: str
     status: str
     source: str = ""
+    gender: str = ""            # m/f - מין דקדוקי של הגורם (אישורי הבנק; התאמת הפועל)
+    value_list: str = ""        # "ministers" - רשימת השרים מהמאגר, נפרשת בזמן הייצור
+    # §0.4: אישור אנושי מפורש של ברק (מי, מתי, למה) - גובר על פסק השומר רק כאן
+    human_approval: dict | None = field(default=None, compare=False, hash=False)
 
     def text(self, committee: str = "") -> str:
-        """הנוסח שהרשומה מוסיפה (בלי ההצעה). {committee} - מעמוד השער."""
-        value = _join(self.value, "{committee}", committee or "{committee}")
-        return _years(_join(self.template, "{value}", value))
+        """הנוסח שהרשומה מוסיפה (בלי ההצעה). {committee} / {הוועדה} - מעמוד השער."""
+        value = _committee(self.value, committee)
+        return _years(_committee(_join(self.template, "{value}", value), committee))
 
     @property
     def screen_key(self) -> str:
@@ -77,6 +81,12 @@ class Record:
 # אות שימוש לפני מילה שמתחילה ב-ו' - הוו' מוכפלת: "ל" + "ועדת" = "לוועדת" (כך בטבריה:
 # "בוועדת הפנים", הסתייגות 47/ב). בלי זה יצא "לועדת הפנים" (נמצא בבדיקת הצורות, 26.9).
 _PREFIX_BEFORE = re.compile(r"(?:^|(?<=[^א-ת]))[ובלמכשה]{1,2}$")
+
+
+def _committee(text: str, committee: str) -> str:
+    for placeholder in ("{committee}", "{הוועדה}"):
+        text = _join(text, placeholder, committee or placeholder)
+    return text
 
 
 def _join(template: str, placeholder: str, value: str) -> str:
@@ -130,9 +140,35 @@ def _screen_verdicts() -> dict:
     return json.loads(SCREEN_PATH.read_text(encoding="utf-8")).get("verdicts", {})
 
 
+MINISTER_PLACEHOLDER = "{שר}"
+
+
+def _record(r: dict) -> Record:
+    fields = {k: r.get(k, "") for k in Record.__dataclass_fields__ if k != "human_approval"}
+    return Record(**fields, human_approval=r.get("human_approval") or None)
+
+
 def load_all() -> list[Record]:
+    """כל הרשומות. רשומה שמפנה לרשימה (value_list) - נפרשת: **רשימה אחת** לגורמים
+    ההזויים (lists.absurd_actors) משמשת גם את החלפת הגורם וגם את האישור או ההתייעצות
+    (אישורי הבנק §1, §4). המזהה: "<רשומה>/<פריט>" - לכל ערך פסק שומר משלו. רשימת
+    השרים ("ministers") - משתנה, ולכן נשארת כאן כרשומה אחת עם {שר}, ונפרשת בזמן הייצור
+    (families): הסינון הוא על התבנית, והתארים באים ממאגר הכנסת."""
     data = json.loads(BANK_PATH.read_text(encoding="utf-8"))
-    return [Record(**{k: r.get(k, "") for k in Record.__dataclass_fields__}) for r in data["records"]]
+    lists = data.get("lists", {})
+    out: list[Record] = []
+    for raw in data["records"]:
+        rec = _record(raw)
+        if rec.value_list == "ministers":
+            out.append(Record(**{**rec.__dict__, "value": MINISTER_PLACEHOLDER}))
+        elif rec.value_list:
+            for item in lists[rec.value_list]:
+                out.append(Record(**{**rec.__dict__, "id": f"{rec.id}/{item['id']}", "value": item["value"],
+                                     "gender": item.get("gender", ""), "value_list": "",
+                                     "human_approval": item.get("human_approval") or rec.human_approval}))
+        else:
+            out.append(rec)
+    return out
 
 
 def check(record: Record, verdicts: dict | None = None) -> str:
@@ -151,8 +187,17 @@ def check(record: Record, verdicts: dict | None = None) -> str:
     if verdict.get("key") != record.screen_key:
         return "לא עבר את שומר 86(ד)(2) על הנוסח הנוכחי (הריצו tools/reservations_bank_review.py)"
     if not verdict.get("allowed"):
+        # §0.4 - החריג היחיד: אישור אנושי מפורש ומלא (מי, מתי, למה) ברשומה עצמה. השומר
+        # רץ ופוסק כרגיל; הפסק נשמר; רק הרשומות המסומנות כך יוצאות לפלט למרות החסימה.
+        if human_approved(record):
+            return ""
         return f"נחסם בשומר 86(ד)(2): {verdict.get('reason', '')}"
     return ""
+
+
+def human_approved(record: Record) -> bool:
+    a = record.human_approval or {}
+    return all(str(a.get(k, "")).strip() for k in ("by", "at", "why"))
 
 
 def load(level: str) -> tuple[list[Record], list[Blocked]]:
@@ -167,4 +212,5 @@ def load(level: str) -> tuple[list[Record], list[Blocked]]:
     return allowed, blocked
 
 
-__all__ = ["BANK_FAMILIES", "Blocked", "LEVELS", "Record", "check", "load", "load_all", "redline_violation"]
+__all__ = ["BANK_FAMILIES", "Blocked", "LEVELS", "MINISTER_PLACEHOLDER", "Record", "check", "human_approved",
+           "load", "load_all", "redline_violation"]

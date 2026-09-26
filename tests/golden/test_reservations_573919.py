@@ -10,6 +10,10 @@
 ("22" מול "22ב" של המסתייגים; בנוסח כתוב "סעיף 22(ב)", ו-"22ב" אינו מופיע
 כצורתו). ושום עוגן לא יושב בתוך ציטוט שם חוק (86(ד)(3)) - איש מ-484 לא עשה זאת.
 
+**הצורות:** מאז אישורי הבנק (ברק 26.9.2026) נוספו גם צורות בלי עוגן בנוסח -
+"בסופו יבוא" (תנאים) ו"אחרי הסעיף יבוא:" (סעיפים אחרי הסעיף האחרון), כמו בטבריה.
+כל הסתייגות - באחת מארבע הצורות; לצורות עם עוגן ("במקום", "אחרי") - הטענה למעלה.
+
 **מה לא נבדק:** אם ייצרנו *מספיק* - זו תשואה, לא תקינות.
 """
 
@@ -27,6 +31,13 @@ import families  # noqa: E402
 
 FIXTURE = ROOT / "tests" / "fixtures" / "reservations"
 _REPLACE_RE = re.compile(r'^במקום "(?P<old>[^"]+)" יבוא "(?P<new>[^"]+)"\.$')
+_AFTER_RE = re.compile(r'^אחרי "(?P<old>[^"]+)" יבוא "[^"]+"\.$')
+_NO_ANCHOR_RE = re.compile(r'^(?:בסופו יבוא "[^"]+"\.|אחרי הסעיף יבוא: .+)$')
+
+
+def _anchor(text: str):
+    m = _REPLACE_RE.match(text) or _AFTER_RE.match(text)
+    return m.group("old") if m else None
 
 
 def _normalize(text: str) -> str:
@@ -53,9 +64,9 @@ def main():
     for level in families.bank_mod.LEVELS:
         p = families.plan(bill, level, list(families.FAMILIES), 1000)
         check(f"{level}: נוצרו הסתייגויות", p.items, "0")
-        replaced = [m.group("old") for m in (_REPLACE_RE.match(it.text) for it in p.items) if m]
-        check(f"{level}: כל הסתייגות בצורה 'במקום \"X\" יבוא \"Y\".'", len(replaced) == len(p.items),
-              str([it.text for it in p.items if not _REPLACE_RE.match(it.text)][:3]))
+        replaced = [a for a in (_anchor(it.text) for it in p.items) if a]
+        odd = [it.text for it in p.items if not _anchor(it.text) and not _NO_ANCHOR_RE.match(it.text)]
+        check(f"{level}: כל הסתייגות בצורה 'במקום'/'אחרי'/'בסופו'/'אחרי הסעיף'", not odd, str(odd[:3]))
         check(f"{level}: כל עוגן מופיע בנוסח מילה במילה", all(a in text for a in replaced),
               str([a for a in replaced if a not in text]))
         foreign = sorted({a for a in replaced if a not in human and not any(h.startswith(a) for h in human)})

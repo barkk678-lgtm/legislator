@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import time
 from datetime import datetime
@@ -97,6 +98,8 @@ def _fallback() -> dict:
 def current_ministers() -> dict:
     """{"ministries": [...], "titles": ["שר הפנים", ...], "source": "feed"/"fallback"}."""
     global _cache, _failed_at
+    if os.environ.get("LEGISLATOR_MINISTERS_SOURCE") == "fallback":
+        return _fallback()           # בדיקות: רשימה קבועה מקובץ הגיבוי, בלי רשת
     now = time.time()
     if _cache and now - _cache[0] < _OK_TTL:
         return _cache[1]

@@ -624,13 +624,22 @@ def journey_reservations(base, res):
     res.check("ניתוח: מקסימום לכל אחת משלוש הרמות", set(levels) == {"serious", "clever", "absurd"}
               and all(v["available"] > 0 for v in levels.values()),
               str({k: v.get("available") for k, v in levels.items()}))
+    # אישורי הבנק (ברק 26.9.2026): המשפחה החדשה "תוספת לפועל" (§6) - בתשובה ובמקסימום;
+    # הבנק מאושר, ולכן טבריה ברציני - מעל 200 (241 בזמן האישור), ואין משפחה ממתינה
+    res.check("ניתוח: 'תוספת לפועל' ברשימת המשפחות ובמקסימום",
+              a.get("families", {}).get("verb_modifier") == "תוספת לפועל"
+              and levels.get("serious", {}).get("per_family", {}).get("verb_modifier", {}).get("available", 0) > 0,
+              str(a.get("families")))
+    res.check("ניתוח: הבנק מאושר - מקסימום רציני מעל 200, בלי משפחה ממתינה",
+              levels.get("serious", {}).get("available", 0) > 200
+              and not any(v.get("families_waiting") for v in levels.values()),
+              str({k: (v.get("available"), v.get("families_waiting")) for k, v in levels.items()}))
     res.check("ניתוח: 50 כלולות, $10 ל-100", a.get("pricing", {}).get("included") == 50
               and a["pricing"].get("price_per_block_usd") == 10, str(a.get("pricing")))
     status, body = _post_file(base, "/api/reservations/generate", pdf,
                               {"level": "serious", "families": "", "count": "8", "payment": ""})
     g = json.loads(body)
     items = g.get("items", [])
-    # 8 ולא 20: מאז הכרעה א (הפניות אינן משתנות) טבריה מאפשרת 9 ברמה הרצינית, לפני אישור הבנק
     res.check("ייצור: 8 הסתייגויות, בלי תשלום", status == 200 and len(items) == 8 and g.get("price_usd") == 0,
               f"{len(items)} {g.get('price_usd')}")
     res.check("ייצור: מספור רציף", [it["number"] for it in items] == list(range(1, 9)))

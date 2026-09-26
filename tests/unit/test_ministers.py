@@ -7,6 +7,7 @@
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -14,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "reservations"))
 
 import ministers  # noqa: E402
+
+os.environ.pop("LEGISLATOR_MINISTERS_SOURCE", None)   # כאן בודקים את המאגר עצמו (במוק), לא את מתג הבדיקות
 
 
 def test_title_from_ministry():
