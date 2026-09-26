@@ -50,12 +50,12 @@ def main() -> int:
             "(e.labels && e.labels[0] ? e.labels[0].innerText : '')].join(' ').toLowerCase())")
         bad = [f for f in fields if any(w in f for w in _PAYMENT_WORDS) or "cc-" in f]
         results.append(("אין בדף אף שדה של פרטי תשלום", not bad, str(bad)))
-        page.fill("#res-count", "20")
+        page.fill("#res-count", "8")   # טבריה: 9 לכל היותר ברמה הרצינית (הכרעה א)
         page.click("#res-pay-btn")
         page.wait_for_selector("#res-preview", timeout=60000)
         preview = page.inner_text("#res-preview")
         results.append(("תצוגה מקדימה: כותרות מיקום ומספור רציף",
-                        "לסעיף 1" in preview and "לסעיף 3" in preview and "1." in preview and "20." in preview,
+                        "לסעיף 1" in preview and "לסעיף 3" in preview and "1." in preview and "8." in preview,
                         preview[:300]))
         results.append(("בלי 'קבוצת ... מציעה'", "מציעה" not in preview, ""))
         with page.expect_download() as dl:

@@ -619,12 +619,13 @@ def journey_reservations(base, res):
     res.check("ניתוח: 50 כלולות, $10 ל-100", a.get("pricing", {}).get("included") == 50
               and a["pricing"].get("price_per_block_usd") == 10, str(a.get("pricing")))
     status, body = _post_file(base, "/api/reservations/generate", pdf,
-                              {"level": "serious", "families": "", "count": "20", "payment": ""})
+                              {"level": "serious", "families": "", "count": "8", "payment": ""})
     g = json.loads(body)
     items = g.get("items", [])
-    res.check("ייצור: 20 הסתייגויות, בלי תשלום", status == 200 and len(items) == 20 and g.get("price_usd") == 0,
+    # 8 ולא 20: מאז הכרעה א (הפניות אינן משתנות) טבריה מאפשרת 9 ברמה הרצינית, לפני אישור הבנק
+    res.check("ייצור: 8 הסתייגויות, בלי תשלום", status == 200 and len(items) == 8 and g.get("price_usd") == 0,
               f"{len(items)} {g.get('price_usd')}")
-    res.check("ייצור: מספור רציף", [it["number"] for it in items] == list(range(1, 21)))
+    res.check("ייצור: מספור רציף", [it["number"] for it in items] == list(range(1, 9)))
     res.check("ייצור: כותרות מיקום", {it["heading"] for it in items} <= {"לסעיף 1", "לסעיף 2", "לסעיף 3", "לאחרי סעיף 3"},
               str({it["heading"] for it in items}))
     import base64  # noqa: PLC0415

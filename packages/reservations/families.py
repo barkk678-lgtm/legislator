@@ -153,8 +153,7 @@ def _fmt(n: int, unit: str, digits: bool, original: str) -> str:
     return quantity(n, unit)
 
 
-_LETTERS = "אבגדהוזחטיכלמנסעפצקרשת"
-# ערכים בלי יחידה - "כמו היום" (ברק): המספר, השנה ומספר הסעיף שבנוסח. בהצעה
+# ערכים בלי יחידה - "כמו היום" (ברק): המספר והשנה שבנוסח - **לא הפניה** (הכרעה א). בהצעה
 # 573919 (484 הסתייגויות שהוגשו) 146 מהן מחליפות בדיוק אלה: "31", "2020", "22ב".
 _BARE_VALUES = {
     "number": {"serious": lambda n: [n + 1, n - 1, n + 2, n - 2], "clever": lambda n: [1, 7, 10, 100],
@@ -167,24 +166,16 @@ _BARE_VALUES = {
 _DAY_RE = re.compile(r"^\s+ב(?:ינואר|פברואר|מרץ|מרס|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)(?![א-ת])")
 
 
-def _section_ref_values(ref: str, level: str) -> list[str]:
-    m = re.fullmatch(r"(\d+)([א-ת])", ref)
-    if not m or m.group(2) not in _LETTERS or level == "absurd":
-        return []
-    i = _LETTERS.index(m.group(2))
-    steps = [1, -1] if level == "serious" else [2, 3]
-    return [m.group(1) + _LETTERS[i + d] for d in steps if 0 <= i + d < len(_LETTERS)]
-
-
 def _bare_values(sc, level, taken: list[tuple[int, int]]):
     for a in find_anchors(sc.text):
-        if a.in_law_citation or a.kind == "hebrew_year" or any(s < a.end and a.start < e for s, e in taken):
+        # הכרעה א (ברק, 26.9): מספר שהוא הפניה - לסעיף, פסקה, תקנה, פרט, תוספת,
+        # בכל חוק - לא משתנה אף פעם, בכל הרמות. anchors.reference_spans.
+        if (a.in_law_citation or a.in_reference or a.kind == "hebrew_year"
+                or any(s < a.end and a.start < e for s, e in taken)):
             continue
         if not _ok_anchor(a.text, sc):
             continue
-        if a.kind == "section_ref":
-            news = _section_ref_values(a.text, level)
-        elif a.kind == "number" and _DAY_RE.match(sc.text[a.end:]):
+        if a.kind == "number" and _DAY_RE.match(sc.text[a.end:]):
             # יום בחודש: "31 בדצמבר" - לא "32 בדצמבר". רק ימים קיימים.
             n = int(a.text)
             news = {"serious": [n - 1, n - 2, n - 3], "clever": [1, 15], "absurd": []}[level]
