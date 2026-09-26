@@ -182,6 +182,12 @@ def main() -> int:
         print(f"  {f}: {kind} x{n}")
     for d in diagnoses[:200]:
         print(f"  {d['file']} #{d['reservation']} [{d['diagnosis']} {d['ratio']}] {d['phrase'][:70]!r} ~ {d['closest'][:90]!r}")
+        if d.get("where"):
+            print(f"      {d['where'][:200]}")
+    for s in summaries:
+        if s.get("section_numbers"):
+            dup = sorted({n for n in s["section_numbers"] if s["section_numbers"].count(n) > 1})
+            print(f"  {s['file']}: {len(s['section_numbers'])} סעיפים, כפולים: {dup[:20]}")
     args.out.write_text(json.dumps({"downloads": downloads, "summaries": summaries, "quotes": quotes,
                                     "diagnoses": diagnoses},
                                    ensure_ascii=False, indent=1), encoding="utf-8")

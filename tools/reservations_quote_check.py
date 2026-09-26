@@ -188,7 +188,8 @@ def check(path: Path) -> tuple[list[Quote], dict]:
     for q in quotes:
         counts[q.result] = counts.get(q.result, 0) + 1
     return quotes, {"file": path.name, "quotes": len(quotes), "counts": counts,
-                    "sections": len(bill.sections), "title": bill.title, "warnings": bill.warnings}
+                    "sections": len(bill.sections), "section_numbers": [s.number for s in bill.sections],
+                    "title": bill.title, "warnings": bill.warnings}
 
 
 _DIGITS = re.compile(r"\d[\d.,/%]*\d|\d%|%\d|\d")
@@ -219,6 +220,7 @@ def diagnose(path: Path, quotes: list[Quote]) -> list[dict]:
     """לכל ציטוט שלא נמצא (או נמצא רק בסעיף) - סוג הכשל המשוער:
     - `spacing` - נמצא אחרי הסרת רווחים ופיסוק: שבירת שורה/מקף/רווח בחילוץ.
     - `digits_order` - נמצא כשסדר הספרות הפוך ("%5" מול "5%"): כיווניות.
+    - `other_section` - מופיע בהצעה, אבל בסעיף אחר (מספור כפול / שיוך שגוי).
     - `outside_bill` - מופיע במסמך, אבל מחוץ לחלק של ההצעה (למשל בנספח החוק העיקרי).
     - `no_section` - הסעיף שהכותרת מפנה אליו לא זוהה בכלל.
     - `unit` - נמצא בסעיף אבל לא ביחידה שצוינה (section_only).
@@ -249,11 +251,19 @@ def diagnose(path: Path, quotes: list[Quote]) -> list[dict]:
             kind = "digits_order"
         elif ratio >= 0.8:
             kind = "near_miss"
+        elif any(_typo(q.phrase) in _typo(o.text) for o in bill.sections if o is not section):
+            kind = "other_section"
         elif _typo(q.phrase) in _typo(whole):
             kind = "outside_bill"
         else:
             kind = "absent"
-        out.append({**asdict(q), "diagnosis": kind, "ratio": round(ratio, 2), "closest": snippet[:160]})
+        where = ""
+        if kind in ("other_section", "outside_bill"):
+            hits = [o.number for o in bill.sections if _typo(q.phrase) in _typo(o.text)]
+            i = _typo(whole).find(_typo(q.phrase))
+            where = f"סעיפים: {hits[:6]} | הקשר: {_typo(whole)[max(0, i - 60):i + 60]}" if i >= 0 else f"סעיפים: {hits[:6]}"
+        out.append({**asdict(q), "diagnosis": kind, "ratio": round(ratio, 2), "closest": snippet[:160],
+                    "where": where})
     return out
 
 
