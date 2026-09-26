@@ -108,6 +108,15 @@ def test_clean_controls():
         assert not any("אינם קריאים" in w for w in bill.warnings), (doc, bill.warnings)
 
 
+def test_unreadable_digits_all_seven_flagged():
+    """שבעת הקבצים שבמדגם סומנו "המספור לא קריא" - כולם בריפו (סבב הסגירה, 26.9):
+    לכל אחד אזהרה, וכל סעיף לא ודאי - אף עוגן לא נבנה על מספר משובש."""
+    for doc in ("240417", "263401", "271820", "280224", "298627", "304244", "457978"):
+        bill = parse_bill_pdf(FIX / f"{doc}.pdf")
+        assert bill.sections and not any(s.certain for s in bill.sections), doc
+        assert any("אינם קריאים" in w for w in bill.warnings), (doc, bill.warnings)
+
+
 def test_628446_number_without_period_is_a_section():
     """המספר של סעיף 1 נקרא "1" בלי נקודה (הנקודה נפלה מהעמודה). בלי זה סעיף 1 לא זוהה,
     הרצף התחיל ב-2, וכל ההצעה סומנה "ספרות לא קריאות" - חיובי שגוי (ריצת המדגם, 26.9)."""
