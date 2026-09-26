@@ -1,0 +1,45 @@
+name: הסתייגויות - הורדת fixtures מהכנסת
+
+# ידני בלבד (הכרעה ז, ברק 26.9.2026): "עד 20 נוסחים ציבוריים מהכנסת מותרים בריפו
+# כ-fixtures". מוריד לאט את המזהים שנבחרו (אותו מוריד כמו reservations-scale) ודוחף
+# אותם לענף reservations-fixtures - משם הם נכנסים ל-tests/fixtures/reservations/pdf.
+# (ה-artifacts של Actions יושבים ב-blob storage שסביבת הפיתוח לא מגיעה אליו.)
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: "מזהי מסמך מופרדים בפסיקים (עד 20)"
+        required: true
+      delay:
+        description: "שניות בין הורדות"
+        default: "8"
+
+permissions:
+  contents: write
+
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: הורדה לאט
+        run: |
+          python3 tools/reservations_scale_sample.py --n 0 --delay "${{ inputs.delay }}" --ids "${{ inputs.ids }}" \
+            --work "$RUNNER_TEMP/fx" --out "$RUNNER_TEMP/results.json"
+          n=$(ls "$RUNNER_TEMP/fx"/*.pdf | wc -l)
+          echo "הורדו $n קבצים"; test "$n" -le 20
+      - name: דחיפה לענף reservations-fixtures
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B reservations-fixtures
+          mkdir -p tests/fixtures/reservations/pdf
+          cp "$RUNNER_TEMP/fx"/*.pdf tests/fixtures/reservations/pdf/
+          git add tests/fixtures/reservations/pdf
+          git commit -m "fixtures: נוסחים לקריאה שנייה ושלישית מהכנסת (${{ inputs.ids }})"
+          git push -f origin reservations-fixtures
