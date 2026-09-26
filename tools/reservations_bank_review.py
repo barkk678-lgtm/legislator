@@ -121,33 +121,43 @@ def write_review(records: list[bank.Record], verdicts: dict) -> None:
         lines.append(f"| {fam_he} | " + " | ".join(str(counts.get((fam, lv), 0)) for lv in bank.LEVELS) + " |")
     lines.append("")
 
-    def block_of(r):
+    def raw_block(r):
+        """מה היה חוסם בלי אישור אנושי: קו אדום, או פסק השומר."""
         red = bank.redline_violation(r.text(SAMPLE_COMMITTEE))
         v = verdicts.get(r.id, {})
         screen_note = "" if v.get("key") == r.screen_key and v.get("allowed") else (
             f"86(ד)(2): {v.get('reason') or 'לא סונן'}")
         return red or screen_note
 
-    blocked = [(r, block_of(r)) for r in records if block_of(r)]
+    # **ההכרעה עצמה - bank.check**, אותה פונקציה שמחליטה מה מגיע לפלט; כך הרשימה כאן לא
+    # יכולה לסטות מהפלט (אישור אנושי, פטור לתארים רשמיים).
+    blocked, overridden = [], []
+    for r in records:
+        raw, final = raw_block(r), bank.check(r, verdicts)
+        if final:
+            blocked.append((r, final))
+        elif raw:
+            overridden.append((r, raw))
     # רשימת השרים (מהמאגר) - התארים נבדקים בקווים האדומים בזמן הייצור; אלה שנחסמים היום:
     import ministers  # noqa: PLC0415
     for r in [r for r in records if r.value_list == "ministers"]:
         for t in ministers.titles():
-            red = bank.redline_violation(r.text(SAMPLE_COMMITTEE).replace(bank.MINISTER_PLACEHOLDER, t))
+            red = bank.redline_violation(r.text(SAMPLE_COMMITTEE).replace(bank.MINISTER_PLACEHOLDER, t),
+                                         official_titles=[t])
             if red:
                 blocked.append((bank.Record(**{**r.__dict__, "id": f"{r.id}/{t}", "value": t,
                                                "value_list": ""}), red))
-    overridden = [(r, b) for r, b in blocked if not b.startswith("קו אדום") and bank.human_approved(r)]
-    stays = [(r, b) for r, b in blocked if (r, b) not in overridden]
+    stays = blocked
     lines += [f"## רשומות חסומות - {len(stays)} (נשארות חסומות)", ""]
     if stays:
         lines += ["| מזהה | דוגמה | הסיבה |", "|---|---|---|"]
         lines += [f"| `{r.id}` | {_example(r).replace('|', chr(92) + '|')} | {b} |" for r, b in stays]
     else:
         lines.append("אין.")
-    lines += ["", f"## חסומות בשומר, ויוצאות לפלט באישור אנושי מפורש (§0.4) - {len(overridden)}", ""]
+    lines += ["", f"## חסומות, ויוצאות לפלט באישור אנושי מפורש של ברק (§0.4; סבב התיקונים ב2) - "
+                  f"{len(overridden)}", ""]
     if overridden:
-        lines += ["| מזהה | דוגמה | פסק השומר | האישור |", "|---|---|---|---|"]
+        lines += ["| מזהה | דוגמה | מה חסם | האישור |", "|---|---|---|---|"]
         for r, b in overridden:
             a = r.human_approval
             lines.append(f"| `{r.id}` | {_example(r).replace('|', chr(92) + '|')} | {b} | {a['by']}, {a['at']} |")
@@ -162,9 +172,9 @@ def write_review(records: list[bank.Record], verdicts: dict) -> None:
                 continue
             lines += [f"### {level_he}", "", "| אשר | מזהה | דוגמה | סטטוס | מקור | חסימה |", "|---|---|---|---|---|---|"]
             for r in rows:
-                block = block_of(r)
-                if block and not block.startswith("קו אדום") and bank.human_approved(r):
-                    block += " - **יוצאת באישור אנושי (§0.4)**"
+                block = bank.check(r, verdicts)
+                if not block and raw_block(r):
+                    block = raw_block(r) + " - **יוצאת באישור אנושי של ברק**"
                 status = {"pending": "ממתינה", "approved": "מאושרת", "rejected": "נדחתה"}.get(r.status, r.status)
                 box = "[x]" if r.status == "approved" else "[ ]"
                 example = _example(r).replace("|", "\\|")

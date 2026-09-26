@@ -32,6 +32,20 @@ HUMAN_APPROVAL = {
            "\"ועד הדולפינים של הים התיכון\" בכל מקום בבנק. גובר על פסק שומר 86(ד)(2) רק ברשומות "
            "שמסומנות כך; השומר עצמו לא משתנה (חריג לחוק ברזל 7, בהחלטת ברק).",
 }
+# סבב התיקונים על אישורי הבנק (ברק 26.9.2026, ב2): אותו מנגנון כמו §0.4, לשתי רשומות
+# שנחסמו בקו אדום. האישור - **רק לביטוי שהוא מאשר** (redline); קו אדום אחר - עדיין חוסם.
+REDLINE_APPROVALS = {
+    "verb_modifier-059": "העבודה",      # "בשעות העבודה בלבד" - לא המפלגה
+    "conditions-128": "זבל",            # "מי מוריד את הזבל" - לא עלבון
+}
+
+
+def _redline_approval(phrase: str) -> dict:
+    return {"by": "ברק", "at": "2026-09-26", "redline": [phrase],
+            "why": f"אישור מפורש בסבב התיקונים על אישורי הבנק (ב2): \"{phrase}\" ברשומה הזו אינו "
+                   "הפרת קו אדום. אותו מנגנון כמו §0.4; גובר רק על הביטוי הזה ורק ברשומה הזו."}
+
+
 APPROVAL_FORMS = ["באישור {value}", "בכפוף לאישור {value}", "בהתייעצות עם {value}",
                   "לאחר התייעצות עם {value}", "בהסכמת {value}"]
 GENDER = {"ז": "m", "נ": "f"}
@@ -90,16 +104,29 @@ def build() -> dict:
     records: list[dict] = []
     counters: dict[str, int] = {}
 
+    used: set[str] = set()
+
     def keep(rid: str, **changes):
+        used.add(rid)
         r = dict(old[rid])
         r.update(status="approved", source=SOURCE, **changes)
         records.append(r)
 
+    # **אידמפוטנטי** (סבב התיקונים, 26.9): רשומה שכבר קיימת באותו תוכן (משפחה, רמה, תבנית,
+    # ערך, רשימה) - שומרת את המזהה שלה; רק תוכן חדש מקבל מזהה חדש. בלי זה, הרצה חוזרת על
+    # הבנק שכבר נבנה שכפלה אותו (חובה ורשות: 264 במקום 104) - ופסקי השומר אבדו.
+    by_content = {(r["family"], r["level"], r["template"], r["value"], r.get("value_list", "")): rid
+                  for rid, r in old.items()}
+
     def new(family: str, level: str, template: str, value: str, **extra):
-        counters[family] = counters.get(family, max(
-            [int(k.rsplit("-", 1)[1]) for k in old if k.startswith(family + "-")] or [0]))
-        counters[family] += 1
-        r = {"id": f"{family}-{counters[family]:03d}", "level": level, "family": family,
+        rid = by_content.get((family, level, template, value, extra.get("value_list", "")))
+        if rid is None or rid in used:
+            counters[family] = counters.get(family, max(
+                [int(k.rsplit("-", 1)[1]) for k in old if k.startswith(family + "-")] or [0]))
+            counters[family] += 1
+            rid = f"{family}-{counters[family]:03d}"
+        used.add(rid)
+        r = {"id": rid, "level": level, "family": family,
              "template": template, "value": value, "status": "approved", "source": SOURCE, **extra}
         records.append(r)
 
@@ -165,7 +192,7 @@ def build() -> dict:
     assert not any(r["value"] in deleted_bodies for r in records if r["family"] == "approval")
 
     # ── §5 חובה ורשות - 24 הקיימות, 14 פעלים בשני הכיוונים, והצמד "חייב" ─────
-    for rid in sorted(k for k in old if k.startswith("duty-")):
+    for rid in (f"duty-{i:03d}" for i in range(1, 25)):             # 24 הקיימות (לפני אישורי הבנק)
         keep(rid)
     for verb, permitted in p["duty_pairs"]:
         new("duty", "serious", "{value}", f"{verb}=>{permitted}")
@@ -186,6 +213,9 @@ def build() -> dict:
     for r in records:
         if DOLPHINS in r["template"] + r["value"]:
             r["human_approval"] = HUMAN_APPROVAL
+    for r in records:
+        if r["id"] in REDLINE_APPROVALS:
+            r["human_approval"] = _redline_approval(REDLINE_APPROVALS[r["id"]])
     actors = [{"id": f"actor-{i:03d}", "value": v, "gender": g,
                **({"human_approval": HUMAN_APPROVAL} if v == DOLPHINS else {})}
               for i, (v, g) in enumerate(p["absurd_actors"], 1)]

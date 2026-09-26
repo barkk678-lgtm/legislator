@@ -645,6 +645,13 @@ def journey_reservations(base, res):
     res.check("ייצור: מספור רציף", [it["number"] for it in items] == list(range(1, 9)))
     res.check("ייצור: כותרות מיקום", {it["heading"] for it in items} <= {"לסעיף 1", "לסעיף 2", "לסעיף 3", "לאחרי סעיף 3"},
               str({it["heading"] for it in items}))
+    # סבב התיקונים על אישורי הבנק, א: תואר שר מהמאגר - מילה במילה, לא "שר הפנים לביטחון לאומי"
+    status, body = _post_file(base, "/api/reservations/generate", pdf,
+                              {"level": "serious", "families": "actor_swap,approval", "count": "50", "payment": ""})
+    titles = [" ".join(it["lines"]) for it in json.loads(body).get("items", [])]
+    glued = [t for t in titles if re.search(r"שר הפנים ל[א-ת]", t)]
+    res.check("ייצור: תארי שרים מהמאגר מילה במילה (בלי 'שר הפנים ל...')", status == 200 and titles and not glued,
+              f"{len(titles)} {glued[:2]}")
     import base64  # noqa: PLC0415
     data = base64.b64decode(g.get("docx_base64", ""))
     problems = structural_problems(data)

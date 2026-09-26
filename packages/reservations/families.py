@@ -526,9 +526,9 @@ def _expand_ministers(records: list) -> list:
         if r.value_list == "ministers":
             for t in ministers_mod.titles():
                 rec = replace(r, id=f"{r.id}/{t}", value=t, value_list="")
-                # קווים אדומים - על כל רשומה (§0.3), גם על התואר שבא מהמאגר: "שר העבודה"
-                # נחסם כמו "העבודה" בכל מקום אחר, ומדווח לברק (קובץ הסקירה)
-                if not bank_mod.redline_violation(rec.text("ועדה")):
+                # קווים אדומים - על כל רשומה (§0.3). התואר עצמו פטור רק ממילות מפלגה
+                # ויישוב ("שר העבודה", "שר ירושלים ומסורת ישראל" - הכרעת ברק, סבב התיקונים)
+                if not bank_mod.redline_violation(rec.text("ועדה"), official_titles=[t]):
                     out.append(rec)
         else:
             out.append(r)

@@ -126,12 +126,32 @@ _CATEGORY_HE = {"people": "אדם אמיתי", "parties": "מפלגה", "media":
                 "groups": "קבוצה דתית או אתנית", "places": "עיר או יישוב", "insults": "עלבון"}
 
 
-def redline_violation(text: str) -> str:
+# **תואר שר מרשימת השרים הרשמית** (מאגר הכנסת, ministers.titles) אינו עובר את בדיקת
+# המילים של מפלגות ויישובים - "שר העבודה", "שר ירושלים ומסורת ישראל" ומה שיבוא אחרי
+# הבחירות (הכרעת ברק, סבב התיקונים 26.9.2026). **כלל, לא אישור נקודתי**, ורק לשתי
+# הקטגוריות האלה ורק לתואר עצמו: שאר הרשומה נבדקת כרגיל, ושאר הקטגוריות - גם בתוך
+# התואר. שומר 86(ד)(2) ממשיך לרוץ (על התבנית עם {שר}).
+_TITLE_EXEMPT = ("parties", "places")
+
+
+def redline_violations(text: str, official_titles: list[str] | tuple = ()) -> list[tuple[str, str]]:
+    """כל ההפרות: [(קטגוריה, ביטוי)]. official_titles - תארים מרשימת השרים הרשמית שמופיעים
+    בטקסט: מילים של מפלגה או יישוב בתוכם אינן נספרות."""
+    masked = text
+    for title in sorted(official_titles, key=len, reverse=True):
+        masked = masked.replace(title, " " * len(title))
+    return [(category, phrase) for category, rx, phrase in _redlines()
+            if rx.search(masked if category in _TITLE_EXEMPT else text)]
+
+
+def _reason(category: str, phrase: str) -> str:
+    return f"קו אדום - {_CATEGORY_HE[category]}: {phrase!r}"
+
+
+def redline_violation(text: str, official_titles: list[str] | tuple = ()) -> str:
     """הסיבה, או "" אם אין הפרה."""
-    for category, rx, phrase in _redlines():
-        if rx.search(text):
-            return f"קו אדום - {_CATEGORY_HE[category]}: {phrase!r}"
-    return ""
+    found = redline_violations(text, official_titles)
+    return _reason(*found[0]) if found else ""
 
 
 def _screen_verdicts() -> dict:
@@ -179,9 +199,12 @@ def check(record: Record, verdicts: dict | None = None) -> str:
         return f"משפחה לא מוכרת: {record.family!r}"
     if record.status != "approved":
         return "ממתינה לאישור" if record.status == "pending" else f"סטטוס: {record.status}"
-    red = redline_violation(record.text("ועדה"))
+    # אישור אנושי מפורש (סבב התיקונים, ב2 - אותו מנגנון כמו §0.4) גובר על קו אדום **רק
+    # לביטוי שהוא מאשר** (human_approval.redline); כל הפרה אחרת - חוסמת.
+    approved = set((record.human_approval or {}).get("redline") or []) if human_approved(record) else set()
+    red = [(c, p) for c, p in redline_violations(record.text("ועדה")) if p not in approved]
     if red:
-        return red
+        return _reason(*red[0])
     verdicts = _screen_verdicts() if verdicts is None else verdicts
     verdict = verdicts.get(record.id) or {}
     if verdict.get("key") != record.screen_key:
@@ -213,4 +236,4 @@ def load(level: str) -> tuple[list[Record], list[Blocked]]:
 
 
 __all__ = ["BANK_FAMILIES", "Blocked", "LEVELS", "MINISTER_PLACEHOLDER", "Record", "check", "human_approved",
-           "load", "load_all", "redline_violation"]
+           "load", "load_all", "redline_violation", "redline_violations"]

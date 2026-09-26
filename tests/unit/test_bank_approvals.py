@@ -179,7 +179,9 @@ def test_human_approval_overrides_guard_only_where_marked():
     dolphins = [r for r in RECORDS if "ועד הדולפינים של הים התיכון" in r.text("ועדה")]
     assert len(dolphins) >= 1 + 5 + 3, len(dolphins)             # החלפה, 5 צורות, תנאי/סעיף/תוספת
     assert all(bank.human_approved(r) for r in dolphins)
-    assert not [r for r in RECORDS if bank.human_approved(r) and r not in dolphins]
+    # מעבר לדולפינים - רק שתי הרשומות שברק אישר בסבב התיקונים (ב2), ורק לביטוי שבקו האדום
+    others = sorted(r.id for r in RECORDS if bank.human_approved(r) and r not in dolphins)
+    assert others == ["conditions-128", "verb_modifier-059"], others
     r = dolphins[0]
     blocked = {r.id: {"key": r.screen_key, "allowed": False, "reason": "גוף אמיתי"}}
     assert bank.check(r, blocked) == ""                                  # האישור האנושי גובר
@@ -196,10 +198,14 @@ def test_human_approval_overrides_guard_only_where_marked():
 
 
 def test_blocked_records_stay_blocked():
-    """קו אדום - חסום גם כשמאושר, ואינו מגיע לפלט (אישורי הבנק §0.3)."""
+    """קו אדום - חסום גם כשמאושר, ואינו מגיע לפלט (אישורי הבנק §0.3). שתי הרשומות האלה
+    שוחררו רק באישור אנושי מפורש של ברק (סבב התיקונים, ב2 - tests/unit/
+    test_human_approval_redline.py); **בלי האישור - חסומות, כמו קודם**."""
     for rid in ("conditions-128", "verb_modifier-059"):
         r = next(r for r in RECORDS if r.id == rid)
-        assert r.status == "approved" and bank.check(r, {r.id: {"key": r.screen_key, "allowed": True}}).startswith("קו אדום")
+        plain = bank.Record(**{**r.__dict__, "human_approval": None})
+        assert plain.status == "approved"
+        assert bank.check(plain, {r.id: {"key": r.screen_key, "allowed": True}}).startswith("קו אדום"), rid
 
 
 for name, fn in sorted(list(globals().items())):

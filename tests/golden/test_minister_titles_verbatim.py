@@ -60,8 +60,9 @@ def _bill_text(bill):
 
 
 def _expected_titles(titles):
-    """כל תואר שאינו נחסם בקו אדום (הקווים האדומים - סעיף ב1, בנפרד)."""
-    return [t for t in titles if not bank.redline_violation(f"במקום \"שר הפנים\" יבוא \"{t}\".")]
+    """כל תואר ברשימה (ב1: תואר רשמי פטור ממילות מפלגה ויישוב - גם "שר העבודה")."""
+    return [t for t in titles if not bank.redline_violation(f"במקום \"שר הפנים\" יבוא \"{t}\".",
+                                                             official_titles=[t])]
 
 
 def _check_verbatim(titles):
