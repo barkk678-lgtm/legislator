@@ -258,8 +258,8 @@
   },
   "actor_swap-021/actor-042": {
    "key": "c779e0657462c91e",
-   "allowed": false,
-   "reason": "הסינון החזיר '# שומר המגדל'"
+   "allowed": true,
+   "reason": ""
   },
   "actor_swap-021/actor-043": {
    "key": "a91661dd45af99bd",
@@ -558,18 +558,18 @@
   },
   "actor_swap-021/actor-102": {
    "key": "f43e1151dc8389ab",
-   "allowed": false,
-   "reason": "הסינון החזיר 'נראה שכתבת'"
+   "allowed": true,
+   "reason": ""
   },
   "actor_swap-021/actor-103": {
    "key": "4832ec6be5f065df",
-   "allowed": false,
-   "reason": "הסינון החזיר 'שלום! נראה ש'"
+   "allowed": true,
+   "reason": ""
   },
   "actor_swap-021/actor-104": {
    "key": "17a14a5e96f89956",
-   "allowed": false,
-   "reason": "הסינון החזיר 'היי! 🎅'"
+   "allowed": true,
+   "reason": ""
   },
   "actor_swap-021/actor-105": {
    "key": "dd559f6c3c2cbe4a",
@@ -2603,8 +2603,8 @@
   },
   "approval-161/actor-087": {
    "key": "33ed2680ffce5b9a",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן'"
+   "allowed": true,
+   "reason": ""
   },
   "approval-161/actor-088": {
    "key": "29f712014713b3b3",
@@ -2893,8 +2893,8 @@
   },
   "approval-162/actor-039": {
    "key": "7412a6140d2ad5b8",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן'"
+   "allowed": true,
+   "reason": ""
   },
   "approval-162/actor-040": {
    "key": "9d2432d37f59d7ac",
@@ -3368,8 +3368,8 @@
   },
   "approval-163/actor-028": {
    "key": "5b6b507412f216bb",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן'"
+   "allowed": true,
+   "reason": ""
   },
   "approval-163/actor-029": {
    "key": "e7f3c6cd3a66710a",
@@ -3433,8 +3433,8 @@
   },
   "approval-163/actor-041": {
    "key": "35f91fa42880191a",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן'"
+   "allowed": true,
+   "reason": ""
   },
   "approval-163/actor-042": {
    "key": "23f9785518921224",
@@ -3663,8 +3663,8 @@
   },
   "approval-163/actor-087": {
    "key": "7dbcc62bf1bdd502",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן'"
+   "allowed": true,
+   "reason": ""
   },
   "approval-163/actor-088": {
    "key": "8a89e7d3d68fb2bc",
@@ -3763,8 +3763,8 @@
   },
   "approval-164/actor-001": {
    "key": "f5673aa5cd09f484",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן'"
+   "allowed": true,
+   "reason": ""
   },
   "approval-164/actor-002": {
    "key": "838569198836efcc",
@@ -5128,8 +5128,8 @@
   },
   "conditions-067": {
    "key": "02cd59e99ff5e223",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן'"
+   "allowed": true,
+   "reason": ""
   },
   "conditions-068": {
    "key": "96756618131049bf",
@@ -6413,8 +6413,8 @@
   },
   "verb_modifier-067": {
    "key": "e692fa938a8acd32",
-   "allowed": false,
-   "reason": "הסינון החזיר 'אני מבין שאת'"
+   "allowed": true,
+   "reason": ""
   },
   "verb_modifier-068": {
    "key": "7707c279b3d4e1d9",
@@ -6463,8 +6463,8 @@
   },
   "verb_modifier-077": {
    "key": "ca6c50b4e68a8511",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן'"
+   "allowed": true,
+   "reason": ""
   },
   "verb_modifier-078": {
    "key": "148558a7e8f0eaad",
@@ -6758,8 +6758,8 @@
   },
   "verb_modifier-136": {
    "key": "7a0973379694a930",
-   "allowed": false,
-   "reason": "הסינון החזיר 'כן\\n\\n**הערה:'"
+   "allowed": true,
+   "reason": ""
   },
   "verb_modifier-137": {
    "key": "50bf058e660a4e01",
@@ -6808,8 +6808,8 @@
   },
   "verb_modifier-146": {
    "key": "553fb4225e623dac",
-   "allowed": false,
-   "reason": "הסינון החזיר 'אני מבין שציינ'"
+   "allowed": true,
+   "reason": ""
   },
   "verb_modifier-147": {
    "key": "b943638b084bc58f",

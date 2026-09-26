@@ -51,6 +51,15 @@ def _sample(text: str) -> str:
             .replace("{משרד}", SAMPLE_MINISTRY))
 
 
+SCREEN_MINISTER = "שר האוצר"          # רשימת השרים בסינון - תואר אמיתי אחד (התארים עצמם - קווים אדומים)
+
+
+def screened_text(r: bank.Record) -> str:
+    """**מה שהשומר קורא: ההסתייגות המלאה, כמו שתופיע בפלט** (סבב התיקונים, 26.9.2026) -
+    ולא הקטע החשוף ("בחלום", "הדוור של הקוטב הצפוני"), שבלי הקשר נקרא כפנייה בצ'אט."""
+    return _example(r).replace("{כל שר מרשימת השרים במאגר}", SCREEN_MINISTER)
+
+
 def _example(r: bank.Record) -> str:
     text = r.text(SAMPLE_COMMITTEE)
     if r.value_list == "ministers":
@@ -75,27 +84,42 @@ def _save(verdicts: dict) -> None:
          "verdicts": dict(sorted(verdicts.items()))}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
-def screen(records: list[bank.Record], workers: int = 8) -> dict:
+_SERVICE_FAILURE = ("הסינון נכשל", "שכבת הסינון אינה זמינה")
+
+
+def screen(records: list[bank.Record], workers: int = 8, rescreen_all: bool = False) -> dict:
     """**כל רשומה חדשה או ששונתה** (אין לה פסק לגיבוב הנוכחי) - דרך השומר. פסקים של
-    רשומות שלא השתנו - נשמרים. נשמר כל 100 פסקים (ריצה ארוכה)."""
+    רשומות שלא השתנו - נשמרים. נשמר כל 100 פסקים (ריצה ארוכה). rescreen_all - **כל**
+    הבנק מחדש, מאפס (קריאה חדשה של השומר - סבב הסגירה, 26.9.2026).
+
+    **כשל שירות אינו פסק:** קריאה שנכשלה (רשת, מכסה) לא נשמרת כפסק - הרשומה נשארת בלי
+    פסק (ולכן חסומה, fail-closed) ומנוסה פעם אחת נוספת בסוף."""
     from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
     data = json.loads(bank.SCREEN_PATH.read_text(encoding="utf-8")) if bank.SCREEN_PATH.exists() else {}
-    verdicts = data.get("verdicts", {})
+    verdicts = {} if rescreen_all else data.get("verdicts", {})
     todo = [r for r in records if verdicts.get(r.id, {}).get("key") != r.screen_key]
     print(f"לסינון: {len(todo)} מתוך {len(records)}", flush=True)
 
     def one(r):
-        text = _sample(r.text(SAMPLE_COMMITTEE).replace(bank.MINISTER_PLACEHOLDER, SAMPLE_MINISTER))
-        return r, guards.screen_text(text.replace("|", " "))
+        return r, guards.screen_text(screened_text(r))
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        for n, (r, v) in enumerate(pool.map(one, todo), 1):
-            verdicts[r.id] = {"key": r.screen_key, "allowed": v.allowed, "reason": v.reason}
-            if not v.allowed:
-                print(f"  {r.id}: נחסם - {v.reason}", flush=True)
-            if n % 100 == 0:
-                _save(verdicts)
-                print(f"  ... {n}/{len(todo)}", flush=True)
+    for attempt in (1, 2):
+        failed = []
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for n, (r, v) in enumerate(pool.map(one, todo), 1):
+                if not v.allowed and v.reason.startswith(_SERVICE_FAILURE):
+                    failed.append(r)
+                    continue
+                verdicts[r.id] = {"key": r.screen_key, "allowed": v.allowed, "reason": v.reason}
+                if not v.allowed:
+                    print(f"  {r.id}: נחסם - {v.reason}", flush=True)
+                if n % 100 == 0:
+                    _save(verdicts)
+                    print(f"  ... {n}/{len(todo)}", flush=True)
+        if not failed:
+            break
+        print(f"  כשל שירות ב-{len(failed)} רשומות (ניסיון {attempt}) - לא נשמר כפסק", flush=True)
+        todo = failed
     live = {r.id for r in records}
     verdicts = {k: v for k, v in verdicts.items() if k in live}    # רשומות שנמחקו - בלי פסק
     _save(verdicts)
@@ -187,6 +211,7 @@ def write_review(records: list[bank.Record], verdicts: dict) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-screen", action="store_true")
+    ap.add_argument("--all", action="store_true", help="לסנן מחדש את כל הבנק, מאפס")
     args = ap.parse_args()
     records = bank.load_all()
     if args.no_screen:
@@ -195,7 +220,7 @@ def main() -> int:
     else:
         import env_file  # noqa: PLC0415
         env_file.load()
-        verdicts = screen(records)
+        verdicts = screen(records, rescreen_all=args.all)
     write_review(records, verdicts)
     return 0
 
