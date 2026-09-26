@@ -85,6 +85,10 @@ def main() -> int:
     checks.append(("כל החסרים - ציטוטים לא מדויקים בהסתייגויות עצמן", missing == KNOWN_MISQUOTES, str(sorted(missing))))
     checks.append(("אף ציטוט לא נמצא רק בסעיף ולא ביחידה שצוינה",
                    not any(q.result == "section_only" for q in quotes), ""))
+    # האבחון (tools/reservations_quote_check.diagnose) - אף חסר אינו כשל קריאה
+    kinds = {d["reservation"]: d["diagnosis"] for d in quote_check.diagnose(PDF, quotes)}
+    reading = {r: k for r, k in kinds.items() if k in ("spacing", "digits_order", "no_section", "unit")}
+    checks.append(("האבחון: אף חסר אינו כשל קריאה (רווח/סדר ספרות/סעיף/יחידה)", not reading, str(reading)))
 
     bad = [c for c in checks if not c[1]]
     for name, ok, info in checks:

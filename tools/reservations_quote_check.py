@@ -191,6 +191,72 @@ def check(path: Path) -> tuple[list[Quote], dict]:
                     "sections": len(bill.sections), "title": bill.title, "warnings": bill.warnings}
 
 
+_DIGITS = re.compile(r"\d[\d.,/%]*\d|\d%|%\d|\d")
+
+
+def _squash(s: str) -> str:
+    return re.sub(r"[\s\-־–—\"״”“'׳,.;:()]", "", s)
+
+
+def _digits_flipped(s: str) -> str:
+    return _DIGITS.sub(lambda m: m.group(0)[::-1], s)
+
+
+def _best_window(phrase: str, text: str) -> tuple[float, str]:
+    """הקטע הדומה ביותר בחילוץ (לפי מילים), ויחס הדמיון."""
+    import difflib  # noqa: PLC0415
+    words, n = text.split(), max(1, len(phrase.split()))
+    best, snippet = 0.0, ""
+    for i in range(max(1, len(words) - n + 1)):
+        cand = " ".join(words[i:i + n])
+        r = difflib.SequenceMatcher(None, phrase, cand).ratio()
+        if r > best:
+            best, snippet = r, cand
+    return best, snippet
+
+
+def diagnose(path: Path, quotes: list[Quote]) -> list[dict]:
+    """לכל ציטוט שלא נמצא (או נמצא רק בסעיף) - סוג הכשל המשוער:
+    - `spacing` - נמצא אחרי הסרת רווחים ופיסוק: שבירת שורה/מקף/רווח בחילוץ.
+    - `digits_order` - נמצא כשסדר הספרות הפוך ("%5" מול "5%"): כיווניות.
+    - `outside_bill` - מופיע במסמך, אבל מחוץ לחלק של ההצעה (למשל בנספח החוק העיקרי).
+    - `no_section` - הסעיף שהכותרת מפנה אליו לא זוהה בכלל.
+    - `unit` - נמצא בסעיף אבל לא ביחידה שצוינה (section_only).
+    - `near_miss` - קטע דומה מאוד (0.8 ומעלה): ציטוט לא מדויק בהסתייגות, או שגיאת קריאה קטנה.
+    - `absent` - שום דבר דומה בהצעה.
+    """
+    bill = parse_bill_pdf(path)
+    by_number = {s.number: s for s in bill.sections}
+    texts = [l.body for l in _lines(path, columns=False)[0] if l.body.strip()]
+    # בלי חלק ההסתייגויות עצמו - אחרת כל ציטוט "נמצא" בנוסח של ההסתייגות שמצטטת אותו
+    start = next((i for i, t in enumerate(texts) if t == "הסתייגויות"), len(texts))
+    end = next((i for i, t in enumerate(texts) if i > start and t.startswith("בקשות רשות דיבור")), len(texts))
+    whole = " ".join(texts[:start] + texts[end:])
+    out = []
+    for q in quotes:
+        if q.result not in ("missing", "section_only"):
+            continue
+        section = by_number.get(q.section)
+        text = section.text if section else ""
+        ratio, snippet = _best_window(q.phrase, text) if text else (0.0, "")
+        if q.result == "section_only":
+            kind = "unit"
+        elif section is None:
+            kind = "no_section"
+        elif _squash(q.phrase) and _squash(q.phrase) in _squash(text):
+            kind = "spacing"
+        elif _digits_flipped(q.phrase) != q.phrase and _digits_flipped(q.phrase) in text:
+            kind = "digits_order"
+        elif ratio >= 0.8:
+            kind = "near_miss"
+        elif _typo(q.phrase) in _typo(whole):
+            kind = "outside_bill"
+        else:
+            kind = "absent"
+        out.append({**asdict(q), "diagnosis": kind, "ratio": round(ratio, 2), "closest": snippet[:160]})
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("files", nargs="*", type=Path)

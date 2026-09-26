@@ -1,78 +1,79 @@
-"""רינדור מסמך ההסתייגויות - פריסה ומקרה ריק.
+"""פלט ה-Word של ההסתייגויות (הסתייגויות 5, 26.9).
 
-הפריסה משוחזרת ממסמך שהונח בכנסת, והמקרה הריק נלמד משני נוסחים
-נוספים (2012, 2014) ששניהם ללא הסתייגויות. ראו drafting-rules.md §9.2.
+David 12, מיושר לשני הצדדים; כותרת - שם ההצעה; כותרות מיקום כמו בטבריה ("לסעיף 1",
+"לאחרי סעיף 3") פעם אחת לכל קבוצה; מספור רציף 1, 2, 3 על פני כל הכותרות, בלי
+חלופות באותיות; בלי "קבוצת X מציעה:"; ועובר את בודק המבנה (docx_check).
 """
 
+import io
+import re
 import sys
-import tempfile
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "reservations"))
+sys.path.insert(0, str(ROOT / "packages" / "render"))
 
-from model import Reservation  # noqa: E402
-from render_docx import EMPTY_NOTICE, _bill_reference, _proposers_line, write_docx  # noqa: E402
+from docx import Document  # noqa: E402
+from docx.enum.text import WD_ALIGN_PARAGRAPH  # noqa: E402
+from docx_check import structural_problems  # noqa: E402
+import families  # noqa: E402
+import render_docx  # noqa: E402
+from pdf_bill import parse_bill_pdf  # noqa: E402
 
-
-def _render(**kwargs):
-    import docx  # noqa: PLC0415
-
-    out = Path(tempfile.mkstemp(suffix=".docx")[1])
-    write_docx(out, **kwargs)
-    return [(p.style.name, p.text.strip()) for p in docx.Document(str(out)).paragraphs
-            if p.text.strip()]
-
-
-def main():
-    ok = True
-
-    def check(name, passed, detail=""):
-        nonlocal ok
-        ok = ok and passed
-        print(("OK  " if passed else "FAIL"), name, detail if not passed else "")
-
-    # שורת המציעים - בדיוק כפי שנצפתה במסמך האמיתי
-    real = ("חברי הכנסת נפתלי בנט, אילת שקד, בצלאל סמוטריץ', "
-            "מתן כהנא ואופיר סופר מציעים:")
-    got = _proposers_line(["נפתלי בנט", "אילת שקד", "בצלאל סמוטריץ'",
-                           "מתן כהנא", "אופיר סופר"])
-    check("שורת המציעים זהה לנוסח האמיתי", got == real, f"התקבל: {got}")
-    check("מציע יחיד", _proposers_line(["פלוני"]) == "חבר/ת הכנסת פלוני מציעים:")
-
-    check("אין 'להצעת הצעת'",
-          _bill_reference("הצעת חוק X, התש\"ף–2020") == "להצעת חוק X, התש\"ף–2020")
-    check("שם בלי התחילית מקבל אותה",
-          _bill_reference("חוק X") == "להצעת חוק X")
-
-    # מקרה מלא
-    res = [Reservation(anchor="31", value=v, axis="replace", section_number="1")
-           for v in ("2", "3")]
-    paras = _render(bill_title="הצעת חוק בדיקה", reservations=res, proposers=["פלוני"])
-    styles = [s for s, _ in paras]
-    check("Heading 1 -> Heading 2 -> Heading 3 -> List Paragraph",
-          styles[0] == "Heading 1" and "Heading 2" in styles
-          and "Heading 3" in styles and "List Paragraph" in styles, str(styles))
-    check("שתי ההסתייגויות מופיעות",
-          sum(1 for s, _ in paras if s == "List Paragraph") == 2)
-
-    # **המקרה הריק** - המקטע קיים ונושא נוסח מפורש
-    empty = _render(bill_title="הצעת חוק בדיקה", reservations=[], proposers=[])
-    texts = [t for _, t in empty]
-    check("מקטע ההסתייגויות קיים גם כשריק", "הסתייגויות" in texts)
-    check(f"ונושא את הנוסח {EMPTY_NOTICE!r}", EMPTY_NOTICE in texts)
-    check("אין כותרת 'לסעיף' כשאין הסתייגויות",
-          not any(t.startswith("לסעיף") for t in texts))
-
-    # סימון תקציבי
-    flagged = _render(bill_title="הצעת חוק בדיקה", reservations=res,
-                      proposers=["פלוני"], budget_flags={0: "דורש 50 ח\"כ"})
-    check("סימון תקציבי מופיע בשורה עצמה",
-          any("עלות תקציבית" in t for _, t in flagged))
-
-    print("\nתוצאה:", "עבר" if ok else "נכשל")
-    return 0 if ok else 1
+BILL = parse_bill_pdf(ROOT / "reference" / "הצעת חוק טבריה.pdf")
+ITEMS = families.plan(BILL, "serious", list(families.FAMILIES), 1000).items
+DATA = render_docx.docx_bytes(bill_title=BILL.title, items=ITEMS)
+DOC = Document(io.BytesIO(DATA))
+PARAS = [p.text for p in DOC.paragraphs]
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+def test_title_is_the_bill():
+    assert PARAS[0] == BILL.title, PARAS[0]
+
+
+def test_location_headings_once_per_group_and_in_order():
+    headings = [p for p in PARAS if re.fullmatch(r"(?:לפני |לאחרי |ל)סעיף \d+[א-ת]?", p)]
+    assert headings == list(dict.fromkeys(it.heading for it in ITEMS)), headings
+    assert headings[0] == "לסעיף 1", headings
+
+
+def test_continuous_numbering_no_letters():
+    numbered = [p for p in PARAS if re.match(r"^\d+\. ", p)]
+    assert [int(p.split(".")[0]) for p in numbered] == list(range(1, len(ITEMS) + 1))
+    assert not any(re.match(r"^[א-ת]\. ", p) for p in PARAS), "חלופות באותיות"
+
+
+def test_no_group_line():
+    assert not any("מציעה" in p or "מציעים" in p for p in PARAS)
+
+
+def test_david_12_justified_rtl():
+    normal = DOC.styles["Normal"]
+    assert normal.font.name == "David" and normal.font.size.pt == 12
+    body = [p for p in DOC.paragraphs if p.text]
+    assert all(p.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY for p in body)
+    xml = zipfile.ZipFile(io.BytesIO(DATA)).read("word/document.xml").decode()
+    assert xml.count("<w:bidi/>") >= len(body) and "<w:rtl/>" in xml
+
+
+def test_passes_structure_check():
+    assert structural_problems(DATA) == [], structural_problems(DATA)
+
+
+def test_empty_and_control_chars():
+    empty = Document(io.BytesIO(render_docx.docx_bytes(bill_title="", items=[])))
+    assert [p.text for p in empty.paragraphs] == ["הצעת חוק", "אין הסתייגויות"]
+    item = families.Item(heading="לסעיף 1", lines=["במקום \"א\x0bב\" יבוא \"ג\x07\"."], family="x",
+                         group="g", order=(0,))
+    data = render_docx.docx_bytes(bill_title="חוק", items=[item])
+    assert structural_problems(data) == []
+    assert Document(io.BytesIO(data)).paragraphs[2].text == '1. במקום "א ב" יבוא "ג".'
+
+
+for name, fn in sorted(list(globals().items())):
+    if name.startswith("test_"):
+        fn()
+        print(f"  ✓ {name}")
+print("test_reservations_render: כל הבדיקות עברו")

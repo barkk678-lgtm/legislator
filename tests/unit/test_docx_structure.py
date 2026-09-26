@@ -75,9 +75,14 @@ def main() -> int:
 
     from render_docx import build_document  # noqa: PLC0415
     buf = io.BytesIO()
-    build_document(bill_title="הצעת חוק בדיקה", proposers=["חבר הכנסת בדיקה"],
-                   reservations=[]).save(buf)
-    check("הסתייגויות (python-docx)", buf.getvalue())
+    build_document(bill_title="הצעת חוק בדיקה", items=[]).save(buf)
+    check("הסתייגויות (python-docx), ריק", buf.getvalue())
+    from types import SimpleNamespace as NS  # noqa: PLC0415
+    buf = io.BytesIO()
+    build_document(bill_title="הצעת חוק בדיקה", items=[
+        NS(heading="לסעיף 1", lines=['בפסקה (1), במקום "שלושים ימים" יבוא "שישים ימים".']),
+        NS(heading="לאחרי סעיף 1", lines=["אחרי הסעיף יבוא:", '"תחילה 2. תחילתו של חוק זה\x0b שנה."'])]).save(buf)
+    check("הסתייגויות (python-docx), עם נוסח מצוטט", buf.getvalue())
 
     # בקרה: אפס ממצאים על קבצים שוורד עצמו שמר
     real = sorted(glob.glob(str(ROOT / "tests/fixtures/**/*.docx"), recursive=True)

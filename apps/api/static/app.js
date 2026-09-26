@@ -3953,15 +3953,16 @@ document.getElementById("critique-btn").addEventListener("click", runCritique);
 
 // א8 - אזור גרירה במקום כפתור "בחר קובץ" האפור. אותו אזור בתקציר
 // ובבודק הניסוח; ה-input נשאר (גרירה לבדה אינה נגישה במקלדת).
-function wireDropzone(zoneId, inputId, pickId, nameId) {
+function wireDropzone(zoneId, inputId, pickId, nameId, exts = [".docx"], hint = ".docx בלבד", onFile = null) {
   const zone = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
   if (!zone || !input) return;
   const nameEl = document.getElementById(nameId);
   const show = () => {
     const f = input.files && input.files[0];
-    nameEl.textContent = f ? f.name : ".docx בלבד";
+    nameEl.textContent = f ? f.name : hint;
     zone.classList.toggle("has-file", Boolean(f));
+    if (f && onFile) onFile(f);
   };
   document.getElementById(pickId).addEventListener("click", () => input.click());
   zone.addEventListener("click", (ev) => { if (ev.target === zone) input.click(); });
@@ -3975,8 +3976,8 @@ function wireDropzone(zoneId, inputId, pickId, nameId) {
     if (!f) return;
     // **הסוג נבדק כאן ולא רק בשרת** - גרירת PDF והמתנה לשגיאה
     // מהשרת היא מסע מיותר.
-    if (!f.name.toLowerCase().endsWith(".docx")) {
-      nameEl.textContent = `${f.name} — נתמך .docx בלבד`;
+    if (!exts.some((e) => f.name.toLowerCase().endsWith(e))) {
+      nameEl.textContent = `${f.name} — נתמך ${hint}`;
       zone.classList.add("has-error");
       return;
     }
@@ -3986,7 +3987,8 @@ function wireDropzone(zoneId, inputId, pickId, nameId) {
     input.files = dt.files;
     show();
   });
-  show();
+  if (input.files && input.files[0]) show();
+  else nameEl.textContent = hint;
 }
 wireDropzone("summary-drop", "summary-file", "summary-pick", "summary-name");
 wireDropzone("critique-drop", "critique-file", "critique-pick", "critique-name");
@@ -3998,135 +4000,169 @@ function critiqueStatusLabel(status) {
   return status;
 }
 
-/* ═══ הסתייגויות ═══ (2026-09-18)
- * שני המספרים מוצגים תמיד יחד ולעולם לא לחוד: "עד N הסתייגויות,
- * מתוכן כ-M מובחנות". N לבדו מטעה - 400 וריאציות על אותו תאריך
- * נראות כמו 400 רעיונות. ראו generate.measure להגדרת "מובחן". */
-function resSections(d) {
-  return d.per_section.map((s) => `
-    <tr><td>${escapeHtml(s.section)}</td><td>${s.anchors}</td>
-    <td>${escapeHtml((s.anchor_values || []).join(", "))}</td></tr>`).join("");
+/* ═══ הסתייגויות ═══ (בנייה מחדש, 26.9)
+ * המשתמש מעלה PDF (או Word) - ורואה: כמה אפשר לייצר מההצעה לכל היותר, מד
+ * יצירתיות, משפחות, כמות, מחיר, ו"לפחות X ייספרו בנפרד". הפירוק של ההצעה
+ * לא מוצג: הקריאה הנכונה היא אחריותנו.
+ * **התשלום מדומה:** אין בדף שום שדה של פרטי תשלום. הכפתור ממשיך ישר, עם
+ * סימון גלוי של מצב הדגמה. */
+const RES = { analysis: null, level: "serious", families: null };
+
+function resFamiliesSelected() {
+  return [...document.querySelectorAll("#res-families input:checked")].map((c) => c.value);
 }
 
-// אזהרות חילוץ, בראש התוצאה ולא בתחתיתה. **הן קריטיות בלשונית
-// הזו:** ההצעה 13948363 איבדה חצי מעצמה בשקט לפני התיקון של
-// 2026-09-19, ומה שהמשתמש ראה היה תוצאה שנראית תקינה לגמרי.
-function extractionWarnings(d) {
-  if (!d.warnings || !d.warnings.length) return "";
-  return `<div class="notice notice-coverage" style="margin-bottom:12px">
-    <b>שימו לב — החילוץ מהמסמך אינו ודאי:</b>
-    <ul>${d.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>`;
+function resTotals() {
+  const a = RES.analysis;
+  if (!a) return { available: 0, groups: 0 };
+  const lv = a.levels[RES.level];
+  const chosen = resFamiliesSelected();
+  let available = 0, groups = 0;
+  chosen.forEach((f) => {
+    const x = (lv.per_family || {})[f] || { available: 0, groups: 0 };
+    available += x.available; groups += x.groups;
+  });
+  return { available, groups };
 }
 
-async function measureReservations() {
-  const input = document.getElementById("res-file");
-  const out = document.getElementById("res-result");
-  const file = input.files && input.files[0];
-  if (!file) { out.innerHTML = `<div class="hint">בחרו קובץ Word תחילה.</div>`; return; }
-  const btn = document.getElementById("res-measure-btn");
-  btn.disabled = true;
-  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>מודד…</div>`;
+function resPrice(n) {
+  const p = RES.analysis.pricing;
+  const extra = Math.max(0, n - p.included);
+  return Math.ceil(extra / p.block_size) * p.price_per_block_usd;
+}
+
+function renderResQuote() {
+  const box = document.getElementById("res-quote");
+  if (!RES.analysis) { box.innerHTML = ""; return; }
+  const { available, groups } = resTotals();
+  const asked = Math.max(1, parseInt(document.getElementById("res-count").value, 10) || 0);
+  const n = Math.min(asked, available);
+  const price = resPrice(n);
+  const p = RES.analysis.pricing;
+  const priceText = price
+    ? `<b>$${price}</b> <span class="hint">(${p.included} כלולות; $${p.price_per_block_usd} לכל ${p.block_size} נוספות או חלק מהן)</span>`
+    : `<b>כלול</b> <span class="hint">(עד ${p.included} הסתייגויות בכל הצעה)</span>`;
+  const short = asked > available
+    ? `<div class="notice" style="margin-top:8px">ביקשתם ${asked.toLocaleString()}, ומההצעה הזו אפשר לייצר
+         <b>${available.toLocaleString()}</b> לכל היותר ברמה הזו. לא נשלים בחזרות - תקבלו ${available.toLocaleString()}.</div>` : "";
+  const separate = Math.min(n, groups);
+  box.innerHTML = `
+    <div class="res-quote-row">מחיר: ${priceText}</div>
+    <div class="res-quote-row">מתוכן <b>לפחות ${separate.toLocaleString()}</b> צפויות להיספר בנפרד
+      <span class="hint">— הערכה: היועצים המשפטיים של הכנסת מקבצים וריאציות על אותה נקודה לחלופות, והן נספרות כאחת.</span></div>
+    ${short}`;
+  document.getElementById("res-pay-btn").disabled = available === 0;
+}
+
+function renderResAnalysis() {
+  const a = RES.analysis;
+  const out = document.getElementById("res-analysis");
+  const lv = a.levels;
+  const waiting = new Set(lv[RES.level].families_waiting || []);
+  // סעיף ששוחזר או טקסט שלא שויך - **בראש, לא בתחתית** (13948363 איבדה חצי
+  // מעצמה בשקט לפני 19.9). אזהרות טכניות של החילוץ לא מוצגות.
+  const notices = (a.notices || []).length
+    ? `<div class="notice notice-coverage" style="margin-bottom:10px"><b>שימו לב — הקריאה של המסמך אינה ודאית:</b>
+        <ul>${a.notices.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : "";
+  out.innerHTML = `${notices}
+    <div class="research-title">${escapeHtml(a.title || "(שם ההצעה לא זוהה)")}</div>
+    <div class="res-max">כמה הסתייגויות אפשר לייצר מההצעה הזו לכל היותר:
+      ${Object.entries(lv).map(([k, v]) => `<span class="res-max-item${k === RES.level ? " on" : ""}">${escapeHtml(v.label)}: <b>${v.available.toLocaleString()}</b></span>`).join("")}
+    </div>`;
+  const fam = document.getElementById("res-families");
+  if (!fam.dataset.built) {
+    fam.innerHTML = Object.entries(a.families).map(([k, label]) =>
+      `<label class="res-fam"><input type="checkbox" value="${k}" checked> ${escapeHtml(label)}<span class="res-fam-note" data-f="${k}"></span></label>`).join("");
+    fam.addEventListener("change", renderResQuote);
+    fam.dataset.built = "1";
+  }
+  fam.querySelectorAll(".res-fam-note").forEach((el) => {
+    el.textContent = waiting.has(el.dataset.f) ? " — ממתינה לאישור הבנק" : "";
+  });
+  document.getElementById("res-controls").hidden = false;
+  renderResQuote();
+}
+
+async function analyzeReservations(file) {
+  const out = document.getElementById("res-analysis");
+  document.getElementById("res-result").innerHTML = "";
+  document.getElementById("res-controls").hidden = true;
+  RES.analysis = null;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>קורא את ההצעה…</div>`;
+  const form = new FormData();
+  form.append("file", file);
   try {
-    const form = new FormData();
-    form.append("file", file);
     const resp = await fetch("/api/reservations/analyze", { method: "POST", body: form });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה במדידה.")}</div>`;
-      return;
-    }
-    const d = await resp.json();
-    out.innerHTML = `
-      ${extractionWarnings(d)}
-      <div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
-      <div class="res-headline"><b>${d.distinct}</b> עוגנים מובחנים</div>
-      <div class="hint">${d.sections_found} סעיפים נמדדו. "עוגן מובחן" = ערך
-        בהצעה שאפשר לשנות. אין כאן "כמה הסתייגויות אפשר לייצר" - המספר הזה
-        תלוי בתקרה שתבחרו ואינו מדידה של ההצעה.</div>
-      <div class="hint" style="margin-top:8px">מצב האיכות על ההצעה הזו:
-        <b>${d.quality_calls}</b> קריאות למודל (אחת לסעיף),
-        <b>${d.quality_points}</b> נקודות עיגון.</div>
-      <table class="res-table"><thead><tr><th>סעיף</th><th>עוגנים מובחנים</th>
-        <th>הערכים</th></tr></thead><tbody>${resSections(d)}</tbody></table>`;
-  } finally { btn.disabled = false; }
+    const d = await resp.json().catch(() => ({}));
+    if (!resp.ok) { out.innerHTML = `<div class="msg err">${escapeHtml(d.detail || "לא הצלחתי לקרוא את הקובץ.")}</div>`; return; }
+    RES.analysis = d;
+    renderResAnalysis();
+  } catch (e) {
+    out.innerHTML = `<div class="msg err">שגיאת רשת - נסו שוב.</div>`;
+  }
 }
 
-async function generateReservations() {
+function renderResItems(d) {
+  let heading = null;
+  const rows = d.items.map((it) => {
+    const head = it.heading !== heading ? `<div class="res-heading">${escapeHtml(it.heading)}</div>` : "";
+    heading = it.heading;
+    const [first, ...rest] = it.lines;
+    const budget = it.budget ? ` <span class="res-budget" title="סעיף 3ג לחוק-יסוד: משק המדינה - דורש 50 חברי כנסת">עלות תקציבית</span>` : "";
+    return `${head}<div class="res-item"><span class="res-num">${it.number}.</span> ${escapeHtml(first)}${budget}
+      ${rest.map((r) => `<div class="res-quoted">${escapeHtml(r)}</div>`).join("")}</div>`;
+  }).join("");
+  return rows || `<div class="hint">לא נוצרו הסתייגויות.</div>`;
+}
+
+async function generateReservationsDoc() {
   const input = document.getElementById("res-file");
   const out = document.getElementById("res-result");
   const file = input.files && input.files[0];
-  if (!file) { out.innerHTML = `<div class="hint">בחרו קובץ Word תחילה.</div>`; return; }
-  const btn = document.getElementById("res-generate-btn");
+  if (!file || !RES.analysis) return;
+  const btn = document.getElementById("res-pay-btn");
   btn.disabled = true;
+  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>מייצר…</div>`;
+  const form = new FormData();
+  form.append("file", file);
+  form.append("level", RES.level);
+  form.append("families", resFamiliesSelected().join(","));
+  form.append("count", String(Math.max(1, parseInt(document.getElementById("res-count").value, 10) || 1)));
+  form.append("payment", "demo");  // מצב הדגמה - אין פרטי תשלום בשום מקום
   try {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("proposers", document.getElementById("res-proposers").value || "");
     const resp = await fetch("/api/reservations/generate", { method: "POST", body: form });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בהפקה.")}</div>`;
-      return;
-    }
-    const warnCount = parseInt(resp.headers.get("X-Extraction-Warnings") || "0", 10);
-    const blob = await resp.blob();
+    const d = await resp.json().catch(() => ({}));
+    if (!resp.ok) { out.innerHTML = `<div class="msg err">${escapeHtml(d.detail || "שגיאה בייצור.")}</div>`; return; }
+    const blob = new Blob([Uint8Array.from(atob(d.docx_base64), (c) => c.charCodeAt(0))],
+      { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "הסתייגויות.docx"; a.click();
-    URL.revokeObjectURL(url);
-    // הורדה שקטה מסתירה אזהרת חילוץ. אם יש - אומרים, ומפנים למדידה.
-    out.innerHTML = warnCount
-      ? `<div class="notice notice-coverage"><b>המסמך הופק, אבל החילוץ אינו ודאי
-           (${warnCount} אזהרות).</b> לחצו "מדידה" כדי לראות אותן לפני ההגשה.</div>`
-      : `<div class="hint">המסמך הופק.</div>`;
+    const waiting = d.families_waiting.length
+      ? `<div class="hint">ממתינות לאישור הבנק ולכן לא יוצרו: ${d.families_waiting.map(escapeHtml).join(", ")}.</div>` : "";
+    out.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="res-headline"><b>${d.produced.toLocaleString()}</b> הסתייגויות · לפחות ${d.at_least_separate.toLocaleString()} ייספרו בנפרד</div>
+        <a class="btn primary" id="res-download" href="${url}" download="הסתייגויות.docx">הורדת Word</a>
+      </div>
+      ${d.short ? `<div class="notice" style="margin-top:8px">ההצעה מאפשרת ${d.available.toLocaleString()} בלבד ברמה ובמשפחות שנבחרו.</div>` : ""}
+      ${waiting}
+      <div class="res-preview" id="res-preview">${renderResItems(d)}</div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="msg err">שגיאת רשת - נסו שוב.</div>`;
   } finally { btn.disabled = false; }
 }
 
-async function qualityReservations() {
-  const input = document.getElementById("res-file");
-  const out = document.getElementById("res-result");
-  const file = input.files && input.files[0];
-  if (!file) { out.innerHTML = `<div class="hint">בחרו קובץ Word תחילה.</div>`; return; }
-  const btn = document.getElementById("res-quality-btn");
-  const limit = parseInt(document.getElementById("res-quality-limit").value, 10) || 0;
-  btn.disabled = true;
-  out.innerHTML = `<div class="law-loading"><span class="spinner"></span>מנסח…</div>`;
-  try {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("sections_limit", String(limit));
-    const resp = await fetch("/api/reservations/quality", { method: "POST", body: form });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      out.innerHTML = `<div class="msg err">${escapeHtml(err.detail || "שגיאה בניסוח.")}</div>`;
-      return;
-    }
-    const d = await resp.json();
-    const u = d.usage || {};
-    // מה שנחסם אינו מוצג - רק נספר. ראו CLAUDE.md חוק ברזל 7.
-    const blocked = d.blocked_count
-      ? `<div class="hint">${d.blocked_count} ניסוחים נחסמו בשומרים ואינם מוצגים.</div>`
-      : "";
-    out.innerHTML = `
-      ${extractionWarnings(d)}
-      <div class="research-title">${escapeHtml(d.title || "(שם ההצעה לא זוהה)")}</div>
-      <div class="res-headline"><b>${d.passed.length}</b> הסתייגויות מהותיות,
-        מתוך ${d.sections_used} סעיפים</div>
-      ${blocked}
-      <div class="hint">עלות בפועל: ${u.drafting_calls} קריאות ניסוח +
-        ${u.screening_calls} קריאות סינון,
-        ${(u.input_tokens || 0).toLocaleString()} טוקני קלט,
-        ${(u.output_tokens || 0).toLocaleString()} טוקני פלט (${escapeHtml(u.model || "")}).</div>
-      <table class="res-table"><thead><tr><th>סעיף</th><th>ההסתייגות</th>
-        <th>נימוק</th></tr></thead><tbody>${d.passed.map((r) => `
-        <tr><td>${escapeHtml(r.section_number)}</td>
-            <td>${escapeHtml(r.text)}</td>
-            <td>${escapeHtml(r.rationale || "")}</td></tr>`).join("")}</tbody></table>`;
-  } finally { btn.disabled = false; }
-}
-document.getElementById("res-measure-btn").addEventListener("click", measureReservations);
-document.getElementById("res-generate-btn").addEventListener("click", generateReservations);
-document.getElementById("res-quality-btn").addEventListener("click", qualityReservations);
+document.getElementById("res-level").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-level]");
+  if (!b) return;
+  RES.level = b.dataset.level;
+  document.querySelectorAll("#res-level button").forEach((x) => {
+    x.classList.toggle("on", x === b); x.setAttribute("aria-checked", x === b ? "true" : "false");
+  });
+  if (RES.analysis) renderResAnalysis();
+});
+document.getElementById("res-count").addEventListener("input", renderResQuote);
+document.getElementById("res-pay-btn").addEventListener("click", generateReservationsDoc);
+wireDropzone("res-drop", "res-file", "res-pick", "res-name", [".pdf", ".docx"], "PDF או Word (.docx)", analyzeReservations);
 
 /* ── נוסח משולב ─────────────────────────────────────────────────
    מעלים הצעת חוק מתקנת, ורואים את נוסח החוק אחרי שהיא התקבלה.

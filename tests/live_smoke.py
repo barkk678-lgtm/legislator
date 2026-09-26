@@ -159,16 +159,20 @@ def _find_nested_paragraph(node, section=None):
 
 
 
-def _post_file(base, path, file_path):
+def _post_file(base, path, file_path, fields=None):
     """העלאת קובץ ב-multipart. נכתב ביד ולא דרך ספרייה חיצונית -
     הבדיקה החיה רצה ב-CI בלי תלויות מעבר לספריית התקן."""
     boundary = "----legislator-live-smoke"
     name = Path(file_path).name
+    ctype = (b"application/pdf" if name.lower().endswith(".pdf") else
+             b"application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+             for k, v in (fields or {}).items()]
     payload = b"".join([
+        *parts,
         f"--{boundary}\r\n".encode(),
         f'Content-Disposition: form-data; name="file"; filename="{name}"\r\n'.encode(),
-        b"Content-Type: application/vnd.openxmlformats-officedocument."
-        b"wordprocessingml.document\r\n\r\n",
+        b"Content-Type: " + ctype + b"\r\n\r\n",
         Path(file_path).read_bytes(),
         f"\r\n--{boundary}--\r\n".encode(),
     ])
@@ -599,6 +603,39 @@ def journey_contact(base, res):
                   f"HTTP {e.code}")
 
 
+def journey_reservations(base, res):
+    """כלי ההסתייגויות (בנייה מחדש, 26.9): PDF טבריה -> ניתוח (שם, ועדה, מקסימום לכל
+    רמה, תמחור) -> ייצור 20 -> Word תקין, כותרות מיקום, מספור רציף, בלי תשלום."""
+    print("\n[הסתייגויות]")
+    pdf = Path(__file__).resolve().parents[1] / "reference" / "הצעת חוק טבריה.pdf"
+    status, body = _post_file(base, "/api/reservations/analyze", pdf)
+    a = json.loads(body)
+    res.check("ניתוח: שם ההצעה והוועדה מעמוד השער", "הרשויות המקומיות" in a.get("title", "")
+              and a.get("committee") == "ועדת הפנים והגנת הסביבה", f"{a.get('title')!r} {a.get('committee')!r}")
+    levels = a.get("levels", {})
+    res.check("ניתוח: מקסימום לכל אחת משלוש הרמות", set(levels) == {"serious", "clever", "absurd"}
+              and all(v["available"] > 0 for v in levels.values()),
+              str({k: v.get("available") for k, v in levels.items()}))
+    res.check("ניתוח: 50 כלולות, $10 ל-100", a.get("pricing", {}).get("included") == 50
+              and a["pricing"].get("price_per_block_usd") == 10, str(a.get("pricing")))
+    status, body = _post_file(base, "/api/reservations/generate", pdf,
+                              {"level": "serious", "families": "", "count": "20", "payment": ""})
+    g = json.loads(body)
+    items = g.get("items", [])
+    res.check("ייצור: 20 הסתייגויות, בלי תשלום", status == 200 and len(items) == 20 and g.get("price_usd") == 0,
+              f"{len(items)} {g.get('price_usd')}")
+    res.check("ייצור: מספור רציף", [it["number"] for it in items] == list(range(1, 21)))
+    res.check("ייצור: כותרות מיקום", {it["heading"] for it in items} <= {"לסעיף 1", "לסעיף 2", "לסעיף 3", "לאחרי סעיף 3"},
+              str({it["heading"] for it in items}))
+    import base64  # noqa: PLC0415
+    data = base64.b64decode(g.get("docx_base64", ""))
+    problems = structural_problems(data)
+    res.check("ייצור: קובץ Word תקין (docx_check)", data[:2] == b"PK" and not problems, str(problems[:3]))
+    text = zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml").decode()
+    res.check("ייצור: David, ובלי 'קבוצת ... מציעה'", "David" in zipfile.ZipFile(io.BytesIO(data)).read(
+        "word/styles.xml").decode() and "מציעה" not in text)
+
+
 def _rules_stream(base, question):
     """התשובה **המוזרמת** של מומחה התקנון, כפי שהלקוח מקבל אותה:
     (הטקסט שהוזרם, אירוע ה-done)."""
@@ -789,6 +826,7 @@ def main():
     run("נוסח משולב", journey_merged_text, base, res)
     run("דף הבית", journey_home, base, res)
     run("יצירת קשר", journey_contact, base, res)
+    run("הסתייגויות", journey_reservations, base, res)
     if args.with_llm:
         run("כלי הצ'אט", journey_chat, base, res)
         run("מומחה התקנון - מקורות", journey_rules_citations, base, res)

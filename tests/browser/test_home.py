@@ -7,6 +7,7 @@
 --send שולח פנייה אמיתית (מסומנת "[בדיקה חיה]") - נשמרת בטבלה.
 """
 import json
+import os
 import sys
 import time
 
@@ -39,7 +40,14 @@ def main() -> int:
         results.append((name, bool(ok), info))
 
     with sync_playwright() as p:
-        b = p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
+        # מול האתר החי מתוך סביבת הסוכן: PW_PROXY (ה-HTTPS_PROXY) ו-PW_TRUST_SPKI -
+        # טביעת המפתח של ה-CA של הפרוקסי בלבד (לא ביטול בדיקת תעודות)
+        kw = {"executable_path": "/opt/pw-browsers/chromium"}
+        if os.environ.get("PW_PROXY"):
+            kw["proxy"] = {"server": os.environ["PW_PROXY"]}
+        if os.environ.get("PW_TRUST_SPKI"):
+            kw["args"] = [f"--ignore-certificate-errors-spki-list={os.environ['PW_TRUST_SPKI']}"]
+        b = p.chromium.launch(**kw)
         errors = []
 
         def page_for(view=None, seed=None):

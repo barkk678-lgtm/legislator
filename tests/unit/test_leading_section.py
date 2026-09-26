@@ -3,7 +3,7 @@
 **הדפוס שזה מתקן, ולמה הוא המסוכן ביותר** (2026-09-19): בהצעות
 אמיתיות מהכנסת, **סעיף 1 הוא לעתים היחיד שממוספר אוטומטית
 ב-Word** (`w:numPr`) - Word מצייר "1." בתצוגה, ובקובץ אין לזה
-טקסט. הגרסה הקודמת של `_reservation_sections` פתחה סעיף רק
+טקסט. הגרסה הקודמת של `_reservation_sections` (היום: bill_input._read_docx) פתחה סעיף רק
 כשהיה `line.number`, ולכן כל מה שקדם לסעיף הממוספר הראשון נעלם.
 
 והסעיף שנעלם הוא בדיוק זה שמגדיר "(להלן - החוק העיקרי)", שכל
@@ -47,13 +47,13 @@ def main() -> int:
     # 13948363: 2 סעיפים בהצעה. לפני התיקון נתפס 1.
     d = _analyze(api, "13948363")
     recovered = [w for w in d["warnings"] if w.startswith("סעיף 1")]
-    checks.append(("13948363: שני הסעיפים נתפסים (היה 1)", d["sections_found"] == 2))
+    checks.append(("13948363: שני הסעיפים נתפסים (היה 1)", len(d["sections"]) == 2))
     checks.append(("13948363: השחזור מדווח באזהרה ולא בשקט", len(recovered) == 1))
     checks.append(("13948363: האזהרה אומרת לוודא", "ודאו" in recovered[0]))
 
     # 13948394: 5 סעיפים. לפני התיקון נתפסו 4.
     d = _analyze(api, "13948394")
-    checks.append(("13948394: חמישה סעיפים (היו 4)", d["sections_found"] == 5))
+    checks.append(("13948394: חמישה סעיפים (היו 4)", len(d["sections"]) == 5))
     checks.append(("13948394: אזהרת שחזור קיימת",
                    any(w.startswith("סעיף 1") for w in d["warnings"])))
 
@@ -68,29 +68,23 @@ def main() -> int:
     loud = [w for w in d["warnings"] if w.startswith("נמצא טקסט")]
     checks.append(("טקסט שלא ניתן לשייך -> אזהרה רועשת", len(loud) == 1))
     checks.append(("האזהרה מצטטת את הטקסט עצמו", "פרק א" in loud[0]))
-    checks.append(("41 הסעיפים לא נפגעו", d["sections_found"] == 41))
+    checks.append(("41 הסעיפים לא נפגעו", len(d["sections"]) == 41))
 
-    # **האזהרה חייבת להגיע ללקוח, לא רק ל-warnings בקוד** (ברק):
-    # הצעה שחצי ממנה נעלמה היא בדיוק מה שהמשתמש צריך לדעת עליו.
+    # **האזהרה חייבת להגיע ללקוח, לא רק ל-warnings בקוד** (ברק): הצעה שחצי ממנה
+    # נעלמה היא בדיוק מה שהמשתמש צריך לדעת עליו. אחרי הבנייה מחדש (26.9) - בשדה
+    # notices, בניתוח ובייצור, והממשק מציג אותו בראש התוצאה.
+    d = _analyze(api, "13948363")
+    checks.append(("הניתוח מחזיר את האזהרה ב-notices",
+                   any(w.startswith("סעיף 1") for w in d.get("notices", []))))
     data = (FIX / "13948363.docx").read_bytes()
-    q = api.post("/api/reservations/quality",
-                 files={"file": ("b.docx", data, _TYPE)},
-                 data={"sections_limit": "1"})
-    checks.append(("מצב איכות מחזיר warnings ללקוח (גם בלי מפתח -> 503)",
-                   q.status_code == 503 or "warnings" in q.json()))
     g = api.post("/api/reservations/generate",
-                 files={"file": ("b.docx", data, _TYPE)})
-    checks.append(("הורדת Word מחזירה את מספר האזהרות בכותרת",
-                   g.headers.get("X-Extraction-Warnings") == "1"))
-
-    # ה-JS מרנדר אותן בשתי הלשוניות
+                 files={"file": ("b.docx", data, _TYPE)}, data={"count": "5"}).json()
+    checks.append(("הייצור מחזיר את האזהרה ב-notices",
+                   any(w.startswith("סעיף 1") for w in g.get("notices", []))))
+    checks.append(("אזהרות טכניות של החילוץ לא מוצגות למשתמש",
+                   not any("טבלה שטוחה" in w for w in d.get("notices", []))))
     js = (ROOT / "apps" / "api" / "static" / "app.js").read_text(encoding="utf-8")
-    checks.append(("app.js: extractionWarnings קיימת",
-                   "function extractionWarnings(" in js))
-    checks.append(("app.js: מוצגת במדידה ובמצב איכות",
-                   js.count("${extractionWarnings(d)}") == 2))
-    checks.append(("app.js: הורדה שקטה מדווחת על אזהרות",
-                   "X-Extraction-Warnings" in js))
+    checks.append(("app.js: ה-notices מוצגים בראש הניתוח", "a.notices" in js))
 
     ok = all(passed for _, passed in checks)
     for name, passed in checks:

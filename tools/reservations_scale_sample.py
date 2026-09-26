@@ -58,6 +58,16 @@ def _row_at(client: httpx.Client, skip: int) -> dict | None:
     return values[0] if values else None
 
 
+def _row_by_id(client: httpx.Client, doc_id: str) -> dict | None:
+    resp = client.get(f"{odata.BASE_URL}/KNS_DocumentBill",
+                      params={"$filter": f"Id eq {int(doc_id)}", "$select": "Id,BillID,FilePath"})
+    if resp.status_code != 200:
+        print(f"   OData: HTTP {resp.status_code} (Id={doc_id})", flush=True)
+        return None
+    values = resp.json().get("value", [])
+    return values[0] if values else None
+
+
 def download(client: httpx.Client, url: str, dest: Path, delay: float) -> str:
     for attempt in range(2):
         try:
@@ -86,12 +96,18 @@ def main() -> int:
     ap.add_argument("--delay", type=float, default=8.0)
     ap.add_argument("--work", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--ids", default="", help="מזהי מסמך (Id) מופרדים בפסיקים - במקום מדגם; לאבחון")
     args = ap.parse_args()
     args.work.mkdir(parents=True, exist_ok=True)
 
-    total_docs = odata.count("KNS_DocumentBill", filter=FILTER)
-    print(f"{total_docs} נוסחים לקריאה שנייה ושלישית (PDF) ב-OData", flush=True)
-    offsets = [int(i * total_docs / args.n) for i in range(args.n)]
+    ids = [i.strip() for i in args.ids.split(",") if i.strip().isdigit()]
+    if ids:
+        offsets = ids
+        print(f"אבחון: {len(ids)} מסמכים לפי מזהה", flush=True)
+    else:
+        total_docs = odata.count("KNS_DocumentBill", filter=FILTER)
+        print(f"{total_docs} נוסחים לקריאה שנייה ושלישית (PDF) ב-OData", flush=True)
+        offsets = [int(i * total_docs / args.n) for i in range(args.n)]
     downloads: dict[str, str] = {}
     blocked_in_row = 0
     with httpx.Client(timeout=90.0, headers=UA, follow_redirects=True) as client, \
@@ -99,7 +115,7 @@ def main() -> int:
         for i, skip in enumerate(offsets, 1):
             if i > 1:
                 time.sleep(args.delay + random.uniform(0, args.delay / 2))
-            row = _row_at(feed, skip)
+            row = _row_by_id(feed, skip) if ids else _row_at(feed, skip)
             if row is None or not _url(row).startswith("https://fs.knesset.gov.il/"):
                 downloads[f"skip{skip}"] = "no row"
                 continue
@@ -122,7 +138,7 @@ def main() -> int:
     rows = offsets
 
     # 4. המדידה
-    summaries, quotes = [], []
+    summaries, quotes, diagnoses = [], [], []
     for pdf in sorted(args.work.glob("*.pdf")):
         try:
             qs, summary = quote_check.check(pdf)
@@ -131,6 +147,10 @@ def main() -> int:
             continue
         summaries.append(summary)
         quotes += [q.__dict__ for q in qs]
+        try:
+            diagnoses += quote_check.diagnose(pdf, qs)
+        except Exception as exc:  # noqa: BLE001
+            print(f"  אבחון נכשל ב-{pdf.name}: {type(exc).__name__}: {exc}"[:200])
 
     counts = Counter(q["result"] for q in quotes)
     total = len(quotes)
@@ -155,7 +175,15 @@ def main() -> int:
     for q in [q for q in quotes if q["result"] in ("missing", "section_only")][:150]:
         print(f"  {q['file']} #{q['reservation']} [{q['result']}] {q['heading']} {q['unit'] or '-'} {q['kind']}: {q['phrase'][:120]}")
     print(f"\nבלי סעיפים: {no_sections[:40]}")
-    args.out.write_text(json.dumps({"downloads": downloads, "summaries": summaries, "quotes": quotes},
+    print("\n── אבחון הכשלים ──")
+    print("לפי סוג:", dict(Counter(d["diagnosis"] for d in diagnoses)))
+    by_file = Counter((d["file"], d["diagnosis"]) for d in diagnoses)
+    for (f, kind), n in sorted(by_file.items()):
+        print(f"  {f}: {kind} x{n}")
+    for d in diagnoses[:200]:
+        print(f"  {d['file']} #{d['reservation']} [{d['diagnosis']} {d['ratio']}] {d['phrase'][:70]!r} ~ {d['closest'][:90]!r}")
+    args.out.write_text(json.dumps({"downloads": downloads, "summaries": summaries, "quotes": quotes,
+                                    "diagnoses": diagnoses},
                                    ensure_ascii=False, indent=1), encoding="utf-8")
     return 0
 

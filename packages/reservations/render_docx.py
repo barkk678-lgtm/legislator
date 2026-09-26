@@ -1,105 +1,96 @@
-"""רינדור מסמך הסתייגויות ל-Word.
+"""פלט Word של ההסתייגויות (הסתייגויות 5, 26.9).
 
-**זו אינה תבנית החקיקה.** מסמך הסתייגויות הוא מסמך אחר לגמרי, עם
-כותרות היררכיות ורשימה - לא טבלה בת ארבע עמודות. הפריסה משוחזרת
-מהמסמך שהונח בכנסת ב-16.6.2020
-(`tests/fixtures/reservations/573919.docx`):
+ההנחיות של ברק:
+- **David 12, מיושר לשני הצדדים.** בלי עיצוב מעבר לזה.
+- כותרת: שם ההצעה.
+- **כותרות מיקום, כמו בטבריה:** "לפני סעיף 1", "לסעיף 1", "לאחרי סעיף 1" -
+  בלעדיהן "בפסקה (2)" לא אומר כלום.
+- **כל הסתייגות במספר, ברצף אחד** על פני כל הכותרות - 1, 2, 3... **בלי חלופות
+  באותיות** (הקיבוץ לחלופות הוא עבודה של היועצים המשפטיים).
+- **בלי השורה "קבוצת X מציעה:".**
+- עובר את בודק המבנה (packages/render/docx_check) - בלי אזהרה בפתיחה.
 
-    Heading 1       הסתייגויות ובקשות רשות דיבור
-    Heading 2       הסתייגויות
-    Heading 3       לסעיף <N>
-    Normal          חברי הכנסת <שמות> מציעים:
-    List Paragraph  <הסתייגות>
-    ...
-    Heading 2       בקשות רשות דיבור
-
-**המקרה הריק** (drafting-rules.md §9.2): גם כשאין הסתייגויות,
-המקטע קיים ונושא נוסח מפורש - "אין הסתייגויות". נלמד משני נוסחים
-נוספים משנים 2012 ו-2014, ששניהם ריקים. רנדרר שמשמיט את המקטע
-כשהרשימה ריקה מפיק מסמך שאינו תואם לפרקטיקה.
-
-**הסדר מחייב** ואינו עניין של נוחות: תקנון הכנסת קובע שהסתייגויות
-מנומקות "לגבי כל סעיף של הצעת החוק בנפרד, לפי הסדר שבו נרשמו
-בנוסח שהונח על שולחן הכנסת".
+המספור נכתב כטקסט ("1. ") ולא כרשימה אוטומטית של Word: מספור אוטומטי מתאפס
+או משתבש כשמעתיקים קטעים, והמספר הוא חלק מההסתייגות (ההצבעה היא לפי מספר).
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+import io
+import re
 
-from model import DraftedReservation, Reservation
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Pt
 
-EMPTY_NOTICE = "אין הסתייגויות"
-_H1 = "הסתייגויות ובקשות רשות דיבור"
-_H2_RESERVATIONS = "הסתייגויות"
-_H2_SPEAKING = "בקשות רשות דיבור"
-
-
-def _proposers_line(names: list[str]) -> str:
-    """שורת המציעים, בדיוק בצורה שנצפתה במסמך שהונח:
-    "חברי הכנסת נפתלי בנט, אילת שקד, בצלאל סמוטריץ', מתן כהנא ואופיר סופר מציעים:"
-
-    ו' החיבור **צמודה לשם ובלי מקף** ("ואופיר"), בניגוד לכותרת
-    "הוספת סעיפים 2ג ו־2ד" שבה כן מופיע מקף עברי (U+05BE). שתי
-    מוסכמות שונות, שתיהן נצפו במסמכים אמיתיים - לא להאחיד ביניהן."""
-    if not names:
-        return "מציעים:"
-    prefix = "חבר/ת הכנסת" if len(names) == 1 else "חברי הכנסת"
-    joined = names[0] if len(names) == 1 else ", ".join(names[:-1]) + f" ו{names[-1]}"
-    return f"{prefix} {joined} מציעים:"
+FONT = "David"
+SIZE = Pt(12)
 
 
-def _bill_reference(bill_title: str) -> str:
-    """"להצעת חוק X" - ולא "להצעת הצעת חוק X". שם ההצעה מגיע לפעמים
-    עם התחילית "הצעת" ולפעמים בלעדיה."""
-    title = bill_title.strip()
-    if title.startswith("הצעת "):
-        title = title[len("הצעת "):]
-    return f"להצעת {title}"
+_CONTROL = re.compile(r"[\x00-\x08\x0c\x0e-\x1f]")
 
 
+def _xml_safe(text: str) -> str:
+    """ירידת שורה ידנית של Word (\x0b) - רווח; שאר תווי הבקרה - נמחקים. בלעדיהם
+    python-docx קורס (ValueError), ו-XML 1.0 אוסר אותם (tests/unit/test_docx_structure.py)."""
+    return _CONTROL.sub("", text.replace("\x0b", " ").replace("\x07", ""))
 
-def build_document(
-    *,
-    bill_title: str,
-    reservations: list[Reservation | DraftedReservation],
-    proposers: list[str],
-    speaking_requests: list[str] | None = None,
-    budget_flags: dict[int, str] | None = None,
-):
-    """בונה מסמך python-docx. הסתייגויות מקובצות לפי סעיף, **בסדר
-    שבו הן התקבלו** - הפונקציה אינה ממיינת מחדש."""
-    import docx  # noqa: PLC0415
 
-    budget_flags = budget_flags or {}
-    doc = docx.Document()
-    doc.add_heading(_H1, level=1)
-    doc.add_paragraph(_bill_reference(bill_title))
-    doc.add_heading(_H2_RESERVATIONS, level=2)
+def _rtl_paragraph(doc, text: str):
+    text = _xml_safe(text)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    ppr = p._p.get_or_add_pPr()
+    ppr.insert(0, OxmlElement("w:bidi"))
+    run = p.add_run(text)
+    run._r.get_or_add_rPr().append(OxmlElement("w:rtl"))
+    return p
 
-    if not reservations:
-        # ראו docstring: המקטע קיים גם כשהוא ריק.
-        doc.add_paragraph(EMPTY_NOTICE)
-    else:
-        current_section = object()
-        for index, item in enumerate(reservations):
-            if item.section_number != current_section:
-                current_section = item.section_number
-                doc.add_heading(f"לסעיף {current_section}", level=3)
-                doc.add_paragraph(_proposers_line(proposers))
-            text = item.text
-            if index in budget_flags:
-                text = f"{text}  [עלות תקציבית — {budget_flags[index]}]"
-            doc.add_paragraph(text, style="List Paragraph")
 
-    doc.add_heading(_H2_SPEAKING, level=2)
-    for name in speaking_requests or []:
-        doc.add_paragraph(name)
-    if not speaking_requests:
-        doc.add_paragraph("להצעת החוק לא הוגשו בקשות רשות דיבור.")
+def _set_default_font(doc) -> None:
+    style = doc.styles["Normal"]
+    style.font.name = FONT
+    style.font.size = SIZE
+    rpr = style.element.get_or_add_rPr()
+    fonts = rpr.find(qn("w:rFonts"))
+    if fonts is None:
+        fonts = OxmlElement("w:rFonts")
+        rpr.insert(0, fonts)
+    for attr in ("w:ascii", "w:hAnsi", "w:cs", "w:eastAsia"):
+        fonts.set(qn(attr), FONT)
+    szcs = OxmlElement("w:szCs")
+    szcs.set(qn("w:val"), str(int(SIZE.pt * 2)))
+    rpr.append(szcs)
+    lang = OxmlElement("w:lang")
+    lang.set(qn("w:bidi"), "he-IL")
+    rpr.append(lang)
+
+
+def build_document(*, bill_title: str, items: list) -> Document:
+    """items: families.Item (או כל אובייקט עם heading ו-lines), בסדר המסמך."""
+    doc = Document()
+    _set_default_font(doc)
+    _rtl_paragraph(doc, bill_title or "הצעת חוק")
+    current = None
+    for number, item in enumerate(items, 1):
+        if item.heading != current:
+            current = item.heading
+            _rtl_paragraph(doc, current)
+        first, *rest = item.lines
+        _rtl_paragraph(doc, f"{number}. {first}")
+        for line in rest:
+            _rtl_paragraph(doc, line)
+    if not items:
+        _rtl_paragraph(doc, "אין הסתייגויות")
     return doc
 
 
-def write_docx(out: Path, **kwargs) -> Path:
-    build_document(**kwargs).save(str(out))
-    return out
+def docx_bytes(*, bill_title: str, items: list) -> bytes:
+    buf = io.BytesIO()
+    build_document(bill_title=bill_title, items=items).save(buf)
+    return buf.getvalue()
+
+
+__all__ = ["build_document", "docx_bytes"]

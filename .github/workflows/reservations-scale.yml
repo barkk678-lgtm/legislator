@@ -13,6 +13,9 @@ on:
       delay:
         description: "שניות בין הורדות"
         default: "8"
+      ids:
+        description: "מזהי מסמך מופרדים בפסיקים (אבחון) - במקום מדגם"
+        default: ""
 
 jobs:
   scale:
@@ -26,7 +29,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: מדגם ומדידה
         run: |
-          python3 tools/reservations_scale_sample.py --n "${{ inputs.n }}" --delay "${{ inputs.delay }}" \
+          python3 tools/reservations_scale_sample.py --n "${{ inputs.n }}" --delay "${{ inputs.delay }}" --ids "${{ inputs.ids }}" \
             --work "$RUNNER_TEMP/sample" --out "$RUNNER_TEMP/results.json"
       - uses: actions/upload-artifact@v4
         if: always()
