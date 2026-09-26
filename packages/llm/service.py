@@ -28,8 +28,10 @@ import re
 from dataclasses import dataclass
 
 from client import (  # noqa: F401 (re-exported)
+    UNAVAILABLE_MESSAGE,
     LLMConfigError,
     LLMRequestError,
+    ModelUnavailable,
     RawCompletion,
     complete,
     complete_stream,

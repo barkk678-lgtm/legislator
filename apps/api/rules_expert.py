@@ -39,6 +39,7 @@ from service import (  # noqa: E402
     LLMConfigError,
     LLMRequestError,
     LLMResult,
+    ModelUnavailable,
     SourceChunk,
     answer_with_sources,
     answer_with_sources_stream,
@@ -368,6 +369,10 @@ class RulesExpertError(Exception):
     main.py, לא צריך להכיר את LLMConfigError/LLMRequestError הפנימיים."""
 
 
+class RulesUnavailable(ModelUnavailable, RulesExpertError):
+    """המודל לא זמין: str() - ההודעה בעברית למשתמש; reason - הסיבה, ל-chat_log."""
+
+
 def source_labels(source_ids: list[str]) -> list[str]:
     """מזהה פנימי (law-2000325/12) -> שם קריא בעברית ("חוק הכנסת,
     סעיף 12"). התווית כבר נבנית ב-_load_sources; כאן רק מחפשים
@@ -385,7 +390,7 @@ def ask(question: str) -> LLMResult:
                                    extra_instructions=_EXTRA_INSTRUCTIONS,
                                    max_tokens=_MAX_TOKENS)
     except (LLMConfigError, LLMRequestError) as e:
-        raise RulesExpertError(f"שכבת ה-LLM לא זמינה: {e}") from None
+        raise RulesUnavailable(reason=str(e)) from None
 
 
 def ask_stream(question: str):
@@ -397,4 +402,4 @@ def ask_stream(question: str):
             question=question, sources=sources(),
             extra_instructions=_EXTRA_INSTRUCTIONS, max_tokens=_MAX_TOKENS)
     except (LLMConfigError, LLMRequestError) as e:
-        raise RulesExpertError(f"שכבת ה-LLM לא זמינה: {e}") from None
+        raise RulesUnavailable(reason=str(e)) from None

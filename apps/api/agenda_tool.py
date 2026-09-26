@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "llm"))
-from service import LLMConfigError, LLMRequestError, draft, draft_conversation  # noqa: E402
+from service import LLMConfigError, LLMRequestError, ModelUnavailable, draft, draft_conversation  # noqa: E402
 from query_tool import _normalize_for_support, unsupported_source_claims  # noqa: E402
 
 # ס3 (26.9.2026): **המבנה של הטופס שהכנסת עצמה משתמשת בו** (reference/הצעה
@@ -58,6 +58,10 @@ AGENDA_KINDS = ("דחופה", "רגילה")
 
 class AgendaDraftError(Exception):
     """שכבת אפליקציה - LLM לא זמין/נכשל, או המודל דיווח שאי אפשר לנסח."""
+
+
+class AgendaUnavailable(ModelUnavailable, AgendaDraftError):
+    """המודל לא זמין: str() - ההודעה בעברית למשתמש; reason - הסיבה, ל-chat_log."""
 
 
 # ── ס5 (ברק, 26.9): השומר נגד פרט חדש - אותו שומר כמו בשאילתות ──────
@@ -131,7 +135,7 @@ def draft_agenda(*, topic_description: str, mk_name: str, kind: str = "דחופ�
     try:
         raw = draft(instructions=_INSTRUCTIONS, content=topic_description, max_tokens=700)
     except (LLMConfigError, LLMRequestError) as e:
-        raise AgendaDraftError(f"שכבת ה-LLM לא זמינה: {e}") from None
+        raise AgendaUnavailable(reason=str(e)) from None
 
     if raw.startswith("לא ניתן לנסח הצעה לסדר"):
         raise AgendaDraftError(raw)

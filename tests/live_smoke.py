@@ -10,7 +10,8 @@
 **כל בדיקה עוברת מסלול שמשתמש אמיתי עובר**, לא endpoint לשם
 endpoint.
 
-**עלות:** ברירת המחדל מריצה רק מה שלא עולה כסף. `--with-llm`
+**עלות:** ברירת המחדל מריצה רק מה שלא עולה כסף - **חוץ מבקשה קצרה אחת שמוודאת שהמודל
+עונה** (journey_model_alive; מודל שלא עונה - אדום). `--with-llm`
 מוסיף את כלי הצ'אט, שכל קריאה שלהם היא קריאה בתשלום. הריצה
 היומית מפעילה את המלא; ריצה על כל פריסה מפעילה את החינמי.
 
@@ -663,6 +664,31 @@ def journey_reservations(base, res):
     res.check("ייצור: עמוד A4 (11906×16838)", sizes == [("11906", "16838")], str(sizes))
 
 
+def journey_model_alive(base, res):
+    """**המודל עונה** - בכל ריצה, גם בלי --with-llm (סבב הסגירה של ההסתייגויות, 26.9.2026).
+
+    נמצא באתר החי: חשבון Anthropic התרוקן, כל כלי הצ'אט החזירו שגיאה - והבדיקה החיה
+    הראתה "הכול עבר", כי כלי ה-LLM רצו רק עם --with-llm. עכשיו: בקשה קצרה אחת במסלול של
+    משתמש אמיתי - "שלום" בהצעה לסדר (סיווג קצר במודל הקטן + תשובת חולין קצרה; בלי מאגר
+    התקנון, זול). **מודל שלא עונה - אדום, לא "לא נבדק"**: הסיווג נופל ל"עניינית", הניסוח
+    נכשל, וחוזר 503 - וכל תשובה שאינה חולין נספרת כאן ככשל."""
+    print("\n[המודל עונה]")
+    req = urllib.request.Request(
+        base + "/api/agenda/draft",
+        data=json.dumps({"topic_description": "שלום", "mk_name": "בדיקה", "kind": "רגילה"}).encode(),
+        headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            status, body = r.status, json.loads(r.read())
+    except urllib.error.HTTPError as e:            # 503 - המודל לא זמין: אדום
+        detail = e.read().decode("utf-8", "replace")[:160]
+        res.check("המודל עונה (בקשה קצרה אחת)", False, f"HTTP {e.code}: {detail}")
+        return
+    reply = (body.get("chat_reply") or "").strip()
+    res.check("המודל עונה (בקשה קצרה אחת)", status == 200 and body.get("chat_kind") == "chitchat" and reply,
+              f"{status} {body.get('chat_kind')!r} {reply[:60]!r}")
+
+
 def _rules_stream(base, question):
     """התשובה **המוזרמת** של מומחה התקנון, כפי שהלקוח מקבל אותה:
     (הטקסט שהוזרם, אירוע ה-done)."""
@@ -854,6 +880,7 @@ def main():
     run("דף הבית", journey_home, base, res)
     run("יצירת קשר", journey_contact, base, res)
     run("הסתייגויות", journey_reservations, base, res)
+    journey_model_alive(base, res)          # תמיד, ומחוץ ל-run: מודל שלא עונה - אדום, לא "לא נבדק"
     if args.with_llm:
         run("כלי הצ'אט", journey_chat, base, res)
         run("מומחה התקנון - מקורות", journey_rules_citations, base, res)

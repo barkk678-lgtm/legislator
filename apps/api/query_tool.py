@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "rende
 from service import (  # noqa: E402
     LLMConfigError,
     LLMRequestError,
+    ModelUnavailable,
     draft,
     draft_conversation,
 )
@@ -249,6 +250,10 @@ class QueryDraftError(Exception):
     """שכבת אפליקציה - LLM לא זמין/נכשל, או המודל דיווח שאי אפשר לנסח."""
 
 
+class QueryUnavailable(ModelUnavailable, QueryDraftError):
+    """המודל לא זמין: str() - ההודעה בעברית למשתמש; reason - הסיבה, ל-chat_log."""
+
+
 def _instructions(kind: QueryKind) -> str:
     limit = _WORD_LIMITS[kind]
     word_limit_instruction = (
@@ -349,7 +354,7 @@ def _draft_query_once(*, turns: list[dict], kind: QueryKind, minister: str, mk_n
     try:
         raw = draft_conversation(instructions=_instructions(kind), turns=turns, max_tokens=400)
     except (LLMConfigError, LLMRequestError) as e:
-        raise QueryDraftError(f"שכבת ה-LLM לא זמינה: {e}") from None
+        raise QueryUnavailable(reason=str(e)) from None
     except ValueError as e:
         raise QueryDraftError(str(e)) from None
 

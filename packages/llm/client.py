@@ -51,6 +51,22 @@ class LLMRequestError(Exception):
     """כשל רשת/HTTP אחרי מיצוי הניסיונות, או תשובה לא-תקינה מה-API."""
 
 
+# **מה המשתמש רואה כשהמודל לא זמין** - קרדיט שנגמר, מגבלת קצב, שירות שנפל, מפתח חסר
+# (סבב הסגירה של ההסתייגויות, ברק 26.9.2026). נמצא באתר החי: כשהחשבון התרוקן, המשתמש
+# קיבל את שגיאת ה-API הגולמית ("HTTP 400 מ-Anthropic: {...credit balance...}"). הסיבה
+# הטכנית לא נעלמת - היא נרשמת ב-chat_log כ-error; היא רק לא מגיעה למסך.
+UNAVAILABLE_MESSAGE = "השירות אינו זמין כרגע, נסו שוב בעוד כמה דקות"
+
+
+class ModelUnavailable(Exception):
+    """מה שכלי זורק כשהמודל לא זמין: str() - ההודעה למשתמש; reason - הסיבה הטכנית
+    (ל-chat_log בלבד). הכלים (שאילתה, הצעה לסדר, מומחה התקנון) יורשים ממנה."""
+
+    def __init__(self, message: str = UNAVAILABLE_MESSAGE, *, reason: str = ""):
+        super().__init__(message)
+        self.reason = reason or message
+
+
 @dataclass
 class RawCompletion:
     text: str

@@ -13,6 +13,7 @@ uvicorn main:app --reload - ואז http://127.0.0.1:8000/
 
 import dataclasses
 import json
+import logging
 import io
 import sys
 import tempfile
@@ -75,7 +76,7 @@ from rules_expert import (  # noqa: E402
     humanize_citations as rules_humanize_citations,
     CitationHumanizer as RulesCitationHumanizer,
 )
-from service import LLMConfigError, LLMRequestError  # noqa: E402
+from service import UNAVAILABLE_MESSAGE, LLMConfigError, LLMRequestError, ModelUnavailable  # noqa: E402
 from chat_layer import (  # noqa: E402 - ת4+ת5: שכבה משותפת לכל הצ'אטבוטים
     chitchat_reply as chat_chitchat_reply,
     chitchat_reply_stream as chat_chitchat_reply_stream,
@@ -179,10 +180,18 @@ def api_contact(req: ContactRequest, request: Request,
 # כולל כאלה שייכתבו אחר כך. **ההודעה מכילה שם משתנה בלבד ולעולם
 # לא ערך** - ראו packages/config/env_file.py.
 @app.exception_handler(MissingSecret)
-@app.exception_handler(LLMConfigError)
 @app.exception_handler(EmbeddingConfigError)
 async def _config_error_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@app.exception_handler(LLMConfigError)
+@app.exception_handler(LLMRequestError)
+async def _model_unavailable_handler(request: Request, exc: Exception) -> JSONResponse:
+    """המודל לא זמין (מפתח חסר, קרדיט, מגבלת קצב, שירות שנפל) - הודעה בעברית; הסיבה ביומן
+    (סבב הסגירה של ההסתייגויות, 26.9.2026)."""
+    logging.getLogger(__name__).warning("המודל לא זמין (%s): %s", request.url.path, exc)
+    return JSONResponse(status_code=503, content={"detail": UNAVAILABLE_MESSAGE})
 
 
 @app.get("/api/laws")
@@ -489,7 +498,8 @@ async def api_summarize_document(file: UploadFile = File(...)) -> dict:
     try:
         summary = summarize_bill(bill)
     except (LLMConfigError, LLMRequestError) as e:
-        raise HTTPException(503, f"שירות ה-LLM אינו זמין: {e}")
+        logging.getLogger(__name__).warning("תקציר ההצעה - המודל לא זמין: %s", e)
+        raise HTTPException(503, UNAVAILABLE_MESSAGE) from None
 
     return {
         "summary": summary.text,
@@ -1056,7 +1066,11 @@ def api_query_draft(req: QueryDraftRequestIn, background: BackgroundTasks,
                              minister=req.minister, mk_name=req.mk_name,
                              fit_limit=req.fit_limit)
     except QueryDraftError as e:
-        # 422 - FastAPI לא מריץ BackgroundTasks כשנזרקת שגיאה; לכן ישירות
+        # 422 - FastAPI לא מריץ BackgroundTasks כשנזרקת שגיאה; לכן ישירות. המודל לא זמין -
+        # 503, המשתמש רואה עברית, והסיבה הטכנית נרשמת (kind=error)
+        if isinstance(e, ModelUnavailable):
+            chat_log.log_turn(**log, reply=e.reason, kind="error", meta={"kind": req.kind})
+            raise HTTPException(503, str(e)) from None
         chat_log.log_turn(**log, reply=str(e), kind=chat_log.draft_error_kind(str(e)),
                           meta={"kind": req.kind})
         raise HTTPException(422, str(e))
@@ -1115,6 +1129,9 @@ def api_agenda_draft(req: AgendaDraftRequestIn, background: BackgroundTasks,
         result = draft_agenda(topic_description=req.topic_description, mk_name=req.mk_name,
                               kind=req.kind)
     except AgendaDraftError as e:
+        if isinstance(e, ModelUnavailable):
+            chat_log.log_turn(**log, reply=e.reason, kind="error")
+            raise HTTPException(503, str(e)) from None
         chat_log.log_turn(**log, reply=str(e), kind=chat_log.draft_error_kind(str(e)))
         raise HTTPException(422, str(e))
     _log_later(background, **log, kind="substantive", meta={"kind": req.kind},
@@ -1160,7 +1177,7 @@ def api_rules_ask(req: RulesAskRequestIn) -> dict:
     try:
         result = rules_expert_ask(req.question)
     except RulesExpertError as e:
-        raise HTTPException(503, str(e))
+        raise HTTPException(503, str(e)) from None
     return {
         # ת2: "[מקור:law-...]" -> "(תקנון הכנסת, סעיף 52)" גם כאן, לא רק בזרם
         "text": rules_humanize_citations(result.text),
@@ -1249,7 +1266,7 @@ def api_rules_ask_stream(req: RulesAskRequestIn,
                                             "refusal_reason": piece.refusal_reason})
         except RulesExpertError as e:
             yield json.dumps({"error": str(e)}, ensure_ascii=False) + "\n"
-            chat_log.log_turn(**log, reply=str(e), kind="error")
+            chat_log.log_turn(**log, reply=getattr(e, "reason", str(e)), kind="error")
 
     return StreamingResponse(events(), media_type="application/x-ndjson",
                              headers={"X-Accel-Buffering": "no",

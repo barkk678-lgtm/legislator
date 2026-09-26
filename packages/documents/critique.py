@@ -257,7 +257,13 @@ def critique_bill(extracted, *, draft_fn=None, sections_fn=None) -> BillCritique
         )
         explanations = _parse_explanations(raw, [f.check_number for f in problems])
     except Exception as exc:  # noqa: BLE001 - ראו ה-docstring: הממצאים שורדים
-        critique.explain_error = f"{type(exc).__name__}: {exc}"
+        # המודל לא זמין - המשתמש רואה עברית, לא שגיאת API (סבב הסגירה, 26.9.2026)
+        if type(exc).__name__ in ("LLMRequestError", "LLMConfigError"):
+            sys.path.insert(0, str(_PKGS / "llm"))
+            from client import UNAVAILABLE_MESSAGE  # noqa: PLC0415
+            critique.explain_error = UNAVAILABLE_MESSAGE
+        else:
+            critique.explain_error = f"{type(exc).__name__}: {exc}"
         return critique
 
     by_number = {f.check_number: f for f in problems}
