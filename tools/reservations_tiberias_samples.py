@@ -26,7 +26,7 @@ from pdf_bill import parse_bill_pdf  # noqa: E402
 
 PDF = ROOT / "reference" / "הצעת חוק טבריה.pdf"
 OUT = ROOT / "docs" / "reservations-samples"
-LEVEL_HE = {"serious": "רציני", "clever": "מתחכם", "absurd": "אבסורדי"}
+LEVEL_HE = bank.LEVELS                     # "רציני" / "מתחכם" / "הזוי" - השמות שבממשק
 
 
 def _spread(members: list, k: int = 3) -> list:
