@@ -395,7 +395,7 @@ def _conditions(scopes, records, committee, bill, **_):
 def _after_last(bill, records, committee, **_):
     last = bill.sections[-1]
     m = re.match(r"\d+", last.number)
-    if not m:
+    if not m or not last.certain:     # מספר לא קריא - "סעיף N+1" יהיה ניחוש
         return
     new_number = str(int(m.group(0)) + 1)
     for r in records.get("after_last", []):

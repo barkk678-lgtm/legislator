@@ -289,6 +289,23 @@ def _join(a: str, b: str) -> str:
     return f"{a} {b}"
 
 
+def _section_key(number: str) -> tuple[int, str]:
+    m = re.match(r"(\d+)([א-ת]?)$", number)
+    return (int(m.group(1)), m.group(2)) if m else (0, "")
+
+
+def _numbering_readable(numbers: list[str]) -> bool:
+    """מספרי הסעיפים בהצעה עולים ברצף מ-1 ("1, 2, 3", ומדי פעם "3א"). בקובץ ששכבת
+    הטקסט שלו ממפה ספרות שונות לאותו תו (263401: "4, 9, 0, 0, 9, 3..." במקום 1-9;
+    גם pdftotext קורא כך) - הרצף שבור מההתחלה, ואי אפשר לדעת איזה סעיף הוא איזה."""
+    keys = [_section_key(n) for n in numbers]
+    if not keys or keys[0][0] != 1:
+        return False
+    steps = sum(1 for a, b in zip(keys, keys[1:])
+                if b[0] == a[0] + 1 or (b[0] == a[0] and b[1] > a[1]))
+    return steps >= (len(keys) - 1) / 2
+
+
 def _label_kind(label: str) -> str:
     return "paragraph" if label[0].isdigit() else "subsection"
 
@@ -327,6 +344,7 @@ def parse_bill_pdf(path: Path | str) -> ParsedBill:
     open_units: list[tuple[BillUnit, float]] = []   # (יחידה, הקצה הימני של הטקסט שלה)
     in_quote = False
     section_edge = 0.0
+    raw_numbers: list[str] = []
     for l in lines[first_section:]:
         if _END_RE.match(l.body.replace(" ", "")) or l.body.strip() in ("הסתייגויות", "הסתייגויות ובקשות רשות דיבור"):
             break
@@ -334,9 +352,19 @@ def parse_bill_pdf(path: Path | str) -> ParsedBill:
             continue
         if re.fullmatch(r"-\s*\d+\s*-|\d{2}/\d{2}/\d{4}|\d{1,2}:\d{2}\s+\d{2}/\d{2}/\d{4}", l.body):
             continue  # כותרת עמוד
-        if _SECTION_NO_RE.match(l.number):
-            current = BillSection(_SECTION_NO_RE.match(l.number).group(1), l.margin,
-                                  BillUnit("lead", "", ""))
+        number_m = _SECTION_NO_RE.match(l.number)
+        body = l.body
+        if number_m:
+            raw_numbers.append(number_m.group(1))
+        if number_m and current is not None \
+                and _section_key(number_m.group(1)) <= _section_key(current.number):
+            # **מספר שאינו עולה - אינו סעיף חדש** (הכרעה ז, 26.9): מספור של נוסח מצוטט
+            # (4715569: "1-4" ו-"1-7" אחרי סעיף 38 - בלי זה הם דרסו את סעיפים 2 ו-4).
+            # השורה נשארת בסעיף הנוכחי, והסעיף - לא ודאי: לא מנחשים את השיוך.
+            current.certain = False
+            body = _clean(f"{l.margin} {number_m.group(1)}. {body}")
+        elif number_m:
+            current = BillSection(number_m.group(1), l.margin, BillUnit("lead", "", ""))
             sections.append(current)
             open_units, in_quote = [], False
             section_edge = l.body_x1
@@ -344,7 +372,6 @@ def parse_bill_pdf(path: Path | str) -> ParsedBill:
             continue
         elif l.margin:
             current.margin_title = _join(current.margin_title, l.margin)
-        body = l.body
         if not body:
             continue
         if l.uncertain:
@@ -381,6 +408,13 @@ def parse_bill_pdf(path: Path | str) -> ParsedBill:
     for s in sections:
         s.lead.text = _clean(s.lead.text)
         s.margin_title = _clean(s.margin_title)
+    if sections and not _numbering_readable(raw_numbers):
+        # מספרי הסעיפים לא קריאים - אי אפשר לדעת לאיזה סעיף שייך כל טקסט: כל ההצעה
+        # לא ודאית, ואין עוגנים (ברק: "שיוך לא ודאי - לא ודאי, בלי עוגנים. לא לנחש").
+        warnings.append("מספרי הסעיפים בקובץ אינם קריאים (הספרות בשכבת הטקסט של הקובץ "
+                        "משובשות) - לא מעגנים בו הסתייגויות.")
+        for s in sections:
+            s.certain = False
     if not sections:
         warnings.append("לא נמצאו סעיפים בהצעה.")
     return ParsedBill(title=_clean(title), committee=committee, sections=sections,

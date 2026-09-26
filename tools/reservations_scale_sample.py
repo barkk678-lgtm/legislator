@@ -166,6 +166,14 @@ def main() -> int:
         print(f"ציטוטים: {total} - נמצאו {found} ({100 * found / total:.1f}%), "
               f"מילה במילה {counts['exact']} ({100 * counts['exact'] / total:.1f}%)")
         print("לפי סוג:", dict(counts))
+        # הכרעה ז (26.9): קובץ שהספרות בשכבת הטקסט שלו משובשות (263401) - כל ההצעה לא
+        # ודאית ואין בה עוגנים; ציטוט "נמצא" בו רק כי גם ההסתייגות משובשת באותו אופן.
+        bad = {s["file"] for s in summaries if any("אינם קריאים" in w for w in s.get("warnings", []))}
+        if bad:
+            rest = [q for q in quotes if q["file"] not in bad]
+            ok = sum(q["result"] in ("exact", "typography", "inner_quotes") for q in rest)
+            print(f"קבצים עם ספרות לא קריאות (לא ודאיים, בלי עוגנים): {sorted(bad)} - "
+                  f"{total - len(rest)} ציטוטים; בלעדיהם: {ok}/{len(rest)} ({100 * ok / max(1, len(rest)):.1f}%)")
     for s in summaries:
         if s.get("error"):
             print(f"  שגיאה {s['file']}: {s['error']}")

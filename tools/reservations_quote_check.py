@@ -45,7 +45,9 @@ _ANCHOR_RES = [
     ("from", re.compile(rf"החל\s+במילים\s+[{Q}](.+?)[{Q}]")),
     ("until", re.compile(rf"עד\s+המילים\s+[{Q}](.+?)[{Q}]")),
 ]
-_HEADING_RE = re.compile(r"^(לפני\s+|לאחרי\s+|ל)סעיף\s+(\d{1,3}[א-ת]?)$")
+# "לסעיף 2", וגם עם יחידה: "לסעיף 2(1)", "לאחרי סעיף 2(2)", "לסעיף 15(2) עד (12)" (491290).
+# בלי היחידה הכותרת לא זוהתה, וכל ההסתייגויות שאחריה נספרו תחת "לסעיף 1" (הכרעה ז, 26.9).
+_HEADING_RE = re.compile(r"^(לפני\s+|לאחרי\s+|ל)סעיף\s+(\d{1,3}[א-ת]?)((?:\([^()\s]{1,4}\))*)(\s+עד\s+\([^()\s]{1,4}\))?$")
 _ITEM_RE = re.compile(r"^(\d{1,3}|[א-ת]{1,2})\.\s+(.*)$")
 _UNIT_RE = re.compile(r"^(ברישה|בסיפה|בפסקה\s+\(([^)]+)\)|בסעיף\s+קטן\s+\(([^)]+)\)|בפסקת\s+משנה\s+\(([^)]+)\))")
 
@@ -82,7 +84,7 @@ def reservation_quotes(path: Path) -> list[Quote]:
     except StopIteration:
         return []
     quotes: list[Quote] = []
-    heading, section = "", ""
+    heading, section, heading_unit = "", "", ""
     number, letter = "", ""
     item_lines: list[str] = []
 
@@ -100,22 +102,37 @@ def reservation_quotes(path: Path) -> list[Quote]:
         if m:
             unit = "lead" if m.group(1) == "ברישה" else ("tail" if m.group(1) == "בסיפה" else
                                                          f"({m.group(2) or m.group(3) or m.group(4)})")
+        if heading_unit and unit not in ("lead", "tail"):
+            # "לסעיף 2(1)" - ההסתייגות היא לפסקה (1); "לסעיף 24(2)" + "בסעיף קטן (ב)" -
+            # (ב) שבתוך (2), לא ה-(ב) הראשון בסעיף (491290)
+            unit = heading_unit + unit
+        if re.match(r"^בתוספת", text):
+            unit = "schedule"         # "בתוספת הראשונה, בפרטים 1 ו־2" (4690270) - לא בסעיף עצמו
         rid = number + (f"/{letter}" if letter else "")
         for kind, rx in _ANCHOR_RES:
             for am in rx.finditer(text):
                 quotes.append(Quote(path.name, rid, heading, section, unit, kind, am.group(1).strip()))
         item_lines.clear()
 
+    in_note = False
     for t in texts[start + 1:]:
         if t.startswith("בקשות רשות דיבור") or re.fullmatch(r"\*{10,}", t.replace(" ", "")):
             flush()
             break
         if re.fullmatch(r"-\s*\d+\s*-|\d{2}/\d{2}/\d{4}|נספח מס.*|\(פ/[\d/]+\)", t):
             continue
+        # "* הערה: הסתייגות זו קשורה להסתייגות של ... | לסעיף 10" - הזנב של ההערה נשבר
+        # לשורה משלו ונראה ככותרת (175006: ההסתייגות לסעיף 11 נספרה תחת 10). הכרעה ז.
+        was_note, in_note = in_note, t.startswith("*")
+        if was_note and not in_note and _HEADING_RE.match(t):
+            in_note = True
+            continue
         h = _HEADING_RE.match(t)
         if h:
             flush()
             heading, section = t, h.group(2)
+            units = re.findall(r"\([^()]+\)", h.group(3) or "")
+            heading_unit = units[0] if units and not h.group(4) else ""
             continue
         if re.match(r"^קבוצת .* מציע(ה|ים|ות)?:?$", t) or t.startswith("לחלופין"):
             flush()
@@ -140,21 +157,31 @@ def reservation_quotes(path: Path) -> list[Quote]:
 
 
 def _unit_text(section, unit: str) -> str | None:
+    if unit == "schedule":
+        return None
     if unit == "lead":
         return section.lead.text
     if not unit or unit == "tail":
         return None
 
-    def walk(units):
+    path = re.findall(r"\([^()]+\)", unit)      # "(2)(ב)" - (ב) בתוך (2)
+
+    def find(units, label):
         for u in units:
-            if u.label == unit:
-                return u.text
-            found = walk(u.children)
+            if u.label == label:
+                return u
+            found = find(u.children, label)
             if found is not None:
                 return found
         return None
 
-    return walk(section.units)
+    node, units = None, section.units
+    for label in path:
+        node = find(units, label)
+        if node is None:
+            return None
+        units = node.children
+    return node.text if node is not None else None
 
 
 def check(path: Path) -> tuple[list[Quote], dict]:
@@ -166,7 +193,11 @@ def check(path: Path) -> tuple[list[Quote], dict]:
         if section is None:
             q.result = "missing"
             continue
-        scope = _unit_text(section, q.unit) if q.unit else None
+        if q.unit == "schedule":
+            # התוספת יושבת אחרי הסעיף האחרון בהצעה - מחפשים בכל ההצעה
+            scope = " ".join(s.text for s in bill.sections)
+        else:
+            scope = _unit_text(section, q.unit) if q.unit else None
         haystacks = [scope] if scope is not None else [section.text]
         if scope is not None:
             haystacks.append(section.text)
