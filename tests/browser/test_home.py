@@ -57,6 +57,12 @@ def main() -> int:
             pg.evaluate("() => localStorage.clear()")
             if seed:
                 pg.evaluate("s => { for (const [k, v] of Object.entries(s)) localStorage.setItem(k, JSON.stringify(v)); }", seed)
+                # "אתמול" לפי לוח השנה של הדפדפן: אתמול בצהריים (25 שעות אחורה אחרי חצות = שלשום)
+                pg.evaluate("""() => { const k = 'legislator.queryConversations.v1';
+                    const list = JSON.parse(localStorage.getItem(k) || '[]');
+                    const d = new Date(); d.setHours(0, 0, 0, 0);
+                    for (const c of list) if (c.id === 'chome1') c.at = d.getTime() - 12 * 3600000;
+                    localStorage.setItem(k, JSON.stringify(list)); }""")
             pg.goto(BASE + "/" + (f"?view={view}" if view else ""))
             pg.wait_for_selector("#home.tab.on")
             return pg

@@ -4,6 +4,7 @@
     uvicorn main:app --app-dir apps/api --port 8010 &
     python3 tests/browser/test_reservations_ui.py [BASE_URL] [SCREENSHOT]
 """
+import os
 import sys
 from pathlib import Path
 
@@ -19,7 +20,12 @@ _PAYMENT_WORDS = ("card", "credit", "cvv", "cvc", "iban", "כרטיס", "אשר�
 def main() -> int:
     results = []
     with sync_playwright() as p:
-        b = p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
+        kw = {"executable_path": "/opt/pw-browsers/chromium"}   # מול האתר החי: ראו tests/browser/test_home.py
+        if os.environ.get("PW_PROXY"):
+            kw["proxy"] = {"server": os.environ["PW_PROXY"]}
+        if os.environ.get("PW_TRUST_SPKI"):
+            kw["args"] = [f"--ignore-certificate-errors-spki-list={os.environ['PW_TRUST_SPKI']}"]
+        b = p.chromium.launch(**kw)
         page = b.new_page(viewport={"width": 1400, "height": 1000}, accept_downloads=True)
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
