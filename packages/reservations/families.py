@@ -148,7 +148,8 @@ _BIGGER_UNIT = {"ימים": "שנים", "שבועות": "שנים", "חודשי�
 
 def _fmt(n: int, unit: str, digits: bool, original: str) -> str:
     if digits:
-        num = f"{n:,}" if "," in original else str(n)
+        # הכרעה ב (ברק, 26.9): מ-1,000 ומעלה - עם מפריד אלפים ("3,000 ימים")
+        num = f"{n:,}" if ("," in original or n >= 1000) else str(n)
         return f"{num} {original.split()[-1] if unit != 'שקלים' else original.split(maxsplit=1)[1]}"
     return quantity(n, unit)
 
@@ -183,7 +184,9 @@ def _bare_values(sc, level, taken: list[tuple[int, int]]):
             news = [v for v in dict.fromkeys(news) if v != a.text]
         else:
             n = int(a.text)
-            news = [str(v) for v in dict.fromkeys(_BARE_VALUES[a.kind][level](n)) if v > 0 and v != n]
+            # מספר - עם מפריד אלפים מ-1,000 (הכרעה ב); שנה ("3000") - בלי
+            fmt = (lambda v: str(v)) if a.kind == "gregorian_year" else (lambda v: f"{v:,}")
+            news = [fmt(v) for v in dict.fromkeys(_BARE_VALUES[a.kind][level](n)) if v > 0 and v != n]
         for new in news:
             yield sc, ("replace", a.text), forms.replace(sc.addr, a.text, new), False
 
