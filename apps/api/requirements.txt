@@ -10,3 +10,4 @@ lxml  # validator._check_14 (בדיקת סגנונות ב-docx) + tests/golden -
 # docx_path=None בנתיב הפרודקשן ולא הגיעה ל-import.
 olefile
 pdfminer.six  # packages/reservations/pdf_bill.py - קריאת הצעה לקריאה שנייה-שלישית מ-PDF (רישיון MIT; לא PyMuPDF, שהוא AGPL)
+tzdata

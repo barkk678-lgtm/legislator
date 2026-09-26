@@ -24,6 +24,8 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from functools import lru_cache
 from pathlib import Path
 
@@ -33,6 +35,22 @@ REDLINES_PATH = ROOT / "data" / "reservations_redlines.json"
 SCREEN_PATH = ROOT / "data" / "reservations_bank_screen.json"
 
 LEVELS = {"serious": "רציני", "clever": "מתחכם", "absurd": "הזוי"}
+
+# §0.2 (אישורי ברק, 26.9): שנה מחושבת - ממועד הייצור, לפי Asia/Jerusalem, כמספר
+# ("ביום 1 בינואר 2027"). לעולם לא "של השנה הבאה". בזמן הרינדור - הגיבוב של
+# הרשומה (ופסק השומר) לא משתנה משנה לשנה.
+JERUSALEM = ZoneInfo("Asia/Jerusalem")
+
+
+def _now() -> datetime:
+    return datetime.now(JERUSALEM)
+
+
+def _years(text: str) -> str:
+    if "{השנה" not in text:
+        return text
+    year = _now().astimezone(JERUSALEM).year
+    return text.replace("{השנה שאחרי הבאה}", str(year + 2)).replace("{השנה הבאה}", str(year + 1))
 BANK_FAMILIES = ("actor_swap", "approval", "duty", "conditions", "after_last")
 
 
@@ -49,7 +67,7 @@ class Record:
     def text(self, committee: str = "") -> str:
         """הנוסח שהרשומה מוסיפה (בלי ההצעה). {committee} - מעמוד השער."""
         value = _join(self.value, "{committee}", committee or "{committee}")
-        return _join(self.template, "{value}", value)
+        return _years(_join(self.template, "{value}", value))
 
     @property
     def screen_key(self) -> str:
