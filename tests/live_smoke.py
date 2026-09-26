@@ -554,7 +554,7 @@ def journey_static(base, res):
 
 
 def journey_home(base, res):
-    """דף הבית (27.9.2026): כולם נוחתים בו, שמונת הכלים, יצירת קשר, והמקום
+    """דף הבית (26.9.2026): כולם נוחתים בו, שמונת הכלים, יצירת קשר, והמקום
     השמור להרשמה ולכניסה."""
     print("\n[דף הבית]")
     status, body = _get(base, "/")
@@ -567,6 +567,14 @@ def journey_home(base, res):
     res.check("הקוד של דף הבית נפרס", "function applyHomeView()" in js and js.rstrip().endswith('switchTab("home");'))
     res.check("באג 186: קבועי ההיסטוריה לפני הרכיב הראשון",
               js.find("const CONV_SHOWN") != -1 and js.find("const CONV_SHOWN") < js.find("= mountConvHistory({"))
+    # הכרעה ו (26.9): נייבי אחד - #0B2A5B - בגיליון הסגנונות וב-favicon שנפרסו
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "unit"))
+    from test_single_navy import NAVY, colors, is_navy  # noqa: PLC0415
+    other = []
+    for path in ("/static/style.css", "/static/favicon.svg"):
+        st, b = _get(base, path)
+        other += [f"{path}: {lit}" for lit, rgb in colors(b.decode("utf-8", "replace")) if is_navy(rgb) and rgb != NAVY]
+    res.check("נייבי אחד בכל המערכת (#0B2A5B)", not other, "; ".join(other[:4]) or "נקי")
     for kind, word in (("signup", "ההרשמה"), ("login", "הכניסה")):
         st, b = _get(base, f"/auth/{kind}")
         res.check(f"/auth/{kind} - מקום שמור", st == 200 and f"{word} עוד לא פתוחה" in b.decode("utf-8", "replace"))

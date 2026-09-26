@@ -25,10 +25,10 @@
   --touched-bg: #FFF9E6;
   --touched-accent: #EFC15E;
   --r: 10px;
-  /* דף הבית (27.9.2026) - מהמוקאפ של ברק: מנטה המותג, והנייבי של פס ההרשמה */
+  /* דף הבית (26.9.2026) - מנטה המותג מהמוקאפ של ברק. נייבי - רק --navy (הכרעה ו):
+     גוון אחד בכל המערכת, גם בפס ההרשמה (tests/unit/test_single_navy.py) */
   --mint: #5EE0A8;
   --mint-deep: #3FCB8F;
-  --band: #0E2A5A;
 }
 
 * { box-sizing: border-box; }
@@ -806,7 +806,7 @@ body[data-view="guest"] .rail-guest { flex: 1; }
 .home-recent, .home-tools { margin-bottom: 26px; }
 
 .home-signup {
-  background: var(--band); color: #fff; border-radius: 14px;
+  background: var(--navy); color: #fff; border-radius: 14px;
   padding: 30px 32px; margin-bottom: 28px;
 }
 .home-signup h2 { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
@@ -906,7 +906,7 @@ body.auth-pending { align-items: center; justify-content: center; background: va
   background: var(--page); border-radius: 14px; padding: 28px 30px; max-width: 440px; margin: 16px;
   text-align: center;
 }
-.auth-card img { width: 220px; height: auto; background: var(--band); border-radius: 10px; margin-bottom: 14px; }
+.auth-card img { width: 220px; height: auto; background: var(--navy); border-radius: 10px; margin-bottom: 14px; }
 .auth-card h1 { margin: 0 0 8px; font-size: 20px; color: var(--navy); }
 .auth-card p { color: var(--soft); margin: 0 0 18px; }
 

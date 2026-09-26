@@ -1,4 +1,4 @@
-"""דף הבית (27.9.2026) - שלושת המצבים ויצירת קשר, בדפדפן אמיתי.
+"""דף הבית (26.9.2026) - שלושת המצבים ויצירת קשר, בדפדפן אמיתי.
 
 **לא רץ ב-CI** (דפדפן + שרת). הרצה:
     uvicorn main:app --app-dir apps/api --port 8010 &
@@ -75,8 +75,8 @@ def main() -> int:
         check("אורח: 'הרשמה' ו'כניסה' בתפריט", pg.is_visible("#rail-guest .btn-mint") and "כניסה" in pg.inner_text("#rail-guest"))
         bg = pg.eval_on_selector("#rail-guest .btn-mint", "e => getComputedStyle(e).backgroundColor")
         check("אורח: כפתור ההרשמה במנטה (#5EE0A8)", bg == "rgb(94, 224, 168)", bg)
-        check("אורח: פס ההרשמה בנייבי", pg.is_visible("#home-signup")
-              and pg.eval_on_selector("#home-signup", "e => getComputedStyle(e).backgroundColor") == "rgb(14, 42, 90)")
+        check("אורח: פס ההרשמה בנייבי של התפריט (#0B2A5B, הכרעה ו)", pg.is_visible("#home-signup")
+              and pg.eval_on_selector("#home-signup", "e => getComputedStyle(e).backgroundColor") == "rgb(11, 42, 91)")
         check("אורח: 'יצירת קשר' בתחתית התפריט", pg.is_visible("#contact-open"))
         check("אורח: 8 כרטיסי כלים", pg.eval_on_selector_all(".tool-card", "els => els.length") == 8)
         check("אורח: אין 'המשך מאיפה שעצרת'", not pg.is_visible("#home-recent"))
