@@ -309,14 +309,21 @@ def _minister(bill: ParsedBill, section: BillSection | None) -> str | None:
     return "השר" if _HASAR_RE.search(whole) else None
 
 
+MINISTER_TOKEN = "{השר}"
+
+
 def _with_minister(text: str, bill: ParsedBill, section: BillSection | None) -> str | None:
-    """`text` עם השר המפורש במקום "השר"; None - התבנית לא מופעלת על ההצעה הזו."""
-    if not _HASAR_RE.search(text):
+    """`text` עם השר המפורש במקום המציין {השר}; None - התבנית לא מופעלת על ההצעה הזו.
+
+    **רק המציין שבתבנית מוחלף** - לעולם לא "השר" שבא מרשימת השרים או מהבנק: "באישור
+    השר לביטחון לאומי" נשאר כמו שהוא, ולא "באישור שר הפנים לביטחון לאומי" (באג, סבב
+    התיקונים על אישורי הבנק, 26.9.2026)."""
+    if MINISTER_TOKEN not in text:
         return text
     minister = _minister(bill, section)
     if minister is None:
         return None
-    return _HASAR_RE.sub(lambda m: m.group(1) + minister, text)
+    return text.replace(MINISTER_TOKEN, minister)
 
 
 def _actors_with_next(sc: _Scope) -> list[tuple[str, str]]:
@@ -341,7 +348,7 @@ def _resolve(text: str, bill: ParsedBill, section: BillSection | None) -> str | 
     אחרת לא מופעל); ועדה שלא נפתרה ({committee}/{הוועדה} בלי עמוד שער) - לא מופעל."""
     if text is None or "{committee}" in text or "{הוועדה}" in text:
         return None
-    return _with_minister(text.replace("{השר}", "השר"), bill, section)
+    return _with_minister(text, bill, section)
 
 
 def _minister_actor(actor: str, bill: ParsedBill, section: BillSection | None) -> str | None:

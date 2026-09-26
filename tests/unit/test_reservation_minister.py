@@ -20,14 +20,15 @@ from pdf_bill import BillSection, BillUnit, ParsedBill, parse_bill_pdf  # noqa: 
 TIBERIAS = parse_bill_pdf(ROOT / "reference" / "הצעת חוק טבריה.pdf")
 # הרשומות של ד (conditions-001/002, actor_swap-007/009) נמחקו באישורי הבנק (26.9) והוחלפו:
 # תנאי "{השר}" - בתבניות לאחרי הסעיף האחרון ובתנאים מתחכמים; "סגן השר" - "סגן {שר}".
-# הכלל של ד לא השתנה, ולכן הבדיקה עליו - על רשומות בנוסח המקורי, בזיכרון בלבד.
+# הכלל של ד לא השתנה, ולכן הבדיקה עליו - על רשומות בזיכרון בלבד. **השר בבנק נכתב
+# כמציין {השר}**, ורק הוא מוחלף (סבב התיקונים, 26.9 - "השר ל..." מרשימת השרים לא נוגעים בו).
 def _rec(rid, family, level, template, value):
     return bank.Record(id=rid, level=level, family=family, template=template, value=value, status="approved")
 
 
 RECORDS = [
-    _rec("t-c1", "conditions", "serious", "ובלבד ש{value}", "השר ידווח ל{committee} של הכנסת בתוך שישה חודשים"),
-    _rec("t-c2", "conditions", "serious", "ובלבד ש{value}", "השר יפרסם את החלטתו ברשומות"),
+    _rec("t-c1", "conditions", "serious", "ובלבד ש{value}", "{השר} ידווח ל{committee} של הכנסת בתוך שישה חודשים"),
+    _rec("t-c2", "conditions", "serious", "ובלבד ש{value}", "{השר} יפרסם את החלטתו ברשומות"),
     _rec("t-a1", "actor_swap", "clever", "{value}", "סגן {שר}"),
     bank.Record(id="t-a2", level="clever", family="actor_swap", template="{value}",
                 value="ועדה ציבורית שימנה {שר}", status="approved", gender="f"),
