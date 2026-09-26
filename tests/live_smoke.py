@@ -635,6 +635,8 @@ def journey_reservations(base, res):
     text = zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml").decode()
     res.check("ייצור: David, ובלי 'קבוצת ... מציעה'", "David" in zipfile.ZipFile(io.BytesIO(data)).read(
         "word/styles.xml").decode() and "מציעה" not in text)
+    sizes = re.findall(r'<w:pgSz [^>]*w:w="(\d+)"[^>]*w:h="(\d+)"', text)
+    res.check("ייצור: עמוד A4 (11906×16838)", sizes == [("11906", "16838")], str(sizes))
 
 
 def _rules_stream(base, question):

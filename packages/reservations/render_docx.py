@@ -23,10 +23,12 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Pt
+from docx.shared import Pt, Twips
 
 FONT = "David"
 SIZE = Pt(12)
+# A4 (הכרעה ח, ברק 26.9.2026) - תבנית ברירת המחדל של python-docx היא Letter (12240×15840)
+A4_TWIPS = (11906, 16838)
 
 
 _CONTROL = re.compile(r"[\x00-\x08\x0c\x0e-\x1f]")
@@ -71,6 +73,8 @@ def _set_default_font(doc) -> None:
 def build_document(*, bill_title: str, items: list) -> Document:
     """items: families.Item (או כל אובייקט עם heading ו-lines), בסדר המסמך."""
     doc = Document()
+    for section in doc.sections:
+        section.page_width, section.page_height = (Twips(v) for v in A4_TWIPS)
     _set_default_font(doc)
     _rtl_paragraph(doc, bill_title or "הצעת חוק")
     current = None

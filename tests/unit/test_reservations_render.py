@@ -72,6 +72,13 @@ def test_empty_and_control_chars():
     assert Document(io.BytesIO(data)).paragraphs[2].text == '1. במקום "א ב" יבוא "ג".'
 
 
+def test_a4_page():
+    """הכרעה ח (ברק, 26.9.2026): A4 - 11906×16838 twips, לא Letter (12240×15840)."""
+    xml = zipfile.ZipFile(io.BytesIO(DATA)).read("word/document.xml").decode("utf-8")
+    sizes = re.findall(r'<w:pgSz [^>]*w:w="(\d+)"[^>]*w:h="(\d+)"', xml)
+    assert sizes == [("11906", "16838")], sizes
+
+
 for name, fn in sorted(list(globals().items())):
     if name.startswith("test_"):
         fn()
