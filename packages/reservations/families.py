@@ -261,6 +261,62 @@ _ACTOR_RE = re.compile(
 _SUBJECT_NEXT_RE = re.compile(r"^\s+(?:[יתנא][א-ת]{2,}|רשאי|רשאית|רשאים|חייב|חייבת|ממונה)(?![א-ת])")
 
 
+# ── "השר" בתבניות הבנק (הכרעה ד, ברק 26.9) ─────────────────────────
+# כותבים את השר המפורש מתוך ההצעה עצמה, דטרמיניסטית - המודל לא בוחר שר:
+# 1. שר אחד בשמו בסעיף - הוא; 2. אחרת, שר אחד בשמו בהצעה כולה - הוא;
+# 3. אחרת, ההצעה משתמשת ב"השר" - נשאר "השר"; 4. אחרת - התבנית לא מופעלת.
+# סעיף שמופיעים בו שני שרים שונים - לא מנחשים: התבנית לא מופעלת עליו.
+# ההחלפה בזמן הרינדור (כמו {committee}) - הרשומה עצמה, ופסק הסינון שלה, לא משתנים.
+_NAMED_MINISTER_RE = re.compile(r"(?<![א-ת])[ובלמכשה]{0,2}(שר\s+ה[א-ת]+(?:\s+וה(?!שר(?![א-ת]))[א-ת]+)?)(?![א-ת])")
+_HASAR_RE = re.compile(r"(?<![א-ת])([ובלמכש]{0,2})השר(?![א-ת])")
+
+
+def _section_text(s: BillSection) -> str:
+    parts = [s.lead.text]
+
+    def walk(units):
+        for u in units:
+            parts.append(u.text)
+            walk(u.children)
+
+    walk(s.units)
+    return " ".join(p for p in parts if p)
+
+
+def _named_ministers(text: str) -> list[str]:
+    out = []
+    for m in _NAMED_MINISTER_RE.finditer(text):
+        name = re.sub(r"\s+", " ", m.group(1))
+        if name not in out:
+            out.append(name)
+    return out
+
+
+def _minister(bill: ParsedBill, section: BillSection | None) -> str | None:
+    """השר שנכתב במקום "השר" בתבנית, או None - התבנית לא מופעלת."""
+    if section is not None:
+        named = _named_ministers(_section_text(section))
+        if len(named) == 1:
+            return named[0]
+        if len(named) > 1:
+            return None
+    whole = " ".join(_section_text(s) for s in bill.sections)
+    named = _named_ministers(whole)
+    if len(named) == 1:
+        return named[0]
+    return "השר" if _HASAR_RE.search(whole) else None
+
+
+def _with_minister(text: str, bill: ParsedBill, section: BillSection | None) -> str | None:
+    """`text` עם השר המפורש במקום "השר"; None - התבנית לא מופעלת על ההצעה הזו."""
+    if not _HASAR_RE.search(text):
+        return text
+    minister = _minister(bill, section)
+    if minister is None:
+        return None
+    return _HASAR_RE.sub(lambda m: m.group(1) + minister, text)
+
+
 def _actors_with_next(sc: _Scope) -> list[tuple[str, str]]:
     """(הגורם, המילה שצמודה אחריו - הפועל או התואר)."""
     found = []
@@ -278,7 +334,7 @@ def _actors(sc: _Scope) -> list[str]:
     return [a for a, _ in _actors_with_next(sc)]
 
 
-def _actor_swap(scopes, records, **_):
+def _actor_swap(scopes, records, bill, **_):
     """הכרעה ג (ברק, 26.9): גורם מאותו מין - מחליפים רק אותו. מין אחר - מחליפים את
     הגורם **ואת המילה שצמודה אחריו**, בצורה המותאמת מהטבלה הסגורה (agreement.py):
     `במקום "שר הפנים יתקן" יבוא "הממשלה תתקן"`. מילה שאינה בטבלה, או מין לא ידוע -
@@ -287,9 +343,9 @@ def _actor_swap(scopes, records, **_):
         for actor, next_word in _actors_with_next(sc):
             old_g = agreement.gender(actor)
             for r in records.get("actor_swap", []):
-                new = r.text()
-                new_g = agreement.gender(new)
-                if r.value == actor or old_g is None or new_g is None:
+                new = _with_minister(r.text(), bill, sc.section)
+                new_g = agreement.gender(new) if new else None
+                if new == actor or old_g is None or new_g is None:
                     continue
                 if new_g == old_g:
                     line = forms.replace(sc.addr, actor, new)
@@ -302,31 +358,38 @@ def _actor_swap(scopes, records, **_):
                 yield sc, ("replace", actor), line, False, r.id
 
 
-def _approval(scopes, records, committee, **_):
+def _approval(scopes, records, committee, bill, **_):
     for sc in scopes:
         for actor in _actors(sc):
             for r in records.get("approval", []):
                 if "{committee}" in r.value and not committee:
                     continue
-                yield sc, ("after", actor), forms.after(sc.addr, actor, r.text(committee)), False, r.id
+                text = _with_minister(r.text(committee), bill, sc.section)
+                if text is None:
+                    continue
+                yield sc, ("after", actor), forms.after(sc.addr, actor, text), False, r.id
 
 
-def _duty(scopes, records, **_):
+def _duty(scopes, records, bill, **_):
     for sc in scopes:
         for r in records.get("duty", []):
             src, _, dst = r.value.partition("=>")
+            dst = _with_minister(dst, bill, sc.section) if dst else dst
             if src and dst and _ok_anchor(src, sc):
                 yield sc, ("replace", src), forms.replace(sc.addr, src, dst), False, r.id
 
 
-def _conditions(scopes, records, committee, **_):
+def _conditions(scopes, records, committee, bill, **_):
     for sc in scopes:
         if not sc.leaf or not sc.certain:
             continue
         for r in records.get("conditions", []):
             if "{committee}" in r.value and not committee:
                 continue
-            yield sc, ("append", ""), forms.append(sc.addr, sc.kind, r.text(committee)), False, r.id
+            text = _with_minister(r.text(committee), bill, sc.section)
+            if text is None:
+                continue
+            yield sc, ("append", ""), forms.append(sc.addr, sc.kind, text), False, r.id
 
 
 def _after_last(bill, records, committee, **_):
@@ -338,7 +401,10 @@ def _after_last(bill, records, committee, **_):
     for r in records.get("after_last", []):
         if "{committee}" in r.value and not committee:
             continue
-        margin, _, body = r.text(committee).partition("|")
+        text = _with_minister(r.text(committee), bill, None)
+        if text is None:
+            continue
+        margin, _, body = text.partition("|")
         yield margin, forms.new_section_after(margin, new_number, body), r.id
 
 
