@@ -37,6 +37,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+import agreement
 import bank as bank_mod
 import forms
 from anchors import find_anchors, law_citation_spans
@@ -260,23 +261,45 @@ _ACTOR_RE = re.compile(
 _SUBJECT_NEXT_RE = re.compile(r"^\s+(?:[יתנא][א-ת]{2,}|רשאי|רשאית|רשאים|חייב|חייבת|ממונה)(?![א-ת])")
 
 
-def _actors(sc: _Scope) -> list[str]:
+def _actors_with_next(sc: _Scope) -> list[tuple[str, str]]:
+    """(הגורם, המילה שצמודה אחריו - הפועל או התואר)."""
     found = []
     for m in _ACTOR_RE.finditer(sc.text):
         a = m.group(0)
-        if a in found or not _SUBJECT_NEXT_RE.match(sc.text[m.end():]):
+        nxt = _SUBJECT_NEXT_RE.match(sc.text[m.end():])
+        if any(a == f for f, _ in found) or not nxt:
             continue
         if _ok_anchor(a, sc):
-            found.append(a)
+            found.append((a, nxt.group(0).strip()))
     return found
 
 
+def _actors(sc: _Scope) -> list[str]:
+    return [a for a, _ in _actors_with_next(sc)]
+
+
 def _actor_swap(scopes, records, **_):
+    """הכרעה ג (ברק, 26.9): גורם מאותו מין - מחליפים רק אותו. מין אחר - מחליפים את
+    הגורם **ואת המילה שצמודה אחריו**, בצורה המותאמת מהטבלה הסגורה (agreement.py):
+    `במקום "שר הפנים יתקן" יבוא "הממשלה תתקן"`. מילה שאינה בטבלה, או מין לא ידוע -
+    הרשומה לא מופעלת על הגורם הזה. הנקודה (לפיזור ולהערכה) - הגורם."""
     for sc in scopes:
-        for actor in _actors(sc):
+        for actor, next_word in _actors_with_next(sc):
+            old_g = agreement.gender(actor)
             for r in records.get("actor_swap", []):
-                if r.value != actor:
-                    yield sc, ("replace", actor), forms.replace(sc.addr, actor, r.text()), False, r.id
+                new = r.text()
+                new_g = agreement.gender(new)
+                if r.value == actor or old_g is None or new_g is None:
+                    continue
+                if new_g == old_g:
+                    line = forms.replace(sc.addr, actor, new)
+                else:
+                    inflected = agreement.inflect(next_word, new_g)
+                    phrase = f"{actor} {next_word}"
+                    if inflected is None or not _ok_anchor(phrase, sc):
+                        continue
+                    line = forms.replace(sc.addr, phrase, f"{new} {inflected}")
+                yield sc, ("replace", actor), line, False, r.id
 
 
 def _approval(scopes, records, committee, **_):

@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "packages" / "reservations"))
 sys.path.insert(0, str(ROOT / "packages" / "config"))
 
+import agreement  # noqa: E402
 import bank  # noqa: E402
 import guards  # noqa: E402
 
@@ -47,6 +48,9 @@ def _example(r: bank.Record) -> str:
     if r.family == "duty":
         src, _, dst = r.value.partition("=>")
         return FAMILY_EXAMPLE["duty"].format(src=src, dst=dst)
+    if r.family == "actor_swap" and agreement.gender(text) == "f":
+        # הכרעה ג: גורם בלשון נקבה - גם הפועל שאחריו מותאם (טבריה, סעיף 3: "שר הפנים יתקן")
+        return f'במקום "שר הפנים יתקן" יבוא "{text} {agreement.inflect("יתקן", "f")}".'
     if r.family == "after_last":
         margin, _, body = text.partition("|")
         return FAMILY_EXAMPLE["after_last"].format(margin=margin, body=body)
