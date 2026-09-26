@@ -774,7 +774,7 @@ a.rules-cite:hover, a.rules-cite:focus { text-decoration: underline; text-underl
 .rules-interp .lbl { display: block; font-size: 12px; font-weight: 700; color: var(--flag); margin-bottom: 2px; }
 
 
-/* ═══ דף הבית (27.9.2026) ═══════════════════════════════════════════
+/* ═══ דף הבית (26.9.2026) ═══════════════════════════════════════════
    שלושה מצבים של אותו דף - body[data-view]: guest / new / returning.
    בשפת העיצוב הקיימת: כרטיסים לבנים על --shell, Assistant לממשק,
    --flag כאקסנט בלבד. המנטה (--mint) - רק לכפתורי ההרשמה. */

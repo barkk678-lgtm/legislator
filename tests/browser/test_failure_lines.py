@@ -40,7 +40,7 @@ def main() -> int:
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(BASE)
-        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (26.9)
         page.evaluate(f"onLawChange('{LAW}')")
         page.wait_for_selector(f'.node-text[data-node-id="{LAW}/s2/p0"]', timeout=20000)
         page.route("**/render", inject)

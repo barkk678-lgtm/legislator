@@ -55,7 +55,7 @@ def main() -> int:
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(BASE)
-        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (26.9)
 
         # ח12
         page.evaluate("onLawChange('kaytanot-1990')")

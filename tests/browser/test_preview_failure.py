@@ -18,7 +18,7 @@ with sync_playwright() as p:
     for mode in ("500", "504html", "abort"):
         page = b.new_page()
         page.goto(BASE)
-        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
+        page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (26.9)
         page.evaluate("onLawChange('kaytanot-1990')")
         sel = '.node-text[data-node-id="kaytanot-1990/s2/p0"]'
         page.wait_for_selector(sel, timeout=20000)

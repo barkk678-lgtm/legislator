@@ -27,7 +27,7 @@ def trash(page, node_id):
 
 def open_law(page, law_id, probe):
     page.goto(BASE)
-    page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (27.9)
+    page.click('.nav button[data-t="bills"]')  # דף הבית הוא ברירת המחדל (26.9)
     page.evaluate(f"onLawChange('{law_id}')")
     page.wait_for_selector(f'.node-text[data-node-id="{probe}"]', timeout=20000)
 
