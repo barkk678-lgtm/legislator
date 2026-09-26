@@ -16,6 +16,8 @@
   מפנה לסעיף שאינו קיים בנוסח הזה. הכשל במקור; נשאר חסר.
 - **4690270** - "בתוספת הראשונה, בפרטים 1 ו־2" תחת "לסעיף 2": התוספת יושבת בסוף ההצעה.
 - **10842601, 7184628** - ביקורת נקייה (11/11, 49/49) - לא נשברת.
+- **628446** - חיובי שגוי של "ספרות לא קריאות" שנמצא בריצת המדגם: "1" בלי נקודה. תוקן.
+- **240417** - ספרות מוזזות במקור (אחד משבעה נוספים במדגם); מסומן כלא ודאי - נכון.
 """
 
 import sys
@@ -104,6 +106,23 @@ def test_clean_controls():
         bill = parse_bill_pdf(FIX / f"{doc}.pdf")
         assert all(s.certain for s in bill.sections) or doc == "7184628", doc
         assert not any("אינם קריאים" in w for w in bill.warnings), (doc, bill.warnings)
+
+
+def test_628446_number_without_period_is_a_section():
+    """המספר של סעיף 1 נקרא "1" בלי נקודה (הנקודה נפלה מהעמודה). בלי זה סעיף 1 לא זוהה,
+    הרצף התחיל ב-2, וכל ההצעה סומנה "ספרות לא קריאות" - חיובי שגוי (ריצת המדגם, 26.9)."""
+    bill = parse_bill_pdf(FIX / "628446.pdf")
+    assert [s.number for s in bill.sections][:3] == ["1", "2", "3"], [s.number for s in bill.sections]
+    assert bill.sections[0].margin_title == "תיקון סעיף 3" and "להטלה" in bill.sections[0].text
+    assert not any("אינם קריאים" in w for w in bill.warnings), bill.warnings
+    assert all(s.certain for s in bill.sections)
+
+
+def test_240417_shifted_digits_flagged():
+    """הספרות בשכבת הטקסט מוזזות ("התש"ע–3121" במקום 2010, סעיפים 2..9, 21..27) - במקור."""
+    bill = parse_bill_pdf(FIX / "240417.pdf")
+    assert any("אינם קריאים" in w for w in bill.warnings), bill.warnings
+    assert not any(s.certain for s in bill.sections)
 
 
 for name, fn in sorted(list(globals().items())):

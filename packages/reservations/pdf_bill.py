@@ -289,6 +289,20 @@ def _join(a: str, b: str) -> str:
     return f"{a} {b}"
 
 
+_BARE_NO_RE = re.compile(r"^(\d{1,3}[א-ת]?)$")
+
+
+def _section_number(line: "_Line") -> str | None:
+    """מספר הסעיף בעמודת המספר: "3." - וגם "1" בלי נקודה כשבשורה יש כותרת שוליים
+    (628446: הנקודה נפלה מהעמודה, סעיף 1 לא זוהה, וכל ההצעה סומנה "לא קריאה")."""
+    m = _SECTION_NO_RE.match(line.number)
+    if m:
+        return m.group(1)
+    m = _BARE_NO_RE.match(line.number)
+    # כותרת שוליים אמיתית היא טקסט עברי; "27" + "06/2022/" בראש כל עמוד הוא תאריך
+    return m.group(1) if m and re.search(r"[א-ת]", line.margin) else None
+
+
 def _section_key(number: str) -> tuple[int, str]:
     m = re.match(r"(\d+)([א-ת]?)$", number)
     return (int(m.group(1)), m.group(2)) if m else (0, "")
@@ -331,7 +345,7 @@ def parse_bill_pdf(path: Path | str) -> ParsedBill:
     first_section = None
     for i in range(start + 1, len(lines)):
         l = lines[i]
-        if _SECTION_NO_RE.match(l.number):
+        if _section_number(l):
             first_section = i
             break
         if not title and re.match(r"^(חוק|פקודת)\s", l.body):
@@ -352,19 +366,18 @@ def parse_bill_pdf(path: Path | str) -> ParsedBill:
             continue
         if re.fullmatch(r"-\s*\d+\s*-|\d{2}/\d{2}/\d{4}|\d{1,2}:\d{2}\s+\d{2}/\d{2}/\d{4}", l.body):
             continue  # כותרת עמוד
-        number_m = _SECTION_NO_RE.match(l.number)
+        number = _section_number(l)
         body = l.body
-        if number_m:
-            raw_numbers.append(number_m.group(1))
-        if number_m and current is not None \
-                and _section_key(number_m.group(1)) <= _section_key(current.number):
+        if number:
+            raw_numbers.append(number)
+        if number and current is not None and _section_key(number) <= _section_key(current.number):
             # **מספר שאינו עולה - אינו סעיף חדש** (הכרעה ז, 26.9): מספור של נוסח מצוטט
             # (4715569: "1-4" ו-"1-7" אחרי סעיף 38 - בלי זה הם דרסו את סעיפים 2 ו-4).
             # השורה נשארת בסעיף הנוכחי, והסעיף - לא ודאי: לא מנחשים את השיוך.
             current.certain = False
-            body = _clean(f"{l.margin} {number_m.group(1)}. {body}")
-        elif number_m:
-            current = BillSection(number_m.group(1), l.margin, BillUnit("lead", "", ""))
+            body = _clean(f"{l.margin} {number}. {body}")
+        elif number:
+            current = BillSection(number, l.margin, BillUnit("lead", "", ""))
             sections.append(current)
             open_units, in_quote = [], False
             section_edge = l.body_x1
