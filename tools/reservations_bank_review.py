@@ -51,6 +51,15 @@ def _sample(text: str) -> str:
             .replace("{משרד}", SAMPLE_MINISTRY))
 
 
+SCREEN_MINISTER = "שר האוצר"          # רשימת השרים בסינון - תואר אמיתי אחד (התארים עצמם - קווים אדומים)
+
+
+def screened_text(r: bank.Record) -> str:
+    """**מה שהשומר קורא: ההסתייגות המלאה, כמו שתופיע בפלט** (סבב התיקונים, 26.9.2026) -
+    ולא הקטע החשוף ("בחלום", "הדוור של הקוטב הצפוני"), שבלי הקשר נקרא כפנייה בצ'אט."""
+    return _example(r).replace("{כל שר מרשימת השרים במאגר}", SCREEN_MINISTER)
+
+
 def _example(r: bank.Record) -> str:
     text = r.text(SAMPLE_COMMITTEE)
     if r.value_list == "ministers":
@@ -85,8 +94,7 @@ def screen(records: list[bank.Record], workers: int = 8) -> dict:
     print(f"לסינון: {len(todo)} מתוך {len(records)}", flush=True)
 
     def one(r):
-        text = _sample(r.text(SAMPLE_COMMITTEE).replace(bank.MINISTER_PLACEHOLDER, SAMPLE_MINISTER))
-        return r, guards.screen_text(text.replace("|", " "))
+        return r, guards.screen_text(screened_text(r))
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for n, (r, v) in enumerate(pool.map(one, todo), 1):
